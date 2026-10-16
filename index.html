@@ -1,0 +1,418 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<meta name="theme-color" content="#0f172a"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-title" content="Kivu Solutions"/>
+<title>Kivu Solutions — Business Control Platform | Platinum Tech</title>
+<link rel="manifest" href="manifest.webmanifest"/>
+<link rel="apple-touch-icon" href="icons/kivu-192.png"/>
+<link rel="stylesheet" href="css/style.css"/>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+<div id="pwaInstallBar" class="pwa-install-bar hidden" role="region" aria-label="Install Kivu Solutions">
+  <span id="pwaInstallText">Install Kivu Solutions for faster access.</span>
+  <button id="pwaInstallBtn" type="button" class="btn primary">Install app</button>
+  <button id="pwaInstallDismiss" type="button" class="btn ghost" aria-label="Dismiss installation notice">✕</button>
+</div>
+<section id="authScreen" class="auth-screen">
+  <div class="auth-card">
+    <div class="brand">Kivu Solutions</div><p class="brand-company">by Platinum Tech</p>
+    <p class="tag">Run your business. Control your stock. Know your money.</p>
+    <div class="tabs">
+      <button id="loginTab" class="tab active" type="button">Login</button>
+      <button id="signupTab" class="tab" type="button">Create account</button>
+    </div>
+    <form id="loginForm">
+      <div class="auth-choice">
+        <button id="ownerLoginMode" class="tab active" type="button">Owner / Email</button>
+        <button id="staffLoginMode" class="tab" type="button">Staff / Phone</button>
+      </div>
+      <div id="ownerLoginFields">
+        <label>Email<input name="email" type="email" autocomplete="email"></label>
+        <label>Password<input name="password" type="password" minlength="6" autocomplete="current-password"></label>
+      </div>
+      <div id="staffLoginFields" class="hidden">
+        <label>Phone number<input name="phone" inputmode="tel" placeholder="0788 123 456" autocomplete="tel"></label>
+        <label>6-digit PIN<input name="pin" type="password" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="••••••"></label>
+        <div class="notice mini">No email or SMS needed. Kivu Solutions accepts 07… or +250… numbers.</div>
+      </div>
+      <button class="btn primary full">Login</button>
+      <button id="forgotPasswordBtn" type="button" class="btn ghost full">Forgot password?</button>
+    </form>
+    <form id="signupForm" class="hidden">
+      <div class="auth-choice">
+        <button id="ownerSignupMode" class="tab active" type="button">New business</button>
+        <button id="staffSignupMode" class="tab" type="button">Join as staff</button>
+      </div>
+      <div id="ownerSignupFields">
+        <label>Full name<input name="ownerFullName"></label>
+        <label>Business name<input name="shopName"></label>
+        <label>Email<input name="ownerEmail" type="email" autocomplete="email"></label>
+        <label>Password<input name="ownerPassword" type="password" minlength="6" autocomplete="new-password"></label>
+      </div>
+      <div id="staffSignupFields" class="hidden">
+        <label>Full name<input name="staffFullName"></label>
+        <label>Invite code<input name="inviteCode" placeholder="Example: KIVU-8K4P2Q"></label>
+        <label>Phone number<input name="staffPhone" inputmode="tel" placeholder="0788 123 456" autocomplete="tel"></label>
+        <label>Create 6-digit PIN<input name="staffPin" type="password" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="Choose 6 digits"></label>
+        <div class="notice mini">Use the same phone number your owner used when creating your invite. No SMS code is required.</div>
+      </div>
+      <button class="btn primary full">Create account</button>
+    </form>
+    <div id="authMsg" class="msg"></div>
+  </div>
+</section>
+
+<div id="appShell" class="hidden">
+<aside class="sidebar">
+  <div class="side-brand"><div class="logo">K</div><div><b>Kivu Solutions</b><small id="shopLabel">by Platinum Tech</small></div></div>
+  <nav>
+    <div class="nav-group-label">WORK</div>
+    <button class="nav active" data-page="dashboard">Overview</button>
+    <button class="nav" data-page="sales">Sales</button>
+    <button id="hospitalityNav" class="nav hidden" data-page="hospitality">Tables & Orders</button>
+    <button class="nav" data-page="inventory">Inventory</button>
+    <button class="nav" data-page="customers">Customers</button>
+
+    <div class="nav-group-label">OPERATIONS</div>
+    <button class="nav" data-page="suppliers">Suppliers</button>
+    <button class="nav" data-page="expenses">Expenses</button>
+    <button class="nav" data-page="employees">Employees</button>
+    <button class="nav" data-page="shifts">Shifts</button>
+
+    <div class="nav-group-label">MANAGE</div>
+    <button class="nav" data-page="reports">Reports</button>
+    <button class="nav" data-page="controls">Controls</button>
+    <button class="nav" data-page="subscription">Plan & billing</button>
+    <button class="nav" data-page="settings">Settings</button>
+    <button id="dukaAdminNav" class="nav hidden" data-page="dukaadmin">Platinum Tech Admin</button>
+  </nav>
+  <div class="side-bottom"><div id="planChip" class="plan-chip">KIVU LITE</div><button id="logoutBtn" class="btn ghost full">Logout</button></div>
+</aside>
+
+<div class="main">
+<header class="topbar">
+  <div><button id="menuBtn" class="mobile-menu">☰</button><b id="pageTitle">Overview</b><small id="todayDate"></small></div>
+  <div class="top-actions"><span id="connectivityBadge" class="pill connectivity online">Online</span><button id="offlineQueueBtn" class="btn ghost hidden" type="button">Offline sales <span id="offlineQueueCount">0</span></button><button id="modeSwitchBtn" class="btn secondary hidden" type="button">Platinum Tech Admin</button><select id="languageSelect" class="top-select"><option value="en">EN</option><option value="rw">RW</option><option value="fr">FR</option></select><button id="notificationsBtn" class="btn ghost" type="button">🔔 <span id="notificationCount">0</span></button><span id="roleBadge" class="pill">owner</span><button id="changePinBtn" class="btn ghost hidden" type="button">Change PIN</button><button id="quickSaleBtn" class="btn primary">+ New sale</button><button id="topLogoutBtn" class="btn ghost" type="button">Sign out</button></div>
+</header>
+
+<main class="content">
+<section id="page-dashboard" class="page active">
+  <div class="page-head"><div><p class="eyebrow">TODAY</p><h1>Business overview</h1></div><div id="shiftStatusCard" class="status">No open shift</div></div>
+  <div class="stats">
+    <article><span>Sales today</span><strong id="salesToday">0 RWF</strong></article>
+    <article><span>Expenses today</span><strong id="expensesToday">0 RWF</strong></article>
+    <article><span>Estimated profit</span><strong id="profitToday">0 RWF</strong></article>
+    <article><span>Customer credit</span><strong id="creditTotal">0 RWF</strong></article>
+    <article><span>Low stock</span><strong id="lowStockCount">0</strong></article>
+    <article><span>Stock value</span><strong id="stockValue">0 RWF</strong></article>
+  </div>
+  <div class="quick">
+    <button data-open="saleModal">＋<b>New sale</b></button>
+    <button data-open="stockModal">↥<b>Add stock</b></button>
+    <button data-open="expenseModal">−<b>Add expense</b></button>
+    <button data-open="creditModal">◎<b>Add credit</b></button>
+  </div>
+  <div class="grid2">
+    <section class="panel"><p class="eyebrow">BUSINESS ASSISTANT</p><h2>What should I know?</h2><div id="assistantMessage" class="assistant"></div></section>
+    <section class="panel"><p class="eyebrow">RECENT ACTIVITY</p><h2>Latest movements</h2><div id="activityList"></div></section>
+  </div>
+  <section class="panel" id="attentionPanel">
+    <div class="page-head"><div><p class="eyebrow">NEEDS ATTENTION</p><h2>Items that may need action</h2></div><span id="attentionCount" class="pill">0</span></div>
+    <div id="attentionList"></div>
+  </section>
+</section>
+
+<section id="page-sales" class="page">
+  <div class="page-head"><div><p class="eyebrow">SALES</p><h1>Transactions</h1></div><button class="btn primary" data-open="saleModal">+ Record sale</button></div>
+  <div class="stats four">
+    <article><span>Cash today</span><strong id="salesCashToday">0 RWF</strong></article>
+    <article><span>Mobile Money today</span><strong id="salesMomoToday">0 RWF</strong></article>
+    <article><span>Bank today</span><strong id="salesBankToday">0 RWF</strong></article>
+    <article><span>Credit today</span><strong id="salesCreditToday">0 RWF</strong></article>
+  </div>
+  <section class="panel"><div class="table-wrap"><table><thead><tr><th>Date</th><th>Receipt</th><th>Product</th><th>Qty</th><th>Payment</th><th>Customer</th><th>Total</th><th></th></tr></thead><tbody id="salesBody"></tbody></table></div></section>
+</section>
+
+<section id="page-hospitality" class="page">
+  <div id="hospitalityManagementHead" class="page-head"><div><p class="eyebrow">HOSPITALITY</p><h1 id="hospitalityTitle">Tables & open bills</h1></div><div><button id="recipeBtn" class="btn secondary" type="button">Recipes</button> <button id="newTableBtn" class="btn secondary" type="button">+ Table</button> <button id="newTabBtn" class="btn primary" type="button">+ Open bill</button></div></div>
+  <div id="hospitalityStats" class="stats hospitality-stats"><article><span>Open bills</span><strong id="openTabsCount">0</strong></article><article><span>Open value</span><strong id="openTabsValue">0 RWF</strong></article><article><span>Tables occupied</span><strong id="occupiedTablesCount">0</strong></article><article><span>Today closed</span><strong id="closedTabsToday">0</strong></article></div>
+  <div id="hospitalityFloorSection" class="grid2"><section class="panel"><div class="panel-head"><div><p class="eyebrow">FLOOR</p><h2>Tables</h2></div></div><div id="hospitalityTablesGrid" class="hospitality-table-grid"></div></section><section class="panel"><div class="panel-head"><div><p class="eyebrow">SERVICE</p><h2>Open bills / tabs</h2></div></div><div id="hospitalityTabsList" class="list"></div></section></div>
+  <section id="hospitalityTicketsSection" class="panel"><div class="panel-head"><div><p class="eyebrow">TICKETS</p><h2>Kitchen / bar queue</h2></div></div><div id="hospitalityTicketsList" class="list"></div></section>
+  <section id="hospitalityClosedSection" class="panel"><div class="panel-head"><div><p class="eyebrow">RECENT</p><h2>Closed bills</h2></div><button id="wastageBtn" class="btn secondary" type="button">Record wastage</button></div><div class="table-wrap"><table><thead><tr><th>Closed</th><th>Table / tab</th><th>Waiter</th><th>Total</th><th>Receipt</th></tr></thead><tbody id="hospitalityClosedBody"></tbody></table></div></section>
+  <section id="hospitalityApprovalsPanel" class="panel hidden"><div class="panel-head"><div><p class="eyebrow">APPROVALS</p><h2>Complimentary requests</h2></div></div><div id="hospitalityApprovalsList" class="list"></div></section>
+</section>
+
+<section id="page-inventory" class="page">
+  <div class="page-head"><div><p class="eyebrow">INVENTORY</p><h1>Products & stock</h1></div><div><button class="btn secondary owner-manager-only" id="importDataBtn" type="button">Import CSV</button> <button class="btn secondary" id="stockAdjustBtn" type="button">Adjust stock</button> <button class="btn primary" data-open="productModal">+ Add product</button></div></div>
+  <section class="panel"><div class="table-wrap"><table><thead><tr><th>Product</th><th>Stock</th><th>Cost</th><th>Selling price</th><th>Margin</th><th>Preferred supplier</th><th>Expiry</th><th>Status</th><th></th></tr></thead><tbody id="productsBody"></tbody></table></div></section>
+</section>
+
+
+<section id="page-suppliers" class="page">
+  <div class="page-head"><div><p class="eyebrow">SUPPLIERS</p><h1>Purchases & supplier debts</h1></div><div><button class="btn secondary" data-open="supplierModal">+ Supplier</button> <button class="btn primary" data-open="purchaseModal">+ Record purchase</button></div></div>
+  <div class="stats three">
+    <article><span>Total supplier debt</span><strong id="supplierDebtTotal">0 RWF</strong></article>
+    <article><span>Suppliers owed</span><strong id="suppliersOwedCount">0</strong></article>
+    <article><span>Purchases this month</span><strong id="supplierPurchasesMonth">0 RWF</strong></article>
+  </div>
+  <section class="panel">
+    <p class="eyebrow">SUPPLIER BALANCES</p><h2>Who the business owes</h2>
+    <div class="table-wrap"><table><thead><tr><th>Supplier</th><th>Phone</th><th>Total purchases</th><th>Total paid</th><th>Balance owed</th><th></th></tr></thead><tbody id="suppliersBody"></tbody></table></div>
+  </section>
+  <section class="panel">
+    <p class="eyebrow">PURCHASE HISTORY</p><h2>Stock received from suppliers</h2>
+    <div class="table-wrap"><table><thead><tr><th>Date</th><th>Supplier</th><th>Invoice</th><th>Total</th><th>Paid</th><th>Balance</th><th>Status</th><th>Due</th></tr></thead><tbody id="supplierPurchasesBody"></tbody></table></div>
+  </section>
+  <section class="panel">
+    <p class="eyebrow">PAYMENT HISTORY</p><h2>Payments made to suppliers</h2>
+    <div class="table-wrap"><table><thead><tr><th>Date</th><th>Supplier</th><th>Method</th><th>Note</th><th>Amount</th></tr></thead><tbody id="supplierPaymentsBody"></tbody></table></div>
+  </section>
+</section>
+
+<section id="page-expenses" class="page">
+  <div class="page-head"><div><p class="eyebrow">EXPENSES</p><h1>Money going out</h1></div><button class="btn primary" data-open="expenseModal">+ Record expense</button></div>
+  <div class="notice">Every expense is tied to the person who recorded it. Only the owner and managers can record expenses. Every expense is tied to the person who recorded it.</div>
+  <section class="panel"><div class="table-wrap"><table><thead><tr><th>Date</th><th>Category</th><th>Description</th><th>Recorded by</th><th>Amount</th></tr></thead><tbody id="expensesBody"></tbody></table></div></section>
+</section>
+
+<section id="page-customers" class="page">
+  <div class="page-head"><div><p class="eyebrow">CUSTOMERS</p><h1>Customer records</h1></div><button class="btn primary" data-open="customerModal">+ Add customer</button></div>
+  <section class="panel"><div class="table-wrap"><table><thead><tr><th>Name</th><th>Phone</th><th>Email</th><th>Outstanding</th><th>Actions</th></tr></thead><tbody id="customersBody"></tbody></table></div></section>
+  <section class="panel"><p class="eyebrow">CREDIT</p><h2>Outstanding balances</h2><div id="creditList"></div></section>
+</section>
+
+<section id="page-employees" class="page">
+  <div class="page-head"><div><p class="eyebrow">EMPLOYEES</p><h1>Team accountability</h1></div><button id="inviteStaffBtn" class="btn primary owner-only" data-open="staffInviteModal">+ Invite staff</button></div>
+  <div class="notice">Each staff member gets their own login. Permissions are enforced in the database, and sensitive actions are tied to the logged-in user.</div>
+  <section class="panel owner-only"><p class="eyebrow">PENDING INVITES</p><h2>Staff invite codes</h2><div id="staffInvitesList"></div></section>
+  <section class="panel"><div class="table-wrap"><table><thead><tr><th>Employee</th><th>Role</th><th>Phone</th><th>Status</th><th>Sales today</th><th>Actions</th></tr></thead><tbody id="employeesBody"></tbody></table></div></section>
+  <section class="panel"><p class="eyebrow">AUDIT TRAIL</p><h2>Recent actions</h2><div id="auditList"></div></section>
+</section>
+
+<section id="page-shifts" class="page">
+  <div class="page-head"><div><p class="eyebrow">SHIFTS</p><h1>Cash reconciliation</h1></div><button id="openShiftBtn" class="btn primary">Open shift</button></div>
+  <div class="stats three">
+    <article><span>Opening cash</span><strong id="shiftOpeningCash">0 RWF</strong></article>
+    <article><span>Expected cash</span><strong id="shiftExpectedCash">0 RWF</strong></article>
+    <article><span>Cash difference</span><strong id="shiftDifference">—</strong></article>
+  </div>
+  <section class="panel">
+    <div class="page-head"><div><p class="eyebrow">CURRENT SHIFT</p><h2 id="currentShiftTitle">No open shift</h2></div><button id="closeShiftBtn" class="btn danger hidden">Close shift</button></div>
+    <div id="currentShiftDetails">Open a shift to start cash accountability.</div>
+    <div id="shiftBreakdown" class="shift-breakdown hidden">
+      <div><span>Cash sales</span><strong id="shiftCashSales">0 RWF</strong></div>
+      <div><span>Mobile Money</span><strong id="shiftMomoSales">0 RWF</strong></div>
+      <div><span>Bank</span><strong id="shiftBankSales">0 RWF</strong></div>
+      <div><span>Credit sales</span><strong id="shiftCreditSales">0 RWF</strong></div>
+      <div><span>Expenses</span><strong id="shiftExpenses">0 RWF</strong></div>
+      <div><span>Total sales</span><strong id="shiftTotalSales">0 RWF</strong></div>
+    </div>
+  </section>
+  <section class="panel">
+    <p class="eyebrow">SHIFT HISTORY</p><h2>Previous shifts</h2>
+    <div class="table-wrap"><table><thead><tr><th>Opened</th><th>Employee</th><th>Total sales</th><th>Expected cash</th><th>Actual cash</th><th>Variance</th><th>Status</th></tr></thead><tbody id="shiftHistoryBody"></tbody></table></div>
+  </section>
+</section>
+
+
+<section id="page-controls" class="page">
+  <div class="page-head"><div><p class="eyebrow">ANTI-THEFT CONTROLS</p><h1>Approvals & exceptions</h1></div></div>
+  <div class="stats four">
+    <article><span>Pending approvals</span><strong id="pendingApprovalCount">0</strong></article>
+    <article><span>Voided sales today</span><strong id="voidedSalesToday">0</strong></article>
+    <article><span>Stock adjustments today</span><strong id="stockAdjustmentsToday">0</strong></article>
+    <article><span>Cash variances today</span><strong id="cashVarianceToday">0 RWF</strong></article>
+  </div>
+  <section class="panel"><p class="eyebrow">PENDING APPROVALS</p><h2>Actions waiting for owner / manager</h2><div id="approvalsList"></div></section>
+  <section class="panel"><p class="eyebrow">RECENT EXCEPTIONS</p><h2>Voids, stock changes and cash differences</h2><div id="controlAlertsList"></div></section>
+</section>
+
+<section id="page-reports" class="page">
+  <div class="page-head"><div><p class="eyebrow">REPORTS</p><h1>Business performance</h1></div><div><button id="accountantExportBtn" class="btn secondary" type="button">Accountant CSV</button> <button id="exportCsvBtn" class="btn secondary" type="button">Export data</button> <button id="exportBackupBtn" class="btn secondary" type="button">Backup JSON</button></div></div>
+  <label class="period">Period<select id="reportPeriod"><option value="7">Last 7 days</option><option value="30" selected>Last 30 days</option><option value="90">Last 90 days</option></select></label>
+  <div class="stats four">
+    <article><span>Sales</span><strong id="reportSales">0 RWF</strong></article>
+    <article><span>Expenses</span><strong id="reportExpenses">0 RWF</strong></article>
+    <article><span>Estimated profit</span><strong id="reportProfit">0 RWF</strong></article>
+    <article><span>Transactions</span><strong id="reportTransactions">0</strong></article>
+  </div>
+</section>
+
+
+<section id="page-dukaadmin" class="page">
+  <div class="page-head"><div><p class="eyebrow">PLATINUM TECH PLATFORM</p><h1>Company operations & support</h1></div><button id="backToShopBtn" class="btn secondary" type="button">← My Shop</button></div>
+  <div class="notice" id="adminScopeNotice">Loading admin scope…</div>
+  <div class="stats five">
+    <article><span>Total shops</span><strong id="adminTotalShops">0</strong></article>
+    <article><span>Active</span><strong id="adminActiveShops">0</strong></article>
+    <article><span>Inactive</span><strong id="adminInactiveShops">0</strong></article>
+    <article><span>Needs assistance</span><strong id="adminNeedsHelp">0</strong></article>
+    <article><span>Estimated MRR</span><strong id="adminMrr">0 RWF</strong></article>
+  </div>
+  <section class="panel">
+    <div class="page-head"><div><p class="eyebrow">SHOPS</p><h2>Support & subscriptions</h2></div><input id="adminShopSearch" placeholder="Search shop / district" style="max-width:300px"></div>
+    <div class="table-wrap"><table><thead><tr><th>Business</th><th>Location</th><th>Plan</th><th>Status</th><th>Onboarding</th><th>Action</th></tr></thead><tbody id="adminShopsBody"></tbody></table></div>
+  </section>
+  <section id="shopSupportPanel" class="panel hidden">
+    <div class="page-head"><div><p class="eyebrow">SHOP SUPPORT MODE</p><h2 id="supportShopTitle">Shop</h2><small id="supportShopMeta"></small></div><span class="badge">READ-ONLY BY DEFAULT</span></div>
+    <div id="supportSummary" class="stats four"></div>
+    <div class="grid2">
+      <section><h3>Staff & open shifts</h3><div id="supportStaffList"></div></section>
+      <section><h3>Recent shop audit</h3><div id="supportAuditList"></div></section>
+      <section><h3>Internal admin notes</h3><div id="supportNotesList"></div><form id="supportNoteForm"><input name="note" placeholder="Internal note" required><button class="btn secondary">Add note</button></form></section>
+      <section><h3>Support tickets</h3><div id="supportTicketsList"></div><form id="supportTicketForm"><input name="subject" placeholder="Issue / subject" required><select name="priority"><option>normal</option><option>high</option><option>urgent</option><option>low</option></select><input name="description" placeholder="Description"><button class="btn secondary">Create ticket</button></form></section>
+    </div>
+    <section class="panel inset"><h3>Controlled support actions</h3>
+      <div class="form-grid">
+        <button id="suspendShopBtn" class="btn danger" type="button">Suspend shop</button>
+        <button id="reactivateShopBtn" class="btn secondary" type="button">Reactivate shop</button>
+        <button id="confirmPaymentBtn" class="btn primary" type="button">Confirm payment</button>
+        <button id="onboardingStatusBtn" class="btn secondary" type="button">Change onboarding status</button><button id="featureFlagBtn" class="btn secondary" type="button">Feature flag</button>
+      </div>
+      <small>Every action requires a reason and is recorded in the platform audit log.</small>
+    </section>
+    <section><h3>Subscription payments</h3><div id="supportPaymentsList"></div></section>
+    <section><h3>Devices / sessions</h3><div id="supportDevicesList"></div></section>
+  </section>
+  <div class="grid2">
+    <section class="panel" id="adminManagementPanel"><p class="eyebrow">ADMIN TEAM</p><h2>Territories & permissions</h2><div id="adminUsersList"></div><button id="addAdminBtn" class="btn primary" type="button">+ Add / update admin</button></section>
+    <section class="panel"><p class="eyebrow">PLATFORM AUDIT</p><h2>Platinum Tech employee actions</h2><div id="platformAuditList"></div></section>
+  </div>
+  <section class="panel" id="platformStatusPanel"><p class="eyebrow">PLATFORM STATUS</p><h2>Version & maintenance</h2><div id="platformStatusBody"></div><button id="generateExpiryAlertsBtn" class="btn secondary" type="button">Generate expiry alerts</button></section>
+</section>
+
+<section id="page-subscription" class="page">
+  <div class="page-head"><div><p class="eyebrow">SUBSCRIPTION</p><h1>Choose what your business needs</h1></div></div>
+
+  <section class="subscription-summary">
+    <div><span>Status</span><strong id="subscriptionStatusBadge" class="subscription-status active">Active</strong></div>
+    <div><span>Current plan</span><strong id="subscriptionPlanName">Kivu Lite</strong></div>
+    <div><span id="subscriptionDateLabel">Renews / expires</span><strong id="subscriptionDateValue">—</strong></div>
+  </section>
+  <div id="subscriptionBanner" class="subscription-banner active"><b>Subscription active.</b></div>
+
+  <div class="pricing">
+    <article data-plan="basic"><b>KIVU LITE</b><h2>2,000 RWF<small>/month</small></h2><p>Simple sales, inventory, customers, credit, expenses, expiry alerts, digital/print receipts and reports.</p><button class="btn secondary plan-btn" data-plan="basic">Request Kivu Lite</button></article>
+    <article data-plan="one_time"><b>KIVU ONE-TIME</b><h2>50,000 RWF<small> once</small></h2><p>Limited basic sales and stock package with no staff accounts, supplier workflow, shifts or advanced controls.</p><button class="btn secondary plan-btn" data-plan="one_time">Request One-Time</button></article>
+    <article data-plan="business"><b>KIVU BUSINESS</b><h2>5,000 RWF<small>/month</small></h2><p>Lite + staff roles, shifts, cash reconciliation, suppliers and purchases. Bar/restaurant businesses also get tables, tabs, waiter/kitchen workflow and recipes.</p><button class="btn primary plan-btn" data-plan="business">Request Kivu Business</button></article>
+    <article data-plan="control"><b>KIVU CONTROL</b><h2>10,000 RWF<small>/month</small></h2><p>Business + void approvals, controlled stock adjustments, cash-variance review and detailed audit controls.</p><button class="btn secondary plan-btn" data-plan="control">Request Kivu Control</button></article>
+    <article data-plan="pro"><b>KIVU PRO</b><h2>20,000 RWF<small>/month</small></h2><p>Control + priority support, advanced reporting and individually activated integrations. Features are only sold after they are enabled for your account.</p><button class="btn secondary plan-btn" data-plan="pro">Request Kivu Pro</button></article>
+  </div>
+  <div class="notice"><b>Activation:</b> plan changes are requests. Platinum Tech confirms payment and activates the account; the browser cannot activate its own paid plan.<br><br><b>7-day free trial:</b> new businesses can test Kivu Control before choosing a paid plan. EBM, payment collection and multi-branch are not advertised as live until the relevant integration/certification is completed.</div>
+</section>
+
+<section id="page-settings" class="page">
+  <div class="page-head"><div><p class="eyebrow">SETTINGS</p><h1>Business settings</h1></div></div>
+  <section class="panel">
+    <form id="settingsForm">
+      <div class="form-grid">
+        <label>Business name<input id="settingsBusinessName"></label><label>Business type<select id="settingsBusinessType"><option value="retail">Shop / Retail</option><option value="bar">Bar</option><option value="restaurant">Restaurant</option><option value="bar_restaurant">Bar & Restaurant</option></select></label>
+        <label>Phone<input id="settingsPhone"></label>
+        <label>Receipt footer<input id="settingsReceiptFooter" placeholder="Thank you for your business"></label>
+        <label>Province<input id="settingsProvince"></label>
+        <label>District<input id="settingsDistrict"></label>
+        <label>Sector<input id="settingsSector"></label>
+        <label>Cell<input id="settingsCell"></label>
+        <label>Language<select id="settingsLanguage"><option value="en">English</option><option value="rw">Kinyarwanda</option><option value="fr">Français</option></select></label><label>Tax / VAT rate (%)<input id="settingsTaxRate" type="number" min="0" max="100" step="0.01" value="0"></label><label>Tax label<input id="settingsTaxLabel" value="VAT" placeholder="VAT / TVA"></label><label>Tax number <small>(optional)</small><input id="settingsTaxNumber" placeholder="TIN / tax number"></label>
+      </div>
+      <div class="notice"><b>Tax note:</b> Kivu can show a configured tax/VAT breakdown on normal receipts. This does not make the receipt an EBM fiscal invoice. Fiscal EBM is not enabled in the public build until approved integration is completed.</div>
+      <input id="ebmEnabled" type="checkbox" class="hidden" disabled>
+      <div id="ebmPlanNotice" class="hidden"></div><div id="ebmNotice" class="hidden"></div>
+      <button class="btn primary">Save settings</button>
+    </form>
+  </section>
+  <section class="panel owner-only"><p class="eyebrow">DEVICES & SESSIONS</p><h2>Signed-in devices</h2><div id="ownerDevicesList"></div></section><section class="panel"><p class="eyebrow">LEGAL & TRUST</p><h2>Policies</h2><p><a href="legal/privacy.html" target="_blank" rel="noopener">Privacy notice</a> · <a href="legal/terms.html" target="_blank" rel="noopener">Terms of service</a></p><small>These launch drafts should be reviewed by your legal adviser before wider rollout.</small></section>
+</section>
+</main>
+</div>
+</div>
+
+
+<dialog id="supplierModal"><form id="supplierForm"><h3>Add supplier</h3><label>Supplier name<input name="name" required placeholder="Example: Kigali Wholesale Ltd"></label><div class="form-grid"><label>Phone<input name="phone" inputmode="tel" placeholder="0788 123 456"></label><label>Address / location<input name="address" placeholder="Kimironko, Kigali"></label></div><label>Notes<input name="notes" placeholder="Optional notes"></label><div class="modal-actions"><button type="button" class="btn ghost cancel-btn">Cancel</button><button class="btn primary">Save supplier</button></div></form></dialog>
+
+<nav class="mobile-bottom-nav" aria-label="Primary navigation">
+  <button class="mobile-nav active" data-mobile-page="dashboard"><span>⌂</span><b>Home</b></button>
+  <button class="mobile-nav" data-mobile-page="sales"><span>＋</span><b>Sell</b></button>
+  <button class="mobile-nav" data-mobile-page="inventory"><span>▦</span><b>Stock</b></button>
+  <button class="mobile-nav" data-mobile-more="1"><span>☰</span><b>More</b></button>
+</nav>
+
+<dialog id="purchaseModal"><form id="purchaseForm"><h3>Record supplier purchase</h3><div class="form-grid"><label>Supplier<select name="supplierId" required></select></label><label>Invoice / reference<input name="invoiceNo" placeholder="Optional"></label><label>Amount paid now<input name="amountPaid" type="number" min="0" value="0" required></label><label>Payment method<select name="paymentMethod"><option>Cash</option><option>Mobile Money</option><option>Bank</option><option>Other</option></select></label><label>Due date<input name="dueDate" type="date"></label></div><div id="inlineSupplierFields" class="notice mini hidden"><b>New supplier</b><div class="form-grid"><label>Name<input name="newSupplierName" placeholder="Supplier name"></label><label>Phone<input name="newSupplierPhone" placeholder="0788 123 456"></label><label>Address<input name="newSupplierAddress" placeholder="Optional"></label></div></div><label>Note<input name="note" placeholder="Optional purchase note"></label><div class="notice mini">Add one or more products below. Stock will increase automatically. Any unpaid amount becomes supplier debt.</div><div id="purchaseItems"></div><button id="addPurchaseItemBtn" type="button" class="btn secondary full">+ Add another product</button><div class="purchase-total"><span>Purchase total</span><strong id="purchaseTotalPreview">0 RWF</strong></div><div class="modal-actions"><button type="button" class="btn ghost cancel-btn">Cancel</button><button class="btn primary">Receive stock & save purchase</button></div></form></dialog>
+
+<dialog id="supplierPaymentModal"><form id="supplierPaymentForm"><h3>Pay supplier debt</h3><input name="supplierId" type="hidden"><div id="supplierPaymentSummary" class="notice"></div><div class="form-grid"><label>Amount<input name="amount" type="number" min="1" required></label><label>Payment method<select name="paymentMethod"><option>Cash</option><option>Mobile Money</option><option>Bank</option><option>Other</option></select></label></div><label>Note<input name="note" placeholder="Optional payment note"></label><div class="modal-actions"><button type="button" class="btn ghost cancel-btn">Cancel</button><button class="btn primary">Record payment</button></div></form></dialog>
+
+<dialog id="productModal"><form id="productForm"><h3>Add product</h3><div class="form-grid"><label>Name<input name="name" required></label><label>Barcode / SKU <small>(optional)</small><div class="barcode-field"><input id="productBarcodeInput" name="barcode" inputmode="numeric" placeholder="Scan or type code"><button id="scanProductBarcodeBtn" type="button" class="btn secondary barcode-scan-btn">📷 Scan</button></div></label><label>Opening quantity (base units)<input name="qty" type="number" min="0" value="0" required></label><label>Base / selling unit<input name="baseUnit" value="Piece" placeholder="Piece, bottle, kg" required></label><label>Bulk purchase unit<input name="bulkUnit" value="Carton" placeholder="Carton, pack, sack"></label><label>Base units per bulk unit<input name="unitsPerBulk" type="number" min="1" step="0.001" value="1" required></label><label>Low-stock alert (base units)<input name="low" type="number" min="0" value="5" required></label><label>Cost per base unit<input name="cost" type="number" min="0" step="0.01" required></label><label>Selling price per base unit<input name="price" type="number" min="0" step="0.01" required></label><label>Preferred supplier<select name="preferredSupplierId"><option value="">None</option></select></label><label>Expiry date <small>(optional)</small><input name="expiryDate" type="date"></label><label>Expiry reminder<input name="expiryReminderDays" type="number" min="0" value="14"><small>Days before expiry</small></label></div><div class="notice mini">Example: Base unit = Bottle, Bulk unit = Carton, Units per bulk = 24. Buying 5 cartons adds 120 bottles to stock.</div><div class="modal-actions"><button type="button" class="btn ghost cancel-btn">Cancel</button><button class="btn primary">Save</button></div></form></dialog>
+
+<dialog id="editProductModal"><form id="editProductForm"><h3>Edit product</h3><input name="productId" type="hidden"><div class="form-grid"><label>Product name<input name="name" required></label><label>Barcode / SKU <small>(optional)</small><div class="barcode-field"><input id="editProductBarcodeInput" name="barcode" inputmode="numeric"><button id="scanEditProductBarcodeBtn" type="button" class="btn secondary barcode-scan-btn">📷 Scan</button></div></label><label>Selling price / base unit<input name="price" type="number" min="0" step="0.01" required></label><label>Low-stock alert<input name="low" type="number" min="0" step="0.001" required></label><label>Base / selling unit<input name="baseUnit" required></label><label>Bulk purchase unit<input name="bulkUnit"></label><label>Base units per bulk unit<input name="unitsPerBulk" type="number" min="1" step="0.001" required></label><label>Preferred supplier<select name="preferredSupplierId"><option value="">None</option></select></label><label>Expiry date <small>(optional)</small><input name="expiryDate" type="date"></label><label>Expiry reminder<input name="expiryReminderDays" type="number" min="0" value="14"><small>Days before expiry</small></label><label>Current quantity<input name="qtyDisplay" type="number" disabled></label></div><div class="notice mini"><b>Cost correction</b><br>The buying cost normally updates automatically when supplier purchases are recorded. Change it here only to correct an incorrect cost. Every correction is saved in the audit trail.</div><label>Buying cost / weighted average cost per base unit<input name="cost" type="number" min="0" step="0.01" required></label><div class="modal-actions"><button type="button" class="btn ghost cancel-btn">Cancel</button><button class="btn primary">Save changes</button></div></form></dialog>
+
+<dialog id="stockModal"><form id="stockForm"><h3>Add stock</h3><label>Product<div class="barcode-select-row"><select name="productId" required></select><button id="scanStockProductBtn" type="button" class="btn secondary barcode-scan-btn">📷 Scan product</button></div></label><div class="form-grid"><label>Quantity<input name="qty" type="number" min="1" required></label><label>Total amount paid<input name="totalCost" type="number" min="0" required></label></div><div class="modal-actions"><button type="button" class="btn ghost cancel-btn">Cancel</button><button class="btn primary">Save</button></div></form></dialog>
+
+<dialog id="hospitalityTableModal"><form id="hospitalityTableForm"><h3>Add table</h3><div class="form-grid"><label>Table name<input name="name" required placeholder="Table 1"></label><label>Seats<input name="seats" type="number" min="1" value="4"></label></div><div class="modal-actions"><button type="button" class="btn ghost cancel-btn">Cancel</button><button class="btn primary">Save table</button></div></form></dialog>
+<dialog id="hospitalityTabModal"><form id="hospitalityTabForm"><h3>Open new bill</h3><div class="form-grid"><label>Table<select name="tableId"><option value="">No table / takeaway</option></select></label><label>Tab / reference<input name="label" placeholder="Bar counter / Takeaway #12"></label><label>Customer <small>(optional)</small><input name="customerName"></label></div><div class="modal-actions"><button type="button" class="btn ghost cancel-btn">Cancel</button><button class="btn primary">Open bill</button></div></form></dialog>
+<dialog id="hospitalityOrderModal"><form id="hospitalityOrderForm"><h3 id="hospitalityOrderHeading">Open bill</h3><input name="tabId" type="hidden"><div id="hospitalityOrderItems" class="hospitality-order-items"></div><hr><div class="form-grid"><label>Product / menu item<select name="productId"></select></label><label>Quantity<input name="qty" type="number" min="0.001" step="0.001" value="1"></label><label>Note<input name="note" placeholder="No ice, medium rare..."></label><label id="complimentaryWrap" class="check"><input name="complimentary" type="checkbox"> Complimentary (manager/owner)</label></div><div class="modal-actions hospitality-order-actions"><button id="requestComplimentaryBtn" type="button" class="btn secondary hidden">Request complimentary</button><button id="sendHospitalityOrderBtn" type="button" class="btn secondary">Send order</button><button id="addHospitalityItemBtn" type="button" class="btn primary">+ Add item</button><button id="settleHospitalityBtn" type="button" class="btn success">Settle bill</button><button type="button" class="btn ghost cancel-btn">Close</button></div></form></dialog>
+<dialog id="hospitalityPaymentModal"><form id="hospitalityPaymentForm"><h3>Settle bill</h3><input name="tabId" type="hidden"><div id="hospitalityPaymentSummary" class="notice"></div><div id="hospitalityPaymentRows"></div><button id="addHospitalityPaymentBtn" class="btn secondary full" type="button">+ Split payment</button><div class="modal-actions"><button type="button" class="btn ghost cancel-btn">Cancel</button><button class="btn primary">Close bill & receipt</button></div></form></dialog>
+<dialog id="hospitalityRecipeModal"><form id="hospitalityRecipeForm"><h3>Recipe / serving stock rule</h3><div class="notice mini">Use recipes for food ingredients or drink portions. Example: <b>Whisky Shot</b> can consume <b>30 ml</b> from a whisky stock ingredient.</div><label>Menu item<select name="menuProductId"></select></label><div id="hospitalityRecipeRows"></div><button id="addRecipeRowBtn" type="button" class="btn secondary full">+ Ingredient</button><div class="modal-actions"><button type="button" class="btn ghost cancel-btn">Cancel</button><button class="btn primary">Save recipe</button></div></form></dialog>
+<dialog id="hospitalityWastageModal"><form id="hospitalityWastageForm"><h3>Record wastage / breakage</h3><label>Product<select name="productId"></select></label><div class="form-grid"><label>Quantity<input name="qty" type="number" min="0.001" step="0.001" required></label><label>Reason<select name="reason"><option>Spillage</option><option>Breakage</option><option>Kitchen waste</option><option>Spoilage</option><option>Staff error</option><option>Other</option></select></label></div><div class="modal-actions"><button type="button" class="btn ghost cancel-btn">Cancel</button><button class="btn danger">Record & deduct stock</button></div></form></dialog>
+
+<dialog id="saleModal"><form id="saleForm"><h3>New sale</h3><div class="sale-builder"><div class="form-grid"><label>Product<select name="productId"></select></label><label>Barcode<div class="barcode-field"><input id="saleBarcodeInput" inputmode="numeric" autocomplete="off" placeholder="USB/Bluetooth scan or type"><button id="scanSaleBarcodeBtn" type="button" class="btn secondary barcode-scan-btn">📷 Camera</button></div></label><label>Quantity<input name="qty" type="number" min="0.001" step="0.001" value="1"></label><label>Sell as<select name="saleUnit"><option value="base">Base unit</option><option value="bulk">Bulk unit</option></select></label><label>&nbsp;<button id="addSaleItemBtn" type="button" class="btn secondary full">+ Add to cart</button></label></div><div id="saleCartEmpty" class="notice mini">No products added yet. Select a product and tap <b>Add to cart</b>.</div><div id="saleCart" class="sale-cart"></div><div class="sale-cart-total"><span>Cart subtotal</span><strong id="saleCartSubtotal">0 RWF</strong></div><div class="form-grid"><label>Payment<select name="payment"><option>Cash</option><option>Mobile Money</option><option>Bank</option><option>Credit</option></select></label><label>Sale discount<input name="discount" type="number" min="0" value="0"></label><label>Customer<select name="customerId"><option value="">Walk-in customer</option></select></label><label id="saleCustomerWrap" class="hidden">Credit customer name<input name="customerName"></label></div><div class="sale-cart-total grand"><span>Total to pay</span><strong id="saleCartTotal">0 RWF</strong></div></div><div class="modal-actions"><button type="button" class="btn ghost cancel-btn">Cancel</button><button class="btn primary">Complete sale</button></div></form></dialog>
+
+<dialog id="expenseModal"><form id="expenseForm"><h3>Record expense</h3><div class="form-grid"><label>Category<select name="category" required><option value="Transport">Transport</option><option value="Utilities">Utilities</option><option value="Supplies">Supplies</option><option value="Repairs">Repairs</option><option value="Food">Food / staff welfare</option><option value="Rent">Rent</option><option value="Other">Other</option></select></label><label>Amount<input name="amount" type="number" min="1" required></label></div><label>Description / reason<input name="description" required placeholder="What was this money used for?"></label><div id="expenseApprovalHint" class="notice mini"></div><div class="modal-actions"><button type="button" class="btn ghost cancel-btn">Cancel</button><button class="btn primary">Save expense</button></div></form></dialog>
+
+<dialog id="creditModal"><form id="creditForm"><h3>Add customer credit</h3><label>Customer<select name="customerId"><option value="">Select customer</option></select></label><label>Or customer name<input name="customer"></label><label>Amount<input name="amount" type="number" min="1" required></label><label>Due date <small>(optional)</small><input name="dueDate" type="date"></label><label>Note<input name="note"></label><div class="modal-actions"><button type="button" class="btn ghost cancel-btn">Cancel</button><button class="btn primary">Save</button></div></form></dialog>
+
+<dialog id="customerModal"><form id="customerForm"><h3>Add customer</h3><label>Name<input name="name" required></label><div class="form-grid"><label>Phone<input name="phone"></label><label>Email<input name="email" type="email"></label></div><div class="modal-actions"><button type="button" class="btn ghost cancel-btn">Cancel</button><button class="btn primary">Save</button></div></form></dialog>
+
+<dialog id="staffInviteModal"><form id="staffInviteForm"><h3>Create staff invite</h3><label>Employee name<input name="name" required></label><div class="form-grid"><label>Phone<input name="phone" inputmode="tel" placeholder="0788 123 456" required></label><label>Role<select name="role"><option value="cashier">Cashier</option><option value="manager">Manager</option><option value="stock_clerk">Stock Clerk</option><option value="waiter">Waiter</option><option value="kitchen">Kitchen / Bar Prep</option></select></label></div><div class="notice">Kivu Solutions will create a one-time invite code. The employee activates it using the code, phone number and a 6-digit PIN — no personal email or SMS required.</div><div class="modal-actions"><button type="button" class="btn ghost cancel-btn">Cancel</button><button class="btn primary">Create invite</button></div></form></dialog>
+
+<dialog id="openShiftModal"><form id="openShiftForm"><h3>Open my shift</h3><div class="notice">This shift will be assigned automatically to the logged-in user.</div><label>Opening cash<input name="openingCash" type="number" min="0" value="0" required></label><div class="modal-actions"><button type="button" class="btn ghost cancel-btn">Cancel</button><button class="btn primary">Open shift</button></div></form></dialog>
+
+<dialog id="closeShiftModal"><form id="closeShiftForm"><h3>Close shift</h3><div id="closeShiftPreview" class="notice"></div><label>Actual cash counted<input name="actualCash" type="number" min="0" required></label><label>Variance reason <small>(required if cash does not match)</small><input name="varianceReason" placeholder="Example: change given incorrectly"></label><div class="modal-actions"><button type="button" class="btn ghost cancel-btn">Cancel</button><button class="btn danger">Close shift</button></div></form></dialog>
+
+<dialog id="importDataModal"><form id="importDataForm"><h3>Import products / customers</h3><div class="notice mini">CSV import is for onboarding. Choose a type, then upload a CSV. Product columns: <b>name, qty, cost, price, low_stock, barcode, base_unit, bulk_unit, units_per_bulk</b>. Customer columns: <b>name, phone, email</b>.</div><label>Import type<select name="type"><option value="products">Products & opening stock</option><option value="customers">Customers</option></select></label><label>CSV file<input name="file" type="file" accept=".csv,text/csv" required></label><div class="modal-actions"><button type="button" class="btn ghost cancel-btn">Cancel</button><button class="btn primary">Import</button></div></form></dialog>
+
+<dialog id="barcodeCameraModal" class="barcode-camera-modal"><div class="barcode-camera-card"><h3 id="barcodeCameraTitle">Scan barcode</h3><div class="barcode-camera-frame"><div id="barcodeCameraReader" class="barcode-camera-reader"></div><video id="barcodeCameraVideo" playsinline muted hidden></video><div class="barcode-camera-guide" aria-hidden="true"></div></div><p id="barcodeCameraStatus" class="notice mini">Starting camera…</p><div class="modal-actions"><button id="barcodeCameraSwitchBtn" type="button" class="btn ghost">Switch camera</button><button id="barcodeCameraCloseBtn" type="button" class="btn ghost">Cancel</button></div></div></dialog>
+
+<dialog id="receiptModal"><div id="receiptContent" class="receipt"></div><div class="modal-actions"><button type="button" class="btn ghost cancel-btn">Close</button><button id="printReceiptBtn" type="button" class="btn primary">Print receipt</button></div></dialog>
+
+
+<dialog id="voidSaleModal"><form id="voidSaleForm"><h3>Void sale</h3><input name="saleId" type="hidden"><div id="voidSaleSummary" class="notice"></div><label>Reason<input name="reason" required minlength="3" placeholder="Why is this sale being voided?"></label><div class="notice mini">Cashiers submit a request. Owner/Manager can void immediately. Voiding restores the sold stock.</div><div class="modal-actions"><button type="button" class="btn ghost cancel-btn">Cancel</button><button class="btn danger">Continue</button></div></form></dialog>
+
+<dialog id="stockAdjustModal"><form id="stockAdjustForm"><h3>Stock adjustment</h3><label>Product<select name="productId" required></select></label><div class="form-grid"><label>Adjustment quantity<input name="qtyDelta" type="number" step="0.001" required placeholder="-2 or 5"></label><label>Reason<select name="reasonType"><option>Damaged</option><option>Expired</option><option>Count correction</option><option>Lost / missing</option><option>Returned</option><option>Other</option></select></label></div><label>Explanation<input name="note" required minlength="3" placeholder="Explain the adjustment"></label><div class="notice mini">Stock Clerks submit this for approval. Owner/Manager adjustments are applied immediately. All changes are permanently logged.</div><div class="modal-actions"><button type="button" class="btn ghost cancel-btn">Cancel</button><button class="btn primary">Save adjustment</button></div></form></dialog>
+
+<dialog id="changePinModal"><form id="changePinForm"><h3>Change staff PIN</h3><div class="notice mini">Choose a new 6-digit PIN. This changes only your own staff login.</div><label>New 6-digit PIN<input name="pin" type="password" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required></label><label>Confirm PIN<input name="confirmPin" type="password" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required></label><div class="modal-actions"><button type="button" class="btn ghost cancel-btn">Cancel</button><button class="btn primary">Change PIN</button></div></form></dialog>
+
+
+<dialog id="editCustomerModal"><form id="editCustomerForm"><h3>Edit customer</h3><input name="id" type="hidden"><label>Name<input name="name" required></label><div class="form-grid"><label>Phone<input name="phone"></label><label>Email<input name="email" type="email"></label></div><div class="modal-actions"><button type="button" class="btn ghost cancel-btn">Cancel</button><button class="btn primary">Save changes</button></div></form></dialog>
+
+<dialog id="editSupplierModal"><form id="editSupplierForm"><h3>Edit supplier</h3><input name="id" type="hidden"><label>Name<input name="name" required></label><div class="form-grid"><label>Phone<input name="phone"></label><label>Address<input name="address"></label></div><label>Notes<input name="notes"></label><div class="modal-actions"><button type="button" class="btn ghost cancel-btn">Cancel</button><button class="btn primary">Save changes</button></div></form></dialog>
+
+<dialog id="adminPaymentModal"><form id="adminPaymentForm"><h3>Confirm subscription payment</h3><input name="shopId" type="hidden"><div class="form-grid"><label>Amount<input name="amount" type="number" min="0" required></label><label>Plan<select name="plan"><option value="basic">Kivu Lite — 2,000 RWF/month</option><option value="one_time">Kivu One-Time — 50,000 RWF once</option><option value="business">Kivu Business — 5,000 RWF</option><option value="control">Kivu Control — 10,000 RWF</option><option value="pro">Kivu Pro — 20,000 RWF</option></select></label><label>Method<select name="method"><option>Mobile Money</option><option>Cash</option><option>Bank</option><option>Other</option></select></label><label>Reference<input name="reference"></label><label>Covered from<input name="from" type="date" required></label><label>Covered to<input name="to" type="date" required></label></div><label>Note<input name="note"></label><div class="modal-actions"><button type="button" class="btn ghost cancel-btn">Cancel</button><button class="btn primary">Confirm payment</button></div></form></dialog>
+<dialog id="adminUserModal"><form id="adminUserForm"><h3>Add / update Platinum Tech admin</h3><label>User email<input name="email" type="email" required></label><label>Name<input name="displayName"></label><div class="form-grid"><label>Role<select name="role"><option value="support">Support Agent</option><option value="district_admin">District Admin</option><option value="province_admin">Province Admin</option><option value="national_admin">National Admin</option><option value="billing">Billing</option><option value="super_admin">Super Admin</option></select></label><label>Province<input name="province"></label><label>District<input name="district"></label><label>Active<select name="active"><option value="true">Yes</option><option value="false">No</option></select></label></div><div class="modal-actions"><button type="button" class="btn ghost cancel-btn">Cancel</button><button class="btn primary">Save admin</button></div></form></dialog>
+<dialog id="notificationsModal"><div><h3>Notifications</h3><div id="notificationsList"></div><div class="modal-actions"><button type="button" class="btn ghost cancel-btn">Close</button></div></div></dialog>
+<dialog id="upgradeModal" class="upgrade-modal">
+  <div class="upgrade-card">
+    <div class="upgrade-icon">🔒</div>
+    <p class="eyebrow">PREMIUM FEATURE</p>
+    <h2 id="upgradeTitle">Upgrade your plan</h2>
+    <p id="upgradeMessage">This feature is available on a higher Kivu Solutions plan.</p>
+    <div class="modal-actions">
+      <button type="button" class="btn ghost cancel-btn">Not now</button>
+      <button id="upgradeGoBtn" type="button" class="btn primary">View plans</button>
+    </div>
+  </div>
+</dialog>
+
+<script src="js/config.js"></script>
+<script src="js/offline-queue.js"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="https://unpkg.com/@zxing/browser@0.1.1/umd/zxing-browser.min.js"></script>
+<script src="js/camera-scanner.js"></script>
+<script src="js/app.js"></script>
+<script src="js/pwa-install.js"></script>
+</body>
+</html>
