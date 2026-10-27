@@ -1,4 +1,4 @@
-const CACHE='kivu-v4-8-8-shell';
+const CACHE='kivu-v4-9-5-shell';
 const SHELL=[
   './','./index.html','./css/style.css','./js/config.js','./js/offline-queue.js',
   './js/camera-scanner.js','./js/app.js','./manifest.webmanifest',
@@ -76,23 +76,14 @@ self.addEventListener('fetch',event=>{
     return;
   }
 
-  if(req.mode==='navigate'){
-    event.respondWith(fetch(req).then(r=>{
-      const copy=r.clone();
-      caches.open(CACHE).then(c=>c.put('./index.html',copy));
-      return r;
-    }).catch(()=>caches.match('./index.html')));
-    return;
-  }
-
-  event.respondWith(caches.match(req).then(hit=>{
-    const network=fetch(req).then(r=>{
+  // Network-first for all local assets and HTML navigation. If offline, falls back to cache.
+  event.respondWith(
+    fetch(req).then(r=>{
       if(r && r.ok){
         const copy=r.clone();
         caches.open(CACHE).then(c=>c.put(req,copy));
       }
       return r;
-    }).catch(()=>hit);
-    return hit||network;
-  }));
+    }).catch(()=>caches.match(req))
+  );
 });
