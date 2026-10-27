@@ -9,6 +9,9 @@
 <title>Kivu Solutions — Business Control Platform | Platinum Tech</title>
 <link rel="manifest" href="manifest.webmanifest"/>
 <link rel="apple-touch-icon" href="icons/kivu-192.png"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
 <link rel="stylesheet" href="css/style.css"/>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -20,7 +23,11 @@
 </div>
 <section id="authScreen" class="auth-screen">
   <div class="auth-card">
-    <div class="brand">Kivu Solutions</div><p class="brand-company">by Platinum Tech</p>
+    <div class="auth-brand-badge">
+      <span class="auth-brand-icon">K</span>
+    </div>
+    <div class="brand">Kivu Solutions</div>
+    <p class="brand-company">by Platinum Tech</p>
     <p class="tag">Run your business. Control your stock. Know your money.</p>
     <div class="tabs">
       <button id="loginTab" class="tab active" type="button">Login</button>
@@ -32,12 +39,12 @@
         <button id="staffLoginMode" class="tab" type="button">Staff / Phone</button>
       </div>
       <div id="ownerLoginFields">
-        <label>Email<input name="email" type="email" autocomplete="email"></label>
-        <label>Password<input name="password" type="password" minlength="6" autocomplete="current-password"></label>
+        <label>Email<input name="email" type="email" autocomplete="email" placeholder="owner@business.com"></label>
+        <label>Password<input name="password" type="password" minlength="6" autocomplete="current-password" placeholder="Enter your password"></label>
       </div>
       <div id="staffLoginFields" class="hidden">
         <label>Phone number<input name="phone" inputmode="tel" placeholder="0788 123 456" autocomplete="tel"></label>
-        <label>6-digit PIN<input name="pin" type="password" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="••••••"></label>
+        <label>6-digit PIN<input name="pin" type="password" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="Enter 6-digit PIN" autocomplete="current-password"></label>
         <div class="notice mini">No email or SMS needed. Kivu Solutions accepts 07… or +250… numbers.</div>
       </div>
       <button class="btn primary full">Login</button>
@@ -49,55 +56,223 @@
         <button id="staffSignupMode" class="tab" type="button">Join as staff</button>
       </div>
       <div id="ownerSignupFields">
-        <label>Full name<input name="ownerFullName"></label>
-        <label>Business name<input name="shopName"></label>
-        <label>Email<input name="ownerEmail" type="email" autocomplete="email"></label>
-        <label>Password<input name="ownerPassword" type="password" minlength="6" autocomplete="new-password"></label>
+        <label>Full name<input name="ownerFullName" autocomplete="name" placeholder="e.g. Jean Mutanguha"></label>
+        <label>Business name<input name="shopName" autocomplete="organization" placeholder="e.g. Kigali Mart or Kivu Lounge"></label>
+        <label>Email<input name="ownerEmail" type="email" autocomplete="email" placeholder="owner@business.com"></label>
+        <label>Password<input name="ownerPassword" type="password" minlength="6" autocomplete="new-password" placeholder="At least 6 characters"></label>
       </div>
       <div id="staffSignupFields" class="hidden">
-        <label>Full name<input name="staffFullName"></label>
-        <label>Invite code<input name="inviteCode" placeholder="Example: KIVU-8K4P2Q"></label>
+        <label>Full name<input name="staffFullName" autocomplete="name" placeholder="e.g. Claude Habimana"></label>
+        <label>Invite code<input name="inviteCode" autocomplete="off" autocapitalize="characters" placeholder="Example: KIVU-8K4P2Q"></label>
         <label>Phone number<input name="staffPhone" inputmode="tel" placeholder="0788 123 456" autocomplete="tel"></label>
-        <label>Create 6-digit PIN<input name="staffPin" type="password" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="Choose 6 digits"></label>
+        <label>Create 6-digit PIN<input name="staffPin" type="password" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="Choose 6 digits" autocomplete="new-password"></label>
         <div class="notice mini">Use the same phone number your owner used when creating your invite. No SMS code is required.</div>
       </div>
       <button class="btn primary full">Create account</button>
     </form>
     <div id="authMsg" class="msg"></div>
   </div>
+  <footer class="auth-footer">
+    <div class="auth-footer-badge">
+      <span class="auth-footer-lock">🔒</span> 256-bit SSL secured • Rwanda DPPO compliant
+    </div>
+    <div class="auth-footer-links">
+      <a href="legal/terms.html" target="_blank" rel="noopener">Terms</a>
+      <span class="auth-footer-sep">·</span>
+      <a href="legal/privacy.html" target="_blank" rel="noopener">Privacy</a>
+      <span class="auth-footer-sep">·</span>
+      <span>Platinum Tech</span>
+    </div>
+  </footer>
 </section>
 
 <div id="appShell" class="hidden">
 <aside class="sidebar">
-  <div class="side-brand"><div class="logo">K</div><div><b>Kivu Solutions</b><small id="shopLabel">by Platinum Tech</small></div></div>
-  <nav>
-    <div class="nav-group-label">WORK</div>
-    <button class="nav active" data-page="dashboard">Overview</button>
-    <button class="nav" data-page="sales">Sales</button>
-    <button id="hospitalityNav" class="nav hidden" data-page="hospitality">Tables & Orders</button>
-    <button class="nav" data-page="inventory">Inventory</button>
-    <button class="nav" data-page="customers">Customers</button>
+  <div class="side-brand" onclick="showPage('dashboard')" role="button" tabindex="0" title="Kivu Solutions Overview">
+    <div class="side-brand-avatar">
+      <div class="logo">K</div>
+    </div>
+    <div class="side-brand-info">
+      <div class="side-brand-title">
+        <span class="side-brand-name">Kivu Solutions</span>
+        <span class="side-verified-badge" title="Verified Business">
+          <svg viewBox="0 0 16 16" width="13" height="13" fill="none">
+            <circle cx="8" cy="8" r="8" fill="#2563eb"/>
+            <path d="M5 8.2L7 10.2L11.2 6" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </span>
+      </div>
+      <div class="side-shop-row">
+        <span class="side-shop-dot"></span>
+        <small id="shopLabel" class="side-shop-label">by Platinum Tech</small>
+      </div>
+    </div>
+  </div>
+  <nav aria-label="Main sidebar navigation">
+    <div class="nav-section">
+      <div class="nav-group-label" data-i18n="work">WORK</div>
+      <button class="nav active" data-page="dashboard">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="7" height="9" rx="1.5"></rect>
+          <rect x="14" y="3" width="7" height="5" rx="1.5"></rect>
+          <rect x="14" y="12" width="7" height="9" rx="1.5"></rect>
+          <rect x="3" y="16" width="7" height="5" rx="1.5"></rect>
+        </svg>
+        <span class="nav-label">Overview</span>
+      </button>
+      <button class="nav" data-page="sales">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="9" cy="21" r="1"></circle>
+          <circle cx="20" cy="21" r="1"></circle>
+          <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+        </svg>
+        <span class="nav-label">Sales</span>
+      </button>
+      <button id="hospitalityNav" class="nav hidden" data-page="hospitality">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M18 8h1a4 4 0 0 1 0 8h-1"></path>
+          <path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"></path>
+          <line x1="6" y1="1" x2="6" y2="4"></line>
+          <line x1="10" y1="1" x2="10" y2="4"></line>
+          <line x1="14" y1="1" x2="14" y2="4"></line>
+        </svg>
+        <span class="nav-label">Tables & Orders</span>
+      </button>
+      <button class="nav" data-page="inventory">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+          <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+          <line x1="12" y1="22.08" x2="12" y2="12"></line>
+        </svg>
+        <span class="nav-label">Inventory</span>
+      </button>
+      <button class="nav" data-page="customers">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+          <circle cx="9" cy="7" r="4"></circle>
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+          <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+        </svg>
+        <span class="nav-label">Customers</span>
+      </button>
+    </div>
 
-    <div class="nav-group-label">OPERATIONS</div>
-    <button class="nav" data-page="suppliers">Suppliers</button>
-    <button class="nav" data-page="expenses">Expenses</button>
-    <button class="nav" data-page="employees">Employees</button>
-    <button class="nav" data-page="shifts">Shifts</button>
+    <div class="nav-section">
+      <div class="nav-group-label" data-i18n="operations">OPERATIONS</div>
+      <button class="nav" data-page="suppliers">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="1" y="3" width="15" height="13" rx="1"></rect>
+          <polygon points="16 8 20 8 23 11 23 16 16 16 8"></polygon>
+          <circle cx="5.5" cy="18.5" r="2.5"></circle>
+          <circle cx="18.5" cy="18.5" r="2.5"></circle>
+        </svg>
+        <span class="nav-label">Suppliers</span>
+      </button>
+      <button class="nav" data-page="expenses">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="5" width="20" height="14" rx="2"></rect>
+          <line x1="2" y1="10" x2="22" y2="10"></line>
+        </svg>
+        <span class="nav-label">Expenses</span>
+      </button>
+      <button class="nav" data-page="employees">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+          <circle cx="12" cy="7" r="4"></circle>
+        </svg>
+        <span class="nav-label">Employees</span>
+      </button>
+      <button class="nav" data-page="shifts">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <polyline points="12 6 12 12 16 14"></polyline>
+        </svg>
+        <span class="nav-label">Shifts</span>
+      </button>
+    </div>
 
-    <div class="nav-group-label">MANAGE</div>
-    <button class="nav" data-page="reports">Reports</button>
-    <button class="nav" data-page="controls">Controls</button>
-    <button class="nav" data-page="subscription">Plan & billing</button>
-    <button class="nav" data-page="settings">Settings</button>
-    <button id="dukaAdminNav" class="nav hidden" data-page="dukaadmin">Platinum Tech Admin</button>
+    <div class="nav-section">
+      <div class="nav-group-label" data-i18n="manage">MANAGE</div>
+      <button class="nav" data-page="reports">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="20" x2="18" y2="10"></line>
+          <line x1="12" y1="20" x2="12" y2="4"></line>
+          <line x1="6" y1="20" x2="6" y2="14"></line>
+        </svg>
+        <span class="nav-label">Reports</span>
+      </button>
+      <button class="nav" data-page="controls">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+        </svg>
+        <span class="nav-label">Controls</span>
+      </button>
+      <button class="nav" data-page="subscription">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+        </svg>
+        <span class="nav-label">Subscription</span>
+      </button>
+      <button class="nav" data-page="settings">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        </svg>
+        <span class="nav-label">Settings</span>
+      </button>
+      <button id="dukaAdminNav" class="nav hidden" data-page="dukaadmin">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+          <line x1="8" y1="21" x2="16" y2="21"></line>
+          <line x1="12" y1="17" x2="12" y2="21"></line>
+        </svg>
+        <span class="nav-label">Platinum Tech Admin</span>
+      </button>
+    </div>
   </nav>
-  <div class="side-bottom"><div id="planChip" class="plan-chip">KIVU LITE</div><button id="logoutBtn" class="btn ghost full">Logout</button></div>
+  <div class="side-bottom">
+    <div class="side-plan-card" onclick="showPage('subscription')" role="button" tabindex="0" title="Manage subscription">
+      <div class="side-plan-header">
+        <div class="side-plan-title">
+          <svg class="side-plan-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+          </svg>
+          <span class="side-plan-label" data-i18n="plan">Plan</span>
+        </div>
+        <span class="side-plan-status-dot"></span>
+      </div>
+      <div id="planChip" class="plan-chip">KIVU CONTROL · TRIAL</div>
+    </div>
+    <div class="side-account">
+      <div class="side-account-info">
+        <div class="side-account-avatar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+            <circle cx="12" cy="7" r="4"></circle>
+          </svg>
+        </div>
+        <div class="side-account-text">
+          <span class="side-account-sub" data-i18n="account">Account</span>
+          <span id="roleBadge" class="side-role-badge">Owner</span>
+        </div>
+      </div>
+      <button id="logoutBtn" class="side-logout-btn" type="button" title="Sign out" aria-label="Sign out">
+        <svg class="logout-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+          <polyline points="16 17 21 12 16 7"></polyline>
+          <line x1="21" y1="12" x2="9" y2="12"></line>
+        </svg>
+        <span class="side-logout-text" data-i18n="logout">Logout</span>
+      </button>
+    </div>
+  </div>
 </aside>
+<div id="sidebarBackdrop" class="sidebar-backdrop"></div>
 
 <div class="main">
 <header class="topbar">
   <div><button id="menuBtn" class="mobile-menu">☰</button><b id="pageTitle">Overview</b><small id="todayDate"></small></div>
-  <div class="top-actions"><span id="connectivityBadge" class="pill connectivity online">Online</span><button id="offlineQueueBtn" class="btn ghost hidden" type="button">Offline sales <span id="offlineQueueCount">0</span></button><button id="modeSwitchBtn" class="btn secondary hidden" type="button">Platinum Tech Admin</button><select id="languageSelect" class="top-select"><option value="en">EN</option><option value="rw">RW</option><option value="fr">FR</option></select><button id="notificationsBtn" class="btn ghost" type="button">🔔 <span id="notificationCount">0</span></button><span id="roleBadge" class="pill">owner</span><button id="changePinBtn" class="btn ghost hidden" type="button">Change PIN</button><button id="quickSaleBtn" class="btn primary">+ New sale</button><button id="topLogoutBtn" class="btn ghost" type="button">Sign out</button></div>
+  <div class="top-actions"><span id="connectivityBadge" class="pill connectivity online">Online</span><button id="offlineQueueBtn" class="btn ghost hidden" type="button">Offline sales <span id="offlineQueueCount">0</span></button><button id="modeSwitchBtn" class="btn secondary hidden" type="button">Platinum Tech Admin</button><select id="languageSelect" class="top-select"><option value="en">EN</option><option value="rw">RW</option><option value="fr">FR</option></select><button id="notificationsBtn" class="btn ghost" type="button">🔔 <span id="notificationCount">0</span></button><span id="topRoleBadge" class="pill">owner</span><button id="changePinBtn" class="btn ghost hidden" type="button">Change PIN</button><button id="quickSaleBtn" class="btn primary">+ New sale</button><button id="topLogoutBtn" class="btn ghost" type="button">Sign out</button></div>
 </header>
 
 <main class="content">
@@ -117,25 +292,245 @@
     <button data-open="expenseModal">−<b>Add expense</b></button>
     <button data-open="creditModal">◎<b>Add credit</b></button>
   </div>
-  <div class="grid2">
-    <section class="panel"><p class="eyebrow">BUSINESS ASSISTANT</p><h2>What should I know?</h2><div id="assistantMessage" class="assistant"></div></section>
-    <section class="panel"><p class="eyebrow">RECENT ACTIVITY</p><h2>Latest movements</h2><div id="activityList"></div></section>
+  <div class="overview-grid-2">
+    <!-- Card 1: Today's Payment Channels & Performance -->
+    <section class="panel overview-panel" id="panelPaymentChannels">
+      <div class="panel-head">
+        <div>
+          <p class="eyebrow">REVENUE CHANNELS</p>
+          <h2>Today's Payment Performance</h2>
+        </div>
+        <button type="button" class="btn ghost btn-sm" onclick="showPage('sales')">View sales →</button>
+      </div>
+      <div class="payment-metrics-summary">
+        <div class="metric-pill">
+          <span class="metric-label">Transactions</span>
+          <strong id="overviewTxCount">0</strong>
+        </div>
+        <div class="metric-pill">
+          <span class="metric-label">Average Basket</span>
+          <strong id="overviewAvgBasket">0 RWF</strong>
+        </div>
+        <div class="metric-pill">
+          <span class="metric-label">Gross Sales</span>
+          <strong id="overviewGrossSales">0 RWF</strong>
+        </div>
+      </div>
+      <div id="paymentChannelsBar" class="payment-progress-bar">
+        <div id="barCash" class="bar-seg bar-cash" style="width:0%" title="Cash"></div>
+        <div id="barMomo" class="bar-seg bar-momo" style="width:0%" title="MoMo"></div>
+        <div id="barBank" class="bar-seg bar-bank" style="width:0%" title="Bank"></div>
+        <div id="barCredit" class="bar-seg bar-credit" style="width:0%" title="Credit"></div>
+      </div>
+      <div id="paymentChannelsList" class="payment-channels-list"></div>
+    </section>
+
+    <!-- Card 3: Live Register & Cash Drawer Status -->
+    <section class="panel overview-panel" id="panelDrawerStatus">
+      <div class="panel-head">
+        <div>
+          <p class="eyebrow">CASHIER & REGISTER</p>
+          <h2>Live Register & Cash Drawer</h2>
+        </div>
+        <button type="button" class="btn ghost btn-sm" onclick="showPage('shifts')">Manage shifts →</button>
+      </div>
+      <div id="overviewDrawerBox" class="drawer-status-content"></div>
+    </section>
   </div>
-  <section class="panel" id="attentionPanel">
-    <div class="page-head"><div><p class="eyebrow">NEEDS ATTENTION</p><h2>Items that may need action</h2></div><span id="attentionCount" class="pill">0</span></div>
-    <div id="attentionList"></div>
+
+  <div class="overview-grid-2">
+    <!-- Card 2: Top Selling Products (Fast Movers) -->
+    <section class="panel overview-panel" id="panelFastMovers">
+      <div class="panel-head">
+        <div>
+          <p class="eyebrow">LEADERBOARD</p>
+          <h2>Top Selling Products (Fast Movers)</h2>
+        </div>
+        <button type="button" class="btn ghost btn-sm" onclick="showPage('inventory')">All inventory →</button>
+      </div>
+      <div id="fastMoversList" class="fast-movers-list"></div>
+    </section>
+
+    <!-- Card 4: Customer Credit / "Amadeni" Watchlist -->
+    <section class="panel overview-panel" id="panelCreditWatchlist">
+      <div class="panel-head">
+        <div>
+          <p class="eyebrow">AMADENI WATCHLIST</p>
+          <h2>Customer Credit Watchlist</h2>
+        </div>
+        <button type="button" class="btn ghost btn-sm" onclick="showPage('customers')">Debtors ledger →</button>
+      </div>
+      <div id="creditWatchlist" class="credit-watchlist"></div>
+    </section>
+  </div>
+
+  <!-- Card 5: Critical Stock & Reorder Alerts -->
+  <section class="panel overview-panel" id="panelStockAlerts">
+    <div class="panel-head">
+      <div>
+        <p class="eyebrow">CRITICAL INVENTORY</p>
+        <h2>Low Stock & Reorder Alerts</h2>
+      </div>
+      <div class="head-actions">
+        <button type="button" class="btn secondary btn-sm" data-open="stockModal">+ Add Stock</button>
+        <button type="button" class="btn primary btn-sm" data-open="purchaseModal">+ Supplier Purchase</button>
+      </div>
+    </div>
+    <div id="stockAlertsList" class="stock-alerts-list"></div>
   </section>
+
+  <!-- Backward compatibility anchors for cached service-worker scripts -->
+  <div style="display:none!important" aria-hidden="true">
+    <div id="assistantMessage"></div>
+    <div id="activityList"></div>
+    <div id="attentionPanel"><div id="attentionList"></div><span id="attentionCount">0</span></div>
+    <div id="adminPlanMix"></div>
+    <button id="editPlatformStatusBtn" type="button"></button>
+  </div>
 </section>
 
 <section id="page-sales" class="page">
-  <div class="page-head"><div><p class="eyebrow">SALES</p><h1>Transactions</h1></div><button class="btn primary" data-open="saleModal">+ Record sale</button></div>
-  <div class="stats four">
-    <article><span>Cash today</span><strong id="salesCashToday">0 RWF</strong></article>
-    <article><span>Mobile Money today</span><strong id="salesMomoToday">0 RWF</strong></article>
-    <article><span>Bank today</span><strong id="salesBankToday">0 RWF</strong></article>
-    <article><span>Credit today</span><strong id="salesCreditToday">0 RWF</strong></article>
+  <div class="page-head sales-header">
+    <div>
+      <p class="eyebrow">SALES MANAGEMENT</p>
+      <h1>Transactions</h1>
+      <p class="page-subhead">Review daily transactions, monitor payment channels, and print receipts.</p>
+    </div>
+    <div class="head-actions sales-head-actions">
+      <div class="search-input-wrap sales-search-wrap">
+        <svg class="search-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <input id="salesSearchInput" type="search" placeholder="Search receipt, product, customer...">
+        <button id="clearSalesSearchBtn" type="button" class="btn ghost clear-search hidden" title="Clear">✕</button>
+      </div>
+      <button class="btn ghost export-btn" type="button" onclick="exportSalesCsv()" title="Download CSV spreadsheet">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon-svg">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+          <polyline points="7 10 12 15 17 10"></polyline>
+          <line x1="12" y1="15" x2="12" y2="3"></line>
+        </svg>
+        <span>Export CSV</span>
+      </button>
+      <button class="btn primary record-sale-btn pos-action-btn" data-open="saleModal" title="Open POS counter checkout (F2)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="btn-icon-svg">
+          <line x1="12" y1="5" x2="12" y2="19"></line>
+          <line x1="5" y1="12" x2="19" y2="12"></line>
+        </svg>
+        <span class="btn-pos-text">+ New POS Sale</span>
+        <span class="btn-pos-badge">F2</span>
+      </button>
+    </div>
   </div>
-  <section class="panel"><div class="table-wrap"><table><thead><tr><th>Date</th><th>Receipt</th><th>Product</th><th>Qty</th><th>Payment</th><th>Customer</th><th>Total</th><th></th></tr></thead><tbody id="salesBody"></tbody></table></div></section>
+
+  <!-- Category Pills Filter Strip -->
+  <div class="category-pills-bar">
+    <span class="cat-filter-label">Categories:</span>
+    <div id="salesCategoryPills" class="category-pills"></div>
+  </div>
+
+  <!-- Modern 4 Revenue Channels Stat Cards -->
+  <div class="stats four sales-channels-grid">
+    <!-- 1. Cash Today -->
+    <article class="channel-card channel-cash">
+      <div class="channel-card-top">
+        <span class="channel-label">Cash Today</span>
+        <div class="channel-icon-wrap icon-cash">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="6" width="20" height="12" rx="2"></rect>
+            <circle cx="12" cy="12" r="2"></circle>
+            <path d="M6 12h.01M18 12h.01"></path>
+          </svg>
+        </div>
+      </div>
+      <strong id="salesCashToday" class="channel-val">0 RWF</strong>
+      <div class="channel-subtext">Physical register drawer</div>
+    </article>
+
+    <!-- 2. Mobile Money Today -->
+    <article class="channel-card channel-momo">
+      <div class="channel-card-top">
+        <span class="channel-label">Mobile Money Today</span>
+        <div class="channel-icon-wrap icon-momo">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
+            <line x1="12" y1="18" x2="12.01" y2="18"></line>
+          </svg>
+        </div>
+      </div>
+      <strong id="salesMomoToday" class="channel-val">0 RWF</strong>
+      <div class="channel-subtext">MTN & Airtel MoMo</div>
+    </article>
+
+    <!-- 3. Bank Today -->
+    <article class="channel-card channel-bank">
+      <div class="channel-card-top">
+        <span class="channel-label">Bank Today</span>
+        <div class="channel-icon-wrap icon-bank">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11M20 10v11M8 14v4M12 14v4M16 14v4"></path>
+          </svg>
+        </div>
+      </div>
+      <strong id="salesBankToday" class="channel-val">0 RWF</strong>
+      <div class="channel-subtext">BK Pay, POS & Transfers</div>
+    </article>
+
+    <!-- 4. Credit Today -->
+    <article class="channel-card channel-credit">
+      <div class="channel-card-top">
+        <span class="channel-label">Credit Today</span>
+        <div class="channel-icon-wrap icon-credit">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="16" y1="13" x2="8" y2="13"></line>
+            <line x1="16" y1="17" x2="8" y2="17"></line>
+            <polyline points="10 9 9 9 8 9"></polyline>
+          </svg>
+        </div>
+      </div>
+      <strong id="salesCreditToday" class="channel-val">0 RWF</strong>
+      <div class="channel-subtext">Unpaid customer debt ("Amadeni")</div>
+    </article>
+  </div>
+
+  <!-- Transactions Table Section with Toolbar -->
+  <section class="panel sales-table-panel">
+    <div class="sales-panel-toolbar">
+      <div class="sales-toolbar-left">
+        <h3 class="sales-panel-title">Sales History</h3>
+        <span id="salesCountPill" class="sales-count-pill">0 sales</span>
+      </div>
+      <div class="sales-toolbar-right">
+        <div class="sales-date-filters" role="tablist">
+          <button type="button" class="sales-filter-btn active" data-filter="all" onclick="setSalesDateFilter('all')">All Time</button>
+          <button type="button" class="sales-filter-btn" data-filter="today" onclick="setSalesDateFilter('today')">Today</button>
+          <button type="button" class="sales-filter-btn" data-filter="yesterday" onclick="setSalesDateFilter('yesterday')">Yesterday</button>
+          <button type="button" class="sales-filter-btn" data-filter="week" onclick="setSalesDateFilter('week')">Last 7 Days</button>
+        </div>
+      </div>
+    </div>
+    
+    <div class="table-wrap sales-table-wrap">
+      <table class="sales-table">
+        <thead>
+          <tr>
+            <th>Date & Time</th>
+            <th>Receipt #</th>
+            <th>Product</th>
+            <th>Qty</th>
+            <th>Payment</th>
+            <th>Customer</th>
+            <th>Total Amount</th>
+            <th class="text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="salesBody"></tbody>
+      </table>
+    </div>
+  </section>
 </section>
 
 <section id="page-hospitality" class="page">
@@ -148,8 +543,21 @@
 </section>
 
 <section id="page-inventory" class="page">
-  <div class="page-head"><div><p class="eyebrow">INVENTORY</p><h1>Products & stock</h1></div><div><button class="btn secondary owner-manager-only" id="importDataBtn" type="button">Import CSV</button> <button class="btn secondary" id="stockAdjustBtn" type="button">Adjust stock</button> <button class="btn primary" data-open="productModal">+ Add product</button></div></div>
-  <section class="panel"><div class="table-wrap"><table><thead><tr><th>Product</th><th>Stock</th><th>Cost</th><th>Selling price</th><th>Margin</th><th>Preferred supplier</th><th>Expiry</th><th>Status</th><th></th></tr></thead><tbody id="productsBody"></tbody></table></div></section>
+  <div class="page-head">
+    <div><p class="eyebrow">INVENTORY</p><h1>Products & stock</h1></div>
+    <div class="head-actions">
+      <div class="search-input-wrap inventory-search-wrap">
+        <span class="search-icon">🔍</span>
+        <input id="inventorySearchInput" type="search" placeholder="Search product, barcode, category...">
+        <button id="clearInventorySearchBtn" type="button" class="btn ghost clear-search hidden" title="Clear">✕</button>
+      </div>
+      <button class="btn secondary owner-manager-only" id="importDataBtn" type="button">Import CSV</button>
+      <button class="btn secondary" id="stockAdjustBtn" type="button">Adjust stock</button>
+      <button class="btn primary" data-open="productModal">+ Add product</button>
+    </div>
+  </div>
+  <div id="inventoryCategoryPills" class="category-pills"></div>
+  <section class="panel"><div class="table-wrap"><table><thead><tr><th>Product</th><th>Category</th><th>Stock</th><th>Cost</th><th>Selling price</th><th>Margin</th><th>Preferred supplier</th><th>Expiry</th><th>Status</th><th></th></tr></thead><tbody id="productsBody"></tbody></table></div></section>
 </section>
 
 
@@ -195,7 +603,14 @@
 </section>
 
 <section id="page-shifts" class="page">
-  <div class="page-head"><div><p class="eyebrow">SHIFTS</p><h1>Cash reconciliation</h1></div><button id="openShiftBtn" class="btn primary">Open shift</button></div>
+  <div class="page-head">
+    <div><p class="eyebrow">SHIFTS</p><h1>Cash reconciliation</h1></div>
+    <div class="head-actions">
+      <button id="pettyCashBtn" class="btn secondary hidden" type="button">− Petty Cash Payout</button>
+      <button id="printCurrentShiftZBtn" class="btn secondary hidden" type="button">🖨️ Shift Z-Report</button>
+      <button id="openShiftBtn" class="btn primary">Open shift</button>
+    </div>
+  </div>
   <div class="stats three">
     <article><span>Opening cash</span><strong id="shiftOpeningCash">0 RWF</strong></article>
     <article><span>Expected cash</span><strong id="shiftExpectedCash">0 RWF</strong></article>
@@ -209,13 +624,15 @@
       <div><span>Mobile Money</span><strong id="shiftMomoSales">0 RWF</strong></div>
       <div><span>Bank</span><strong id="shiftBankSales">0 RWF</strong></div>
       <div><span>Credit sales</span><strong id="shiftCreditSales">0 RWF</strong></div>
+      <div><span>Debt collections</span><strong id="shiftDebtCollections">0 RWF</strong></div>
+      <div><span>Petty cash payouts</span><strong id="shiftPettyCash">0 RWF</strong></div>
       <div><span>Expenses</span><strong id="shiftExpenses">0 RWF</strong></div>
       <div><span>Total sales</span><strong id="shiftTotalSales">0 RWF</strong></div>
     </div>
   </section>
   <section class="panel">
     <p class="eyebrow">SHIFT HISTORY</p><h2>Previous shifts</h2>
-    <div class="table-wrap"><table><thead><tr><th>Opened</th><th>Employee</th><th>Total sales</th><th>Expected cash</th><th>Actual cash</th><th>Variance</th><th>Status</th></tr></thead><tbody id="shiftHistoryBody"></tbody></table></div>
+    <div class="table-wrap"><table><thead><tr><th>Opened</th><th>Employee</th><th>Total sales</th><th>Expected cash</th><th>Actual cash</th><th>Variance</th><th>Status</th><th>Report</th></tr></thead><tbody id="shiftHistoryBody"></tbody></table></div>
   </section>
 </section>
 
@@ -287,23 +704,430 @@
 </section>
 
 <section id="page-subscription" class="page">
-  <div class="page-head"><div><p class="eyebrow">SUBSCRIPTION</p><h1>Choose what your business needs</h1></div></div>
+  <!-- Spotify-Inspired Subscription Hero -->
+  <div class="sub-hero">
+    <div class="sub-hero-badge">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="sub-badge-icon">
+        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+      </svg>
+      <span>TRANSPARENT BUSINESS PRICING</span>
+    </div>
+    <h1 class="sub-hero-title">Choose the plan that powers your business</h1>
+    <p class="sub-hero-subtitle">Simple, reliable, and tailored for Rwandan retail, wholesale, and hospitality. Cancel or switch plans anytime.</p>
+    
+    <div class="sub-hero-perks">
+      <div class="sub-perk"><span class="perk-check">✓</span> Instant MTN & Airtel MoMo Payment</div>
+      <div class="sub-perk"><span class="perk-check">✓</span> 7-Day Free Trial on Kivu Control</div>
+      <div class="sub-perk"><span class="perk-check">✓</span> 100% Offline PWA Reliability</div>
+    </div>
+  </div>
 
+  <!-- Subscription Status Summary -->
   <section class="subscription-summary">
-    <div><span>Status</span><strong id="subscriptionStatusBadge" class="subscription-status active">Active</strong></div>
-    <div><span>Current plan</span><strong id="subscriptionPlanName">Kivu Lite</strong></div>
-    <div><span id="subscriptionDateLabel">Renews / expires</span><strong id="subscriptionDateValue">—</strong></div>
+    <div class="sub-stat-card">
+      <span class="sub-stat-label">Subscription Status</span>
+      <div class="sub-stat-val-wrap">
+        <strong id="subscriptionStatusBadge" class="subscription-status active">Active</strong>
+      </div>
+    </div>
+    <div class="sub-stat-card">
+      <span class="sub-stat-label">Current Plan</span>
+      <div class="sub-stat-val-wrap">
+        <strong id="subscriptionPlanName" class="sub-plan-highlight">Kivu Lite</strong>
+      </div>
+    </div>
+    <div class="sub-stat-card">
+      <span id="subscriptionDateLabel" class="sub-stat-label">Renews / expires</span>
+      <div class="sub-stat-val-wrap">
+        <strong id="subscriptionDateValue">—</strong>
+      </div>
+    </div>
   </section>
+
   <div id="subscriptionBanner" class="subscription-banner active"><b>Subscription active.</b></div>
 
-  <div class="pricing">
-    <article data-plan="basic"><b>KIVU LITE</b><h2>2,000 RWF<small>/month</small></h2><p>Simple sales, inventory, customers, credit, expenses, expiry alerts, digital/print receipts and reports.</p><button class="btn secondary plan-btn" data-plan="basic">Request Kivu Lite</button></article>
-    <article data-plan="one_time"><b>KIVU ONE-TIME</b><h2>50,000 RWF<small> once</small></h2><p>Limited basic sales and stock package with no staff accounts, supplier workflow, shifts or advanced controls.</p><button class="btn secondary plan-btn" data-plan="one_time">Request One-Time</button></article>
-    <article data-plan="business"><b>KIVU BUSINESS</b><h2>5,000 RWF<small>/month</small></h2><p>Lite + staff roles, shifts, cash reconciliation, suppliers and purchases. Bar/restaurant businesses also get tables, tabs, waiter/kitchen workflow and recipes.</p><button class="btn primary plan-btn" data-plan="business">Request Kivu Business</button></article>
-    <article data-plan="control"><b>KIVU CONTROL</b><h2>10,000 RWF<small>/month</small></h2><p>Business + void approvals, controlled stock adjustments, cash-variance review and detailed audit controls.</p><button class="btn secondary plan-btn" data-plan="control">Request Kivu Control</button></article>
-    <article data-plan="pro"><b>KIVU PRO</b><h2>20,000 RWF<small>/month</small></h2><p>Control + priority support, advanced reporting and individually activated integrations. Features are only sold after they are enabled for your account.</p><button class="btn secondary plan-btn" data-plan="pro">Request Kivu Pro</button></article>
+  <!-- Billing Cycle Switcher (Monthly vs Annual - Save ~20%) -->
+  <div class="billing-switch-wrap">
+    <div class="billing-switch-pills" role="tablist">
+      <button type="button" class="billing-pill active" id="billingMonthlyBtn" onclick="toggleBillingCycle('monthly')">
+        Monthly Billing
+      </button>
+      <button type="button" class="billing-pill" id="billingAnnualBtn" onclick="toggleBillingCycle('annual')">
+        Annual Billing
+        <span class="billing-save-badge">Save ~20% · 2 Months Free</span>
+      </button>
+    </div>
   </div>
-  <div class="notice"><b>Activation:</b> plan changes are requests. Platinum Tech confirms payment and activates the account; the browser cannot activate its own paid plan.<br><br><b>7-day free trial:</b> new businesses can test Kivu Control before choosing a paid plan. EBM, payment collection and multi-branch are not advertised as live until the relevant integration/certification is completed.</div>
+
+  <!-- Pricing Cards Grid -->
+  <div class="pricing">
+    <!-- 1. KIVU LITE -->
+    <article data-plan="basic" class="sub-card sub-card-lite">
+      <div class="sub-card-top">
+        <div class="sub-card-badge-row">
+          <span class="spotify-tag tag-lite">SOLO STORE / BOUTIQUE</span>
+        </div>
+        <h3 class="sub-card-title">Kivu Lite</h3>
+        <p class="sub-card-tagline">Essential sales & stock tracking for solo shopkeepers, market stalls, and kiosks.</p>
+        <div class="sub-card-price-box">
+          <div class="price-line">
+            <span class="price-currency">RWF</span>
+            <span class="price-val" data-monthly="2,000" data-annual="20,000">2,000</span>
+            <span class="price-cycle" data-monthly="/mo" data-annual="/year">/mo</span>
+          </div>
+          <div class="price-subtext" data-monthly="Billed monthly" data-annual="20,000 RWF billed yearly (Save 4,000 RWF)">Billed monthly</div>
+        </div>
+      </div>
+      
+      <div class="sub-card-mid">
+        <hr class="sub-card-divider">
+        <p class="features-header">What's included:</p>
+        <ul class="spotify-feature-list">
+          <li>
+            <svg class="feat-check" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+            <span>Fast counter POS & product catalog</span>
+          </li>
+          <li>
+            <svg class="feat-check" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+            <span>Cash, MoMo & Bank payments</span>
+          </li>
+          <li>
+            <svg class="feat-check" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+            <span>Customer debt ("Amadeni") ledger</span>
+          </li>
+          <li>
+            <svg class="feat-check" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+            <span>Stock inventory & expiry date alerts</span>
+          </li>
+          <li>
+            <svg class="feat-check" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+            <span>80mm thermal & digital receipts</span>
+          </li>
+          <li>
+            <svg class="feat-check" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+            <span>Offline PWA local reliability</span>
+          </li>
+        </ul>
+      </div>
+
+      <div class="sub-card-bot">
+        <button class="btn secondary plan-btn spotify-plan-btn" data-plan="basic">Request Kivu Lite</button>
+        <p class="sub-card-terms">1 register counter · 1 location</p>
+      </div>
+    </article>
+
+    <!-- 2. KIVU BUSINESS (MOST POPULAR) -->
+        <!-- 2. KIVU BUSINESS (MOST POPULAR) -->
+    <article data-plan="business" class="sub-card sub-card-business sub-card-popular">
+      <div class="sub-card-top">
+        <div class="sub-card-badge-row">
+          <span class="spotify-tag tag-popular">RETAIL & HOSPITALITY</span>
+          <span class="popular-badge">⭐ MOST POPULAR</span>
+        </div>
+        <h3 class="sub-card-title">Kivu Business</h3>
+        <p class="sub-card-tagline">Complete operational control for busy retail shops, supermarkets, bars, and restaurants.</p>
+        <div class="sub-card-price-box">
+          <div class="price-line">
+            <span class="price-currency">RWF</span>
+            <span class="price-val" data-monthly="5,000" data-annual="50,000">5,000</span>
+            <span class="price-cycle" data-monthly="/mo" data-annual="/year">/mo</span>
+          </div>
+          <div class="price-subtext" data-monthly="Billed monthly" data-annual="50,000 RWF billed yearly (Save 10,000 RWF)">Billed monthly</div>
+        </div>
+      </div>
+      
+      <div class="sub-card-mid">
+        <hr class="sub-card-divider">
+        <p class="features-header">Everything in Lite, plus:</p>
+        <ul class="spotify-feature-list">
+          <li class="feat-highlight">
+            <svg class="feat-check" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+            <span><strong>Cashier shift management & drawer sync</strong></span>
+          </li>
+          <li class="feat-highlight">
+            <svg class="feat-check" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+            <span><strong>Printable Shift Z-Reports (80mm)</strong></span>
+          </li>
+          <li>
+            <svg class="feat-check" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+            <span>Staff employee accounts & PIN logins</span>
+          </li>
+          <li>
+            <svg class="feat-check" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+            <span>Supplier purchases & unpaid debt tracker</span>
+          </li>
+          <li>
+            <svg class="feat-check" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+            <span>Petty cash payouts with daily audit</span>
+          </li>
+          <li>
+            <svg class="feat-check" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+            <span>Bar & restaurant tables, tabs & kitchen workflow</span>
+          </li>
+        </ul>
+      </div>
+
+      <div class="sub-card-bot">
+        <button class="btn primary plan-btn spotify-plan-btn btn-popular" data-plan="business">Request Kivu Business</button>
+        <p class="sub-card-terms">Up to 5 staff accounts · Multi-device</p>
+      </div>
+    </article>
+
+    <!-- 3. KIVU CONTROL -->
+    <article data-plan="control" class="sub-card sub-card-control">
+      <div class="sub-card-top">
+        <div class="sub-card-badge-row">
+          <span class="spotify-tag tag-control">FRAUD & THEFT CONTROL</span>
+        </div>
+        <h3 class="sub-card-title">Kivu Control</h3>
+        <p class="sub-card-tagline">Advanced theft prevention and governance for hands-off owners who delegate management.</p>
+        <div class="sub-card-price-box">
+          <div class="price-line">
+            <span class="price-currency">RWF</span>
+            <span class="price-val" data-monthly="10,000" data-annual="100,000">10,000</span>
+            <span class="price-cycle" data-monthly="/mo" data-annual="/year">/mo</span>
+          </div>
+          <div class="price-subtext" data-monthly="Billed monthly" data-annual="100,000 RWF billed yearly (Save 20,000 RWF)">Billed monthly</div>
+        </div>
+      </div>
+      
+      <div class="sub-card-mid">
+        <hr class="sub-card-divider">
+        <p class="features-header">Everything in Business, plus:</p>
+        <ul class="spotify-feature-list">
+          <li class="feat-highlight">
+            <svg class="feat-check" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+            <span><strong>Owner-required void & refund approvals</strong></span>
+          </li>
+          <li class="feat-highlight">
+            <svg class="feat-check" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+            <span><strong>Controlled stock quantity adjustments</strong></span>
+          </li>
+          <li>
+            <svg class="feat-check" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+            <span>Cash-variance review & discrepancy logs</span>
+          </li>
+          <li>
+            <svg class="feat-check" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+            <span>Comprehensive platform audit trails</span>
+          </li>
+          <li>
+            <svg class="feat-check" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+            <span>Includes 7-day full feature free trial</span>
+          </li>
+        </ul>
+      </div>
+
+      <div class="sub-card-bot">
+        <button class="btn secondary plan-btn spotify-plan-btn" data-plan="control">Request Kivu Control</button>
+        <p class="sub-card-terms">Unlimited staff · Complete audit security</p>
+      </div>
+    </article>
+
+    <!-- 4. KIVU PRO -->
+    <article data-plan="pro" class="sub-card sub-card-pro">
+      <div class="sub-card-top">
+        <div class="sub-card-badge-row">
+          <span class="spotify-tag tag-pro">MULTI-BRANCH & VIP</span>
+        </div>
+        <h3 class="sub-card-title">Kivu Pro</h3>
+        <p class="sub-card-tagline">High-volume supermarkets, multi-branch operations, and priority executive support.</p>
+        <div class="sub-card-price-box">
+          <div class="price-line">
+            <span class="price-currency">RWF</span>
+            <span class="price-val" data-monthly="20,000" data-annual="200,000">20,000</span>
+            <span class="price-cycle" data-monthly="/mo" data-annual="/year">/mo</span>
+          </div>
+          <div class="price-subtext" data-monthly="Billed monthly" data-annual="200,000 RWF billed yearly (Save 40,000 RWF)">Billed monthly</div>
+        </div>
+      </div>
+      
+      <div class="sub-card-mid">
+        <hr class="sub-card-divider">
+        <p class="features-header">Everything in Control, plus:</p>
+        <ul class="spotify-feature-list">
+          <li class="feat-highlight">
+            <svg class="feat-check" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+            <span><strong>Multi-branch & warehouse consolidation readiness</strong></span>
+          </li>
+          <li class="feat-highlight">
+            <svg class="feat-check" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+            <span><strong>Priority VIP support SLA & direct phone hotline</strong></span>
+          </li>
+          <li>
+            <svg class="feat-check" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+            <span>Advanced profit & inventory turnover analytics</span>
+          </li>
+          <li>
+            <svg class="feat-check" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+            <span>RRA EBM fiscal readiness & custom integrations</span>
+          </li>
+          <li>
+            <svg class="feat-check" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+            <span>Dedicated Platinum Tech account manager</span>
+          </li>
+        </ul>
+      </div>
+
+      <div class="sub-card-bot">
+        <button class="btn secondary plan-btn spotify-plan-btn" data-plan="pro">Request Kivu Pro</button>
+        <p class="sub-card-terms">Enterprise scale · Custom setup</p>
+      </div>
+    </article>
+
+    <!-- 5. KIVU ONE-TIME (LIFETIME PACKAGE) -->
+    <article data-plan="one_time" class="sub-card sub-card-onetime">
+      <div class="onetime-content-grid">
+        <div class="onetime-left">
+          <div class="sub-card-badge-row">
+            <span class="spotify-tag tag-onetime">PERPETUAL LICENSE · PAY ONCE</span>
+          </div>
+          <h3 class="sub-card-title">Kivu One-Time</h3>
+          <p class="sub-card-tagline">Prefer to pay once and own your system forever without monthly subscriptions? Kivu One-Time gives you perpetual access to essential sales, inventory, and receipt printing.</p>
+          <div class="sub-card-price-box">
+            <div class="price-line">
+              <span class="price-currency">RWF</span>
+              <span class="price-val">50,000</span>
+              <span class="price-cycle">single payment</span>
+            </div>
+            <div class="price-subtext">No recurring monthly fees ever.</div>
+          </div>
+        </div>
+        <div class="onetime-mid">
+          <p class="features-header">Package details:</p>
+          <ul class="spotify-feature-list onetime-list">
+            <li>
+              <svg class="feat-check" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+              <span>Full counter POS & stock management</span>
+            </li>
+            <li>
+              <svg class="feat-check" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+              <span>Thermal receipt printing & customer accounts</span>
+            </li>
+            <li class="feat-excluded">
+              <span class="feat-cross">✕</span>
+              <span>No staff accounts, shift reconciliations, or supplier workflow</span>
+            </li>
+          </ul>
+        </div>
+        <div class="onetime-right">
+          <button class="btn secondary plan-btn spotify-plan-btn" data-plan="one_time">Request One-Time</button>
+          <p class="sub-card-terms">Upgrade to monthly plans anytime as your business expands</p>
+        </div>
+      </div>
+    </article>
+  </div>
+
+  <!-- Feature Comparison Table -->
+  <section class="panel plan-comparison-panel">
+    <div class="comparison-header">
+      <p class="eyebrow">COMPARE ALL FEATURES</p>
+      <h2>Compare plans side by side</h2>
+      <p class="comparison-subtitle">Everything you need to run, protect, and grow your shop or restaurant.</p>
+    </div>
+    <div class="table-wrap plan-comparison-wrap">
+      <table class="plan-comparison-table">
+        <thead>
+          <tr>
+            <th style="width: 32%;">Feature Capability</th>
+            <th style="width: 17%; text-align: center;">Lite<br><small style="color:var(--muted)">2k RWF/mo</small></th>
+            <th style="width: 17%; text-align: center;" class="highlight-col">Business ⭐<br><small style="color:var(--muted)">5k RWF/mo</small></th>
+            <th style="width: 17%; text-align: center;">Control<br><small style="color:var(--muted)">10k RWF/mo</small></th>
+            <th style="width: 17%; text-align: center;">Pro<br><small style="color:var(--muted)">20k RWF/mo</small></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="table-section-head"><td colspan="5">Core POS & Sales Operations</td></tr>
+          <tr><td>Fast Counter POS & Barcode Checkout</td><td class="text-center"><span class="comp-check">✓</span></td><td class="text-center highlight-col"><span class="comp-check">✓</span></td><td class="text-center"><span class="comp-check">✓</span></td><td class="text-center"><span class="comp-check">✓</span></td></tr>
+          <tr><td>Cash, Mobile Money & Split Payments</td><td class="text-center"><span class="comp-check">✓</span></td><td class="text-center highlight-col"><span class="comp-check">✓</span></td><td class="text-center"><span class="comp-check">✓</span></td><td class="text-center"><span class="comp-check">✓</span></td></tr>
+          <tr><td>Offline PWA Local Reliability</td><td class="text-center"><span class="comp-check">✓</span></td><td class="text-center highlight-col"><span class="comp-check">✓</span></td><td class="text-center"><span class="comp-check">✓</span></td><td class="text-center"><span class="comp-check">✓</span></td></tr>
+          <tr><td>Thermal 80mm & Digital Receipts</td><td class="text-center"><span class="comp-check">✓</span></td><td class="text-center highlight-col"><span class="comp-check">✓</span></td><td class="text-center"><span class="comp-check">✓</span></td><td class="text-center"><span class="comp-check">✓</span></td></tr>
+          <tr><td>Customer Accounts & Debt ("Amadeni")</td><td class="text-center"><span class="comp-check">✓</span></td><td class="text-center highlight-col"><span class="comp-check">✓</span></td><td class="text-center"><span class="comp-check">✓</span></td><td class="text-center"><span class="comp-check">✓</span></td></tr>
+          
+          <tr class="table-section-head"><td colspan="5">Staff & Cash Accountability</td></tr>
+          <tr><td>Cashier Shift Management & Drawer Sync</td><td class="text-center"><span class="comp-cross">—</span></td><td class="text-center highlight-col"><span class="comp-check">✓</span></td><td class="text-center"><span class="comp-check">✓</span></td><td class="text-center"><span class="comp-check">✓</span></td></tr>
+          <tr><td>Printable Shift Z-Reports (80mm)</td><td class="text-center"><span class="comp-cross">—</span></td><td class="text-center highlight-col"><span class="comp-check">✓</span></td><td class="text-center"><span class="comp-check">✓</span></td><td class="text-center"><span class="comp-check">✓</span></td></tr>
+          <tr><td>Staff Employee Accounts & PIN Logins</td><td class="text-center"><span class="comp-cross">—</span></td><td class="text-center highlight-col">Up to 5</td><td class="text-center">Unlimited</td><td class="text-center">Unlimited</td></tr>
+          <tr><td>Petty Cash Payouts (&lt; 5,000 RWF)</td><td class="text-center"><span class="comp-cross">—</span></td><td class="text-center highlight-col"><span class="comp-check">✓</span></td><td class="text-center"><span class="comp-check">✓</span></td><td class="text-center"><span class="comp-check">✓</span></td></tr>
+
+          <tr class="table-section-head"><td colspan="5">Suppliers & Hospitality (Bars/Restaurants)</td></tr>
+          <tr><td>Supplier Purchasing & Unpaid Debt Tracker</td><td class="text-center"><span class="comp-cross">—</span></td><td class="text-center highlight-col"><span class="comp-check">✓</span></td><td class="text-center"><span class="comp-check">✓</span></td><td class="text-center"><span class="comp-check">✓</span></td></tr>
+          <tr><td>Bar / Restaurant Tables & Open Tabs</td><td class="text-center"><span class="comp-cross">—</span></td><td class="text-center highlight-col"><span class="comp-check">✓</span></td><td class="text-center"><span class="comp-check">✓</span></td><td class="text-center"><span class="comp-check">✓</span></td></tr>
+          <tr><td>Waiter & Kitchen Order Workflow</td><td class="text-center"><span class="comp-cross">—</span></td><td class="text-center highlight-col"><span class="comp-check">✓</span></td><td class="text-center"><span class="comp-check">✓</span></td><td class="text-center"><span class="comp-check">✓</span></td></tr>
+
+          <tr class="table-section-head"><td colspan="5">Fraud Prevention & Security Control</td></tr>
+          <tr><td>Owner-Required Void / Refund Approvals</td><td class="text-center"><span class="comp-cross">—</span></td><td class="text-center highlight-col"><span class="comp-cross">—</span></td><td class="text-center"><span class="comp-check">✓</span></td><td class="text-center"><span class="comp-check">✓</span></td></tr>
+          <tr><td>Controlled Stock Quantity Adjustments</td><td class="text-center"><span class="comp-cross">—</span></td><td class="text-center highlight-col"><span class="comp-cross">—</span></td><td class="text-center"><span class="comp-check">✓</span></td><td class="text-center"><span class="comp-check">✓</span></td></tr>
+          <tr><td>Shift Cash Variance Auditing</td><td class="text-center"><span class="comp-cross">—</span></td><td class="text-center highlight-col"><span class="comp-cross">—</span></td><td class="text-center"><span class="comp-check">✓</span></td><td class="text-center"><span class="comp-check">✓</span></td></tr>
+          <tr><td>Complete Platform Audit Logs</td><td class="text-center"><span class="comp-cross">—</span></td><td class="text-center highlight-col"><span class="comp-cross">—</span></td><td class="text-center"><span class="comp-check">✓</span></td><td class="text-center"><span class="comp-check">✓</span></td></tr>
+
+          <tr class="table-section-head"><td colspan="5">Support, Scale & Integrations</td></tr>
+          <tr><td>7-Day Risk-Free Trial</td><td class="text-center"><span class="comp-check">✓</span></td><td class="text-center highlight-col"><span class="comp-check">✓</span></td><td class="text-center"><span class="comp-check">✓</span></td><td class="text-center"><span class="comp-check">✓</span></td></tr>
+          <tr><td>Priority Support SLA & Direct Phone Hotline</td><td class="text-center"><span class="comp-cross">—</span></td><td class="text-center highlight-col"><span class="comp-cross">—</span></td><td class="text-center"><span class="comp-cross">—</span></td><td class="text-center"><span class="comp-check">✓</span></td></tr>
+          <tr><td>Multi-Branch Enterprise Readiness</td><td class="text-center"><span class="comp-cross">—</span></td><td class="text-center highlight-col"><span class="comp-cross">—</span></td><td class="text-center"><span class="comp-cross">—</span></td><td class="text-center"><span class="comp-check">✓</span></td></tr>
+          <tr><td>RRA EBM Fiscal Tax Readiness</td><td class="text-center"><span class="comp-cross">—</span></td><td class="text-center highlight-col"><span class="comp-cross">—</span></td><td class="text-center"><span class="comp-cross">—</span></td><td class="text-center"><span class="comp-check">✓</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Payment & Activation Steps -->
+  <section class="panel">
+    <p class="eyebrow">HOW ACTIVATION WORKS</p>
+    <h2>Three quick steps to start</h2>
+    <div class="sub-steps-grid">
+      <div class="sub-step-card">
+        <div class="sub-step-num">1</div>
+        <div class="sub-step-content">
+          <h4>Pick your plan</h4>
+          <p>Click "Request Plan" above on the tier that best fits your shop, supermarket, or bar.</p>
+        </div>
+      </div>
+      <div class="sub-step-card">
+        <div class="sub-step-num">2</div>
+        <div class="sub-step-content">
+          <h4>Pay via MoMo or Bank</h4>
+          <p>Send payment via MTN Mobile Money (*182#), Airtel Money, or Bank of Kigali to Platinum Tech.</p>
+        </div>
+      </div>
+      <div class="sub-step-card">
+        <div class="sub-step-num">3</div>
+        <div class="sub-step-content">
+          <h4>Instant Account Activation</h4>
+          <p>Platinum Tech verifies the reference and your system unlocks immediately. Zero downtime.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ Section -->
+  <section class="panel">
+    <p class="eyebrow">FREQUENTLY ASKED QUESTIONS</p>
+    <h2>Common billing questions</h2>
+    <div class="sub-faq-grid">
+      <div class="sub-faq-item">
+        <h4>Can I switch or upgrade my plan anytime?</h4>
+        <p>Yes. You can upgrade from Lite to Business or Control whenever your business hires staff or needs advanced auditing. Upgrades take effect immediately upon payment confirmation.</p>
+      </div>
+      <div class="sub-faq-item">
+        <h4>What happens to my data if my subscription lapses?</h4>
+        <p>Your business data is 100% safe and permanently preserved in the database. Operational access pauses temporarily, and instantly resumes once renewed.</p>
+      </div>
+      <div class="sub-faq-item">
+        <h4>How does the 7-day free trial work?</h4>
+        <p>Every newly registered business can explore the full features of Kivu Control for 7 days without paying. You only choose a paid plan after experiencing the value.</p>
+      </div>
+      <div class="sub-faq-item">
+        <h4>Are there hidden fees or setup charges?</h4>
+        <p>None. The price you see is the exact amount you pay. Standard software updates, cloud syncing, and offline PWA functionality are all included.</p>
+      </div>
+    </div>
+  </section>
+
+  <div class="notice">
+    <b>Activation note:</b> Plan change requests are processed by Platinum Tech upon confirmation of Mobile Money or Bank payment. The browser client cannot activate its own paid plan.<br><br>
+    <b>7-day free trial:</b> New businesses can test Kivu Control before choosing a paid plan. EBM, payment collection, and multi-branch are not advertised as live until the relevant integration/certification is completed.
+  </div>
 </section>
 
 <section id="page-settings" class="page">
@@ -342,15 +1166,17 @@
   <button class="mobile-nav" data-mobile-more="1"><span>☰</span><b>More</b></button>
 </nav>
 
-<dialog id="purchaseModal"><form id="purchaseForm"><h3>Record supplier purchase</h3><div class="form-grid"><label>Supplier<select name="supplierId" required></select></label><label>Invoice / reference<input name="invoiceNo" placeholder="Optional"></label><label>Amount paid now<input name="amountPaid" type="number" min="0" value="0" required></label><label>Payment method<select name="paymentMethod"><option>Cash</option><option>Mobile Money</option><option>Bank</option><option>Other</option></select></label><label>Due date<input name="dueDate" type="date"></label></div><div id="inlineSupplierFields" class="notice mini hidden"><b>New supplier</b><div class="form-grid"><label>Name<input name="newSupplierName" placeholder="Supplier name"></label><label>Phone<input name="newSupplierPhone" placeholder="0788 123 456"></label><label>Address<input name="newSupplierAddress" placeholder="Optional"></label></div></div><label>Note<input name="note" placeholder="Optional purchase note"></label><div class="notice mini">Add one or more products below. Stock will increase automatically. Any unpaid amount becomes supplier debt.</div><div id="purchaseItems"></div><button id="addPurchaseItemBtn" type="button" class="btn secondary full">+ Add another product</button><div class="purchase-total"><span>Purchase total</span><strong id="purchaseTotalPreview">0 RWF</strong></div><div class="modal-actions"><button type="button" class="btn ghost cancel-btn">Cancel</button><button class="btn primary">Receive stock & save purchase</button></div></form></dialog>
+<dialog id="purchaseModal"><form id="purchaseForm"><h3>Record supplier purchase</h3><div class="form-grid"><label>Supplier<select name="supplierId" required></select></label><label>Invoice / reference<input name="invoiceNo" placeholder="Optional"></label><label>Amount paid now<input name="amountPaid" type="text" inputmode="decimal" class="money-input" value="0" required></label><label>Payment method<select name="paymentMethod"><option>Cash</option><option>Mobile Money</option><option>Bank</option><option>Other</option></select></label><label>Due date<input name="dueDate" type="date"></label></div><div id="inlineSupplierFields" class="notice mini hidden"><b>New supplier</b><div class="form-grid"><label>Name<input name="newSupplierName" placeholder="Supplier name"></label><label>Phone<input name="newSupplierPhone" placeholder="0788 123 456"></label><label>Address<input name="newSupplierAddress" placeholder="Optional"></label></div></div><label>Note<input name="note" placeholder="Optional purchase note"></label><div class="notice mini">Add one or more products below. Stock will increase automatically. Any unpaid amount becomes supplier debt.</div><div id="purchaseItems"></div><button id="addPurchaseItemBtn" type="button" class="btn secondary full">+ Add another product</button><div class="purchase-total"><span>Purchase total</span><strong id="purchaseTotalPreview">0 RWF</strong></div><div class="modal-actions"><button type="button" class="btn ghost cancel-btn">Cancel</button><button class="btn primary">Receive stock & save purchase</button></div></form></dialog>
 
-<dialog id="supplierPaymentModal"><form id="supplierPaymentForm"><h3>Pay supplier debt</h3><input name="supplierId" type="hidden"><div id="supplierPaymentSummary" class="notice"></div><div class="form-grid"><label>Amount<input name="amount" type="number" min="1" required></label><label>Payment method<select name="paymentMethod"><option>Cash</option><option>Mobile Money</option><option>Bank</option><option>Other</option></select></label></div><label>Note<input name="note" placeholder="Optional payment note"></label><div class="modal-actions"><button type="button" class="btn ghost cancel-btn">Cancel</button><button class="btn primary">Record payment</button></div></form></dialog>
+<dialog id="supplierPaymentModal"><form id="supplierPaymentForm"><h3>Pay supplier debt</h3><input name="supplierId" type="hidden"><div id="supplierPaymentSummary" class="notice"></div><div class="form-grid"><label>Amount<input name="amount" type="text" inputmode="decimal" class="money-input" required></label><label>Payment method<select name="paymentMethod"><option>Cash</option><option>Mobile Money</option><option>Bank</option><option>Other</option></select></label></div><label>Note<input name="note" placeholder="Optional payment note"></label><div class="modal-actions"><button type="button" class="btn ghost cancel-btn">Cancel</button><button class="btn primary">Record payment</button></div></form></dialog>
 
-<dialog id="productModal"><form id="productForm"><h3>Add product</h3><div class="form-grid"><label>Name<input name="name" required></label><label>Barcode / SKU <small>(optional)</small><div class="barcode-field"><input id="productBarcodeInput" name="barcode" inputmode="numeric" placeholder="Scan or type code"><button id="scanProductBarcodeBtn" type="button" class="btn secondary barcode-scan-btn">📷 Scan</button></div></label><label>Opening quantity (base units)<input name="qty" type="number" min="0" value="0" required></label><label>Base / selling unit<input name="baseUnit" value="Piece" placeholder="Piece, bottle, kg" required></label><label>Bulk purchase unit<input name="bulkUnit" value="Carton" placeholder="Carton, pack, sack"></label><label>Base units per bulk unit<input name="unitsPerBulk" type="number" min="1" step="0.001" value="1" required></label><label>Low-stock alert (base units)<input name="low" type="number" min="0" value="5" required></label><label>Cost per base unit<input name="cost" type="number" min="0" step="0.01" required></label><label>Selling price per base unit<input name="price" type="number" min="0" step="0.01" required></label><label>Preferred supplier<select name="preferredSupplierId"><option value="">None</option></select></label><label>Expiry date <small>(optional)</small><input name="expiryDate" type="date"></label><label>Expiry reminder<input name="expiryReminderDays" type="number" min="0" value="14"><small>Days before expiry</small></label></div><div class="notice mini">Example: Base unit = Bottle, Bulk unit = Carton, Units per bulk = 24. Buying 5 cartons adds 120 bottles to stock.</div><div class="modal-actions"><button type="button" class="btn ghost cancel-btn">Cancel</button><button class="btn primary">Save</button></div></form></dialog>
+<datalist id="categoryDatalist"></datalist>
 
-<dialog id="editProductModal"><form id="editProductForm"><h3>Edit product</h3><input name="productId" type="hidden"><div class="form-grid"><label>Product name<input name="name" required></label><label>Barcode / SKU <small>(optional)</small><div class="barcode-field"><input id="editProductBarcodeInput" name="barcode" inputmode="numeric"><button id="scanEditProductBarcodeBtn" type="button" class="btn secondary barcode-scan-btn">📷 Scan</button></div></label><label>Selling price / base unit<input name="price" type="number" min="0" step="0.01" required></label><label>Low-stock alert<input name="low" type="number" min="0" step="0.001" required></label><label>Base / selling unit<input name="baseUnit" required></label><label>Bulk purchase unit<input name="bulkUnit"></label><label>Base units per bulk unit<input name="unitsPerBulk" type="number" min="1" step="0.001" required></label><label>Preferred supplier<select name="preferredSupplierId"><option value="">None</option></select></label><label>Expiry date <small>(optional)</small><input name="expiryDate" type="date"></label><label>Expiry reminder<input name="expiryReminderDays" type="number" min="0" value="14"><small>Days before expiry</small></label><label>Current quantity<input name="qtyDisplay" type="number" disabled></label></div><div class="notice mini"><b>Cost correction</b><br>The buying cost normally updates automatically when supplier purchases are recorded. Change it here only to correct an incorrect cost. Every correction is saved in the audit trail.</div><label>Buying cost / weighted average cost per base unit<input name="cost" type="number" min="0" step="0.01" required></label><div class="modal-actions"><button type="button" class="btn ghost cancel-btn">Cancel</button><button class="btn primary">Save changes</button></div></form></dialog>
+<dialog id="productModal"><form id="productForm"><h3>Add product</h3><div class="form-grid"><label>Name<input name="name" required></label><label>Category<input name="category" list="categoryDatalist" placeholder="e.g. Beverages, Food, Groceries"></label><label>Barcode / SKU <small>(optional)</small><div class="barcode-field"><input id="productBarcodeInput" name="barcode" inputmode="numeric" placeholder="Scan or type code"><button id="scanProductBarcodeBtn" type="button" class="btn secondary barcode-scan-btn">📷 Scan</button></div></label><label>Opening quantity (base units)<input name="qty" type="number" min="0" value="0" required></label><label>Base / selling unit<input name="baseUnit" value="Piece" placeholder="Piece, bottle, kg" required></label><label>Bulk purchase unit<input name="bulkUnit" value="Carton" placeholder="Carton, pack, sack"></label><label>Base units per bulk unit<input name="unitsPerBulk" type="number" min="1" step="0.001" value="1" required></label><label>Low-stock alert (base units)<input name="low" type="number" min="0" value="5" required></label><label>Cost per base unit<input name="cost" type="text" inputmode="decimal" class="money-input" placeholder="0" required></label><label>Selling price per base unit<input name="price" type="text" inputmode="decimal" class="money-input" placeholder="0" required></label><label>Bulk selling price <small>(optional, e.g. carton price)</small><input name="bulkPrice" type="text" inputmode="decimal" class="money-input" placeholder="Unit price × ratio if empty"></label><label>Preferred supplier<select name="preferredSupplierId"><option value="">None</option></select></label><label>Expiry date <small>(optional)</small><input name="expiryDate" type="date"></label><label>Expiry reminder<input name="expiryReminderDays" type="number" min="0" value="14"><small>Days before expiry</small></label></div><div class="notice mini">Example: Base unit = Bottle, Bulk unit = Carton, Units per bulk = 24. Buying 5 cartons adds 120 bottles to stock.</div><div class="modal-actions"><button type="button" class="btn ghost cancel-btn">Cancel</button><button class="btn primary">Save</button></div></form></dialog>
 
-<dialog id="stockModal"><form id="stockForm"><h3>Add stock</h3><label>Product<div class="barcode-select-row"><select name="productId" required></select><button id="scanStockProductBtn" type="button" class="btn secondary barcode-scan-btn">📷 Scan product</button></div></label><div class="form-grid"><label>Quantity<input name="qty" type="number" min="1" required></label><label>Total amount paid<input name="totalCost" type="number" min="0" required></label></div><div class="modal-actions"><button type="button" class="btn ghost cancel-btn">Cancel</button><button class="btn primary">Save</button></div></form></dialog>
+<dialog id="editProductModal"><form id="editProductForm"><h3>Edit product</h3><input name="productId" type="hidden"><div class="form-grid"><label>Product name<input name="name" required></label><label>Category<input name="category" list="categoryDatalist" placeholder="e.g. Beverages, Food, Groceries"></label><label>Barcode / SKU <small>(optional)</small><div class="barcode-field"><input id="editProductBarcodeInput" name="barcode" inputmode="numeric"><button id="scanEditProductBarcodeBtn" type="button" class="btn secondary barcode-scan-btn">📷 Scan</button></div></label><label>Selling price / base unit<input name="price" type="text" inputmode="decimal" class="money-input" required></label><label>Bulk selling price <small>(optional)</small><input name="bulkPrice" type="text" inputmode="decimal" class="money-input" placeholder="Unit price × ratio if empty"></label><label>Low-stock alert<input name="low" type="number" min="0" step="0.001" required></label><label>Base / selling unit<input name="baseUnit" required></label><label>Bulk purchase unit<input name="bulkUnit"></label><label>Base units per bulk unit<input name="unitsPerBulk" type="number" min="1" step="0.001" required></label><label>Preferred supplier<select name="preferredSupplierId"><option value="">None</option></select></label><label>Expiry date <small>(optional)</small><input name="expiryDate" type="date"></label><label>Expiry reminder<input name="expiryReminderDays" type="number" min="0" value="14"><small>Days before expiry</small></label><label>Current quantity<input name="qtyDisplay" type="number" disabled></label></div><div class="notice mini"><b>Cost correction</b><br>The buying cost normally updates automatically when supplier purchases are recorded. Change it here only to correct an incorrect cost. Every correction is saved in the audit trail.</div><label>Buying cost / weighted average cost per base unit<input name="cost" type="text" inputmode="decimal" class="money-input" required></label><div class="modal-actions"><button type="button" class="btn ghost cancel-btn">Cancel</button><button class="btn primary">Save changes</button></div></form></dialog>
+
+<dialog id="stockModal"><form id="stockForm"><h3>Add stock</h3><label>Product<div class="barcode-select-row"><select name="productId" required></select><button id="scanStockProductBtn" type="button" class="btn secondary barcode-scan-btn">📷 Scan product</button></div></label><div class="form-grid"><label>Quantity<input name="qty" type="number" min="1" required></label><label>Total amount paid<input name="totalCost" type="text" inputmode="decimal" class="money-input" placeholder="0" required></label></div><div class="modal-actions"><button type="button" class="btn ghost cancel-btn">Cancel</button><button class="btn primary">Save</button></div></form></dialog>
 
 <dialog id="hospitalityTableModal"><form id="hospitalityTableForm"><h3>Add table</h3><div class="form-grid"><label>Table name<input name="name" required placeholder="Table 1"></label><label>Seats<input name="seats" type="number" min="1" value="4"></label></div><div class="modal-actions"><button type="button" class="btn ghost cancel-btn">Cancel</button><button class="btn primary">Save table</button></div></form></dialog>
 <dialog id="hospitalityTabModal"><form id="hospitalityTabForm"><h3>Open new bill</h3><div class="form-grid"><label>Table<select name="tableId"><option value="">No table / takeaway</option></select></label><label>Tab / reference<input name="label" placeholder="Bar counter / Takeaway #12"></label><label>Customer <small>(optional)</small><input name="customerName"></label></div><div class="modal-actions"><button type="button" class="btn ghost cancel-btn">Cancel</button><button class="btn primary">Open bill</button></div></form></dialog>
@@ -359,19 +1185,19 @@
 <dialog id="hospitalityRecipeModal"><form id="hospitalityRecipeForm"><h3>Recipe / serving stock rule</h3><div class="notice mini">Use recipes for food ingredients or drink portions. Example: <b>Whisky Shot</b> can consume <b>30 ml</b> from a whisky stock ingredient.</div><label>Menu item<select name="menuProductId"></select></label><div id="hospitalityRecipeRows"></div><button id="addRecipeRowBtn" type="button" class="btn secondary full">+ Ingredient</button><div class="modal-actions"><button type="button" class="btn ghost cancel-btn">Cancel</button><button class="btn primary">Save recipe</button></div></form></dialog>
 <dialog id="hospitalityWastageModal"><form id="hospitalityWastageForm"><h3>Record wastage / breakage</h3><label>Product<select name="productId"></select></label><div class="form-grid"><label>Quantity<input name="qty" type="number" min="0.001" step="0.001" required></label><label>Reason<select name="reason"><option>Spillage</option><option>Breakage</option><option>Kitchen waste</option><option>Spoilage</option><option>Staff error</option><option>Other</option></select></label></div><div class="modal-actions"><button type="button" class="btn ghost cancel-btn">Cancel</button><button class="btn danger">Record & deduct stock</button></div></form></dialog>
 
-<dialog id="saleModal"><form id="saleForm"><h3>New sale</h3><div class="sale-builder"><div class="form-grid"><label>Product<select name="productId"></select></label><label>Barcode<div class="barcode-field"><input id="saleBarcodeInput" inputmode="numeric" autocomplete="off" placeholder="USB/Bluetooth scan or type"><button id="scanSaleBarcodeBtn" type="button" class="btn secondary barcode-scan-btn">📷 Camera</button></div></label><label>Quantity<input name="qty" type="number" min="0.001" step="0.001" value="1"></label><label>Sell as<select name="saleUnit"><option value="base">Base unit</option><option value="bulk">Bulk unit</option></select></label><label>&nbsp;<button id="addSaleItemBtn" type="button" class="btn secondary full">+ Add to cart</button></label></div><div id="saleCartEmpty" class="notice mini">No products added yet. Select a product and tap <b>Add to cart</b>.</div><div id="saleCart" class="sale-cart"></div><div class="sale-cart-total"><span>Cart subtotal</span><strong id="saleCartSubtotal">0 RWF</strong></div><div class="form-grid"><label>Payment<select name="payment"><option>Cash</option><option>Mobile Money</option><option>Bank</option><option>Credit</option></select></label><label>Sale discount<input name="discount" type="number" min="0" value="0"></label><label>Customer<select name="customerId"><option value="">Walk-in customer</option></select></label><label id="saleCustomerWrap" class="hidden">Credit customer name<input name="customerName"></label></div><div class="sale-cart-total grand"><span>Total to pay</span><strong id="saleCartTotal">0 RWF</strong></div></div><div class="modal-actions"><button type="button" class="btn ghost cancel-btn">Cancel</button><button class="btn primary">Complete sale</button></div></form></dialog>
+<dialog id="saleModal" class="pos-modal"><form id="saleForm"><div class="pos-modal-header"><div><h3>Counter POS & Checkout</h3><p class="tag mini">Fast counter sales, live search & smart checkout</p></div><div class="pos-header-actions"><button id="parkCartBtn" type="button" class="btn secondary mini-btn">⏸ Hold cart</button><button id="viewParkedCartsBtn" type="button" class="btn secondary mini-btn">📋 Held (<span id="parkedCartsBadge">0</span>)</button><button type="button" class="btn ghost cancel-btn pos-modal-close" aria-label="Close modal">✕</button></div></div><div class="sale-builder pos-layout-container"><div class="pos-catalog-pane"><div class="pos-live-search"><div class="search-input-wrap pos-search-wrap"><span class="search-icon">🔍</span><input id="saleProductSearch" type="search" placeholder="Type product name or scan barcode to add..." autocomplete="off"><button id="clearSaleSearchBtn" type="button" class="btn ghost clear-search hidden" title="Clear">✕</button><button id="scanSaleBarcodeBtn" type="button" class="btn secondary barcode-scan-btn pos-quick-cam-btn" title="Scan with camera">📷 Scan</button></div><div id="saleCategoryPills" class="category-pills"></div></div><div id="saleQuickResults" class="sale-quick-results"></div><details class="pos-manual-entry-details"><summary class="pos-manual-toggle"><span>⚡ Manual Item Select & Barcode</span></summary><div class="form-grid pos-selector-grid"><label>Selected Product<select name="productId"></select></label><label>Barcode<div class="barcode-field"><input id="saleBarcodeInput" inputmode="numeric" autocomplete="off" placeholder="USB/Bluetooth scan or type"></div></label><label>Quantity<input name="qty" type="number" min="0.001" step="0.001" value="1"></label><label>Sell as<select name="saleUnit"><option value="base">Base unit</option><option value="bulk">Bulk unit</option></select></label><label class="add-to-cart-label">&nbsp;<button id="addSaleItemBtn" type="button" class="btn secondary full">+ Add to cart</button></label></div></details></div><div class="pos-cart-checkout-pane"><div class="pos-pane-heading"><div class="pos-cart-title"><span class="cart-icon">🛒</span><span>Current Order</span></div><button type="button" class="btn ghost btn-sm clear-cart-btn" onclick="resetSaleCart()" title="Empty cart">Clear cart</button></div><div id="saleCartEmpty" class="pos-cart-empty notice mini"><div class="empty-cart-illustration">🛒</div><b>Cart is empty</b><p>Tap any product from the catalog or scan a barcode to add.</p></div><div id="saleCart" class="sale-cart"></div><div class="pos-checkout-section"><div class="sale-cart-total"><span>Cart subtotal</span><strong id="saleCartSubtotal">0 RWF</strong></div><div class="pos-payment-methods-strip"><label class="pos-method-label">Payment Method</label><select name="payment" class="pos-payment-select"><option value="Cash">Cash</option><option value="Mobile Money">Mobile Money (MoMo)</option><option value="Bank">Bank</option><option value="Credit">Credit (Amadeni)</option><option value="Split">Split payment</option></select><div class="pos-payment-pills" id="posPaymentPills"><button type="button" class="pos-pay-pill active" data-method="Cash">💵 Cash</button><button type="button" class="pos-pay-pill" data-method="Mobile Money">📱 MoMo</button><button type="button" class="pos-pay-pill" data-method="Bank">🏦 Bank</button><button type="button" class="pos-pay-pill" data-method="Credit">📝 Credit</button><button type="button" class="pos-pay-pill" data-method="Split">🔀 Split</button></div></div><div class="form-grid pos-customer-discount-grid"><label>Customer<select name="customerId"><option value="">Walk-in customer</option></select></label><label id="saleCustomerWrap" class="hidden">Credit customer name<input name="customerName" placeholder="Enter customer name"></label><label>Sale discount (RWF)<input name="discount" type="text" inputmode="decimal" class="money-input" value="0" placeholder="0"></label></div><div id="splitPaymentSection" class="split-payment-wrap hidden"><div class="notice mini">Split across payment methods. Sum must match Total to pay.</div><div class="form-grid three"><label>Cash amount (RWF)<input id="splitCashInput" type="text" inputmode="decimal" class="money-input" value="0"></label><label>MoMo amount (RWF)<input id="splitMomoInput" type="text" inputmode="decimal" class="money-input" value="0"></label><label>Bank amount (RWF)<input id="splitBankInput" type="text" inputmode="decimal" class="money-input" value="0"></label></div><div class="split-status-bar"><span>Allocated: <b id="splitAllocatedDisplay">0 RWF</b></span><span id="splitRemainingWrap">Remaining: <b id="splitRemainingDisplay">0 RWF</b></span></div></div><div id="tenderedSection" class="tendered-calculator"><div class="form-grid tendered-top-row"><label>Cash Tendered (RWF)<input id="amountTenderedInput" type="text" inputmode="decimal" class="money-input" placeholder="Amount received"></label><div class="change-due-box"><span class="change-label">Change Due</span><strong id="changeDueDisplay">0 RWF</strong></div></div><div class="quick-cash-buttons"><button type="button" class="btn ghost cash-quick-btn" data-amt="exact">Exact</button><button type="button" class="btn ghost cash-quick-btn" data-amt="500">+500</button><button type="button" class="btn ghost cash-quick-btn" data-amt="1000">+1,000</button><button type="button" class="btn ghost cash-quick-btn" data-amt="2000">+2,000</button><button type="button" class="btn ghost cash-quick-btn" data-amt="5000">+5,000</button><button type="button" class="btn ghost cash-quick-btn" data-amt="10000">+10,000</button><button type="button" class="btn ghost cash-quick-btn" data-amt="20000">+20,000</button><button type="button" class="btn ghost cash-quick-btn" data-amt="50000">+50,000</button></div></div><div class="sale-cart-total grand"><span>Total to pay</span><strong id="saleCartTotal">0 RWF</strong></div><div class="modal-actions pos-checkout-actions"><button type="button" class="btn ghost cancel-btn">Cancel</button><button class="btn primary" id="completeSaleBtn">Complete sale</button></div></div></div></div></form></dialog>
 
-<dialog id="expenseModal"><form id="expenseForm"><h3>Record expense</h3><div class="form-grid"><label>Category<select name="category" required><option value="Transport">Transport</option><option value="Utilities">Utilities</option><option value="Supplies">Supplies</option><option value="Repairs">Repairs</option><option value="Food">Food / staff welfare</option><option value="Rent">Rent</option><option value="Other">Other</option></select></label><label>Amount<input name="amount" type="number" min="1" required></label></div><label>Description / reason<input name="description" required placeholder="What was this money used for?"></label><div id="expenseApprovalHint" class="notice mini"></div><div class="modal-actions"><button type="button" class="btn ghost cancel-btn">Cancel</button><button class="btn primary">Save expense</button></div></form></dialog>
+<dialog id="expenseModal"><form id="expenseForm"><h3>Record expense</h3><div class="form-grid"><label>Category<select name="category" required><option value="Transport">Transport</option><option value="Utilities">Utilities</option><option value="Supplies">Supplies</option><option value="Repairs">Repairs</option><option value="Food">Food / staff welfare</option><option value="Rent">Rent</option><option value="Other">Other</option></select></label><label>Amount<input name="amount" type="text" inputmode="decimal" class="money-input" required></label></div><label>Description / reason<input name="description" required placeholder="What was this money used for?"></label><div id="expenseApprovalHint" class="notice mini"></div><div class="modal-actions"><button type="button" class="btn ghost cancel-btn">Cancel</button><button class="btn primary">Save expense</button></div></form></dialog>
 
-<dialog id="creditModal"><form id="creditForm"><h3>Add customer credit</h3><label>Customer<select name="customerId"><option value="">Select customer</option></select></label><label>Or customer name<input name="customer"></label><label>Amount<input name="amount" type="number" min="1" required></label><label>Due date <small>(optional)</small><input name="dueDate" type="date"></label><label>Note<input name="note"></label><div class="modal-actions"><button type="button" class="btn ghost cancel-btn">Cancel</button><button class="btn primary">Save</button></div></form></dialog>
+<dialog id="creditModal"><form id="creditForm"><h3>Add customer credit</h3><label>Customer<select name="customerId"><option value="">Select customer</option></select></label><label>Or customer name<input name="customer"></label><label>Amount<input name="amount" type="text" inputmode="decimal" class="money-input" required></label><label>Due date <small>(optional)</small><input name="dueDate" type="date"></label><label>Note<input name="note"></label><div class="modal-actions"><button type="button" class="btn ghost cancel-btn">Cancel</button><button class="btn primary">Save</button></div></form></dialog>
 
 <dialog id="customerModal"><form id="customerForm"><h3>Add customer</h3><label>Name<input name="name" required></label><div class="form-grid"><label>Phone<input name="phone"></label><label>Email<input name="email" type="email"></label></div><div class="modal-actions"><button type="button" class="btn ghost cancel-btn">Cancel</button><button class="btn primary">Save</button></div></form></dialog>
 
 <dialog id="staffInviteModal"><form id="staffInviteForm"><h3>Create staff invite</h3><label>Employee name<input name="name" required></label><div class="form-grid"><label>Phone<input name="phone" inputmode="tel" placeholder="0788 123 456" required></label><label>Role<select name="role"><option value="cashier">Cashier</option><option value="manager">Manager</option><option value="stock_clerk">Stock Clerk</option><option value="waiter">Waiter</option><option value="kitchen">Kitchen / Bar Prep</option></select></label></div><div class="notice">Kivu Solutions will create a one-time invite code. The employee activates it using the code, phone number and a 6-digit PIN — no personal email or SMS required.</div><div class="modal-actions"><button type="button" class="btn ghost cancel-btn">Cancel</button><button class="btn primary">Create invite</button></div></form></dialog>
 
-<dialog id="openShiftModal"><form id="openShiftForm"><h3>Open my shift</h3><div class="notice">This shift will be assigned automatically to the logged-in user.</div><label>Opening cash<input name="openingCash" type="number" min="0" value="0" required></label><div class="modal-actions"><button type="button" class="btn ghost cancel-btn">Cancel</button><button class="btn primary">Open shift</button></div></form></dialog>
+<dialog id="openShiftModal"><form id="openShiftForm"><h3>Open my shift</h3><div class="notice">This shift will be assigned automatically to the logged-in user.</div><label>Opening cash<input name="openingCash" type="text" inputmode="decimal" class="money-input" value="0" required></label><div class="modal-actions"><button type="button" class="btn ghost cancel-btn">Cancel</button><button class="btn primary">Open shift</button></div></form></dialog>
 
-<dialog id="closeShiftModal"><form id="closeShiftForm"><h3>Close shift</h3><div id="closeShiftPreview" class="notice"></div><label>Actual cash counted<input name="actualCash" type="number" min="0" required></label><label>Variance reason <small>(required if cash does not match)</small><input name="varianceReason" placeholder="Example: change given incorrectly"></label><div class="modal-actions"><button type="button" class="btn ghost cancel-btn">Cancel</button><button class="btn danger">Close shift</button></div></form></dialog>
+<dialog id="closeShiftModal"><form id="closeShiftForm"><h3>Close shift</h3><div id="closeShiftPreview" class="notice"></div><label>Actual cash counted<input name="actualCash" type="text" inputmode="decimal" class="money-input" placeholder="Counted cash in drawer" required></label><label>Variance reason <small>(required if cash does not match)</small><input name="varianceReason" placeholder="Example: change given incorrectly"></label><div class="modal-actions"><button type="button" class="btn ghost cancel-btn">Cancel</button><button class="btn danger">Close shift</button></div></form></dialog>
 
 <dialog id="importDataModal"><form id="importDataForm"><h3>Import products / customers</h3><div class="notice mini">CSV import is for onboarding. Choose a type, then upload a CSV. Product columns: <b>name, qty, cost, price, low_stock, barcode, base_unit, bulk_unit, units_per_bulk</b>. Customer columns: <b>name, phone, email</b>.</div><label>Import type<select name="type"><option value="products">Products & opening stock</option><option value="customers">Customers</option></select></label><label>CSV file<input name="file" type="file" accept=".csv,text/csv" required></label><div class="modal-actions"><button type="button" class="btn ghost cancel-btn">Cancel</button><button class="btn primary">Import</button></div></form></dialog>
 
@@ -391,9 +1217,38 @@
 
 <dialog id="editSupplierModal"><form id="editSupplierForm"><h3>Edit supplier</h3><input name="id" type="hidden"><label>Name<input name="name" required></label><div class="form-grid"><label>Phone<input name="phone"></label><label>Address<input name="address"></label></div><label>Notes<input name="notes"></label><div class="modal-actions"><button type="button" class="btn ghost cancel-btn">Cancel</button><button class="btn primary">Save changes</button></div></form></dialog>
 
-<dialog id="adminPaymentModal"><form id="adminPaymentForm"><h3>Confirm subscription payment</h3><input name="shopId" type="hidden"><div class="form-grid"><label>Amount<input name="amount" type="number" min="0" required></label><label>Plan<select name="plan"><option value="basic">Kivu Lite — 2,000 RWF/month</option><option value="one_time">Kivu One-Time — 50,000 RWF once</option><option value="business">Kivu Business — 5,000 RWF</option><option value="control">Kivu Control — 10,000 RWF</option><option value="pro">Kivu Pro — 20,000 RWF</option></select></label><label>Method<select name="method"><option>Mobile Money</option><option>Cash</option><option>Bank</option><option>Other</option></select></label><label>Reference<input name="reference"></label><label>Covered from<input name="from" type="date" required></label><label>Covered to<input name="to" type="date" required></label></div><label>Note<input name="note"></label><div class="modal-actions"><button type="button" class="btn ghost cancel-btn">Cancel</button><button class="btn primary">Confirm payment</button></div></form></dialog>
+<dialog id="adminPaymentModal"><form id="adminPaymentForm"><h3>Confirm subscription payment</h3><input name="shopId" type="hidden"><div class="form-grid"><label>Amount<input name="amount" type="text" inputmode="decimal" class="money-input" required></label><label>Plan<select name="plan"><option value="basic">Kivu Lite — 2,000 RWF/month</option><option value="one_time">Kivu One-Time — 50,000 RWF once</option><option value="business">Kivu Business — 5,000 RWF</option><option value="control">Kivu Control — 10,000 RWF</option><option value="pro">Kivu Pro — 20,000 RWF</option></select></label><label>Method<select name="method"><option>Mobile Money</option><option>Cash</option><option>Bank</option><option>Other</option></select></label><label>Reference<input name="reference"></label><label>Covered from<input name="from" type="date" required></label><label>Covered to<input name="to" type="date" required></label></div><label>Note<input name="note"></label><div class="modal-actions"><button type="button" class="btn ghost cancel-btn">Cancel</button><button class="btn primary">Confirm payment</button></div></form></dialog>
 <dialog id="adminUserModal"><form id="adminUserForm"><h3>Add / update Platinum Tech admin</h3><label>User email<input name="email" type="email" required></label><label>Name<input name="displayName"></label><div class="form-grid"><label>Role<select name="role"><option value="support">Support Agent</option><option value="district_admin">District Admin</option><option value="province_admin">Province Admin</option><option value="national_admin">National Admin</option><option value="billing">Billing</option><option value="super_admin">Super Admin</option></select></label><label>Province<input name="province"></label><label>District<input name="district"></label><label>Active<select name="active"><option value="true">Yes</option><option value="false">No</option></select></label></div><div class="modal-actions"><button type="button" class="btn ghost cancel-btn">Cancel</button><button class="btn primary">Save admin</button></div></form></dialog>
-<dialog id="notificationsModal"><div><h3>Notifications</h3><div id="notificationsList"></div><div class="modal-actions"><button type="button" class="btn ghost cancel-btn">Close</button></div></div></dialog>
+<dialog id="notificationsModal" class="notification-modal">
+  <div class="notification-center">
+    <div class="notification-header">
+      <div class="notification-title-wrap">
+        <div class="notif-bell-icon">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+          </svg>
+        </div>
+        <div>
+          <div class="notif-heading-row">
+            <h3>Notifications</h3>
+            <span id="notifUnreadBadge" class="notif-unread-pill">0 unread</span>
+          </div>
+          <p class="notif-subtitle">Alerts, cashier shifts, stock updates & business reminders</p>
+        </div>
+      </div>
+      <div class="notif-header-actions">
+        <button id="markAllReadBtn" type="button" class="btn ghost btn-sm" onclick="markAllNotificationsRead()">Mark all read</button>
+        <button type="button" class="notif-close-btn cancel-btn" aria-label="Close notifications">✕</button>
+      </div>
+    </div>
+    <div id="notificationsList" class="notification-list"></div>
+    <div class="notification-footer">
+      <small class="notif-footer-text">Live updates from Kivu Solutions</small>
+      <button type="button" class="btn ghost btn-sm cancel-btn">Close</button>
+    </div>
+  </div>
+</dialog>
 <dialog id="upgradeModal" class="upgrade-modal">
   <div class="upgrade-card">
     <div class="upgrade-icon">🔒</div>
@@ -406,6 +1261,17 @@
     </div>
   </div>
 </dialog>
+
+<dialog id="creditRepaymentModal"><form id="creditRepaymentForm"><h3>Customer Debt Repayment</h3><input name="creditId" type="hidden"><input name="customerId" type="hidden"><div id="creditRepaySummary" class="notice"></div><div class="form-grid"><label>Repayment Amount (RWF)<input name="amount" type="text" inputmode="decimal" class="money-input" required></label><label>Payment Method<select name="paymentMethod"><option value="Cash">Cash (To Shift Drawer)</option><option value="Mobile Money">Mobile Money (MoMo)</option><option value="Bank">Bank</option></select></label></div><label>Note / Reference<input name="note" placeholder="Optional note or reference"></label><div class="notice mini">Cash debt repayments are automatically added to the active cashier's shift expected cash drawer.</div><div class="modal-actions"><button type="button" class="btn ghost cancel-btn">Cancel</button><button class="btn primary">Record Repayment</button></div></form></dialog>
+
+<dialog id="customerLedgerModal" class="ledger-modal"><div class="ledger-card"><div class="page-head"><div><p class="eyebrow">AMADENI LEDGER</p><h2 id="ledgerCustomerName">Customer Statement</h2><small id="ledgerCustomerPhone"></small></div><div class="ledger-balance-box"><span>Current Balance</span><strong id="ledgerCustomerBalance">0 RWF</strong></div></div><div class="table-wrap"><table class="ledger-table"><thead><tr><th>Date</th><th>Type</th><th>Reference / Note</th><th>Debit (+)</th><th>Credit (-)</th><th>Balance</th></tr></thead><tbody id="ledgerTableBody"></tbody></table></div><div class="modal-actions"><button id="whatsappReminderBtn" type="button" class="btn secondary">💬 WhatsApp Reminder</button><button id="printLedgerBtn" type="button" class="btn secondary">🖨️ Print Statement</button><button type="button" class="btn ghost cancel-btn">Close</button></div></div></dialog>
+
+<dialog id="pettyCashModal"><form id="pettyCashForm"><h3>Cash Drawer Petty Cash Payout</h3><div class="notice mini">Record small cash payouts (under 5,000 RWF) directly from the register drawer during an open shift. This is subtracted from shift expected physical cash.</div><div class="form-grid"><label>Amount (RWF)<input name="amount" type="text" inputmode="decimal" class="money-input" placeholder="Under 5,000 RWF" required></label><label>Category<select name="category"><option value="Supplies">Supplies</option><option value="Transport">Transport / Fare</option><option value="Food">Staff Welfare / Tea</option><option value="Repairs">Repairs</option><option value="Other">Other</option></select></label></div><label>Description / Reason<input name="description" placeholder="What was this cash taken for?" required></label><label>Paid to (Recipient)<input name="paidTo" placeholder="Recipient name (optional)"></label><div class="modal-actions"><button type="button" class="btn ghost cancel-btn">Cancel</button><button class="btn danger">Payout from Drawer</button></div></form></dialog>
+
+<dialog id="zReportModal" class="z-report-modal"><div id="zReportContent" class="z-report"></div><div class="modal-actions"><button type="button" class="btn ghost cancel-btn">Close</button><button id="printZReportBtn" type="button" class="btn primary">🖨️ Print 80mm Z-Report</button></div></dialog>
+
+<dialog id="parkedCartsModal"><div class="parked-carts-card"><h3>Held Carts (Parked)</h3><p class="tag mini">Resume a previously held cart or discard it</p><div id="parkedCartsList" class="parked-carts-list"></div><div class="modal-actions"><button type="button" class="btn ghost cancel-btn">Close</button></div></div></dialog>
+
 
 <script src="js/config.js"></script>
 <script src="js/offline-queue.js"></script>

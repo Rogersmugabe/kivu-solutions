@@ -9,11 +9,208 @@ let shopFeatureFlags={};
 let approvalRequests=[],stockAdjustments=[];
 let currentShift=null;
 let saleCart=[];
+let saleSearchQuery='', selectedSaleCategory='All';
+let selectedInventoryCategory='All', inventorySearchQuery='';
+let selectedSalesCategory='All', salesSearchQuery='';
+let lastTenderedInfo=null;
 let isDukaAdmin=false,platformOverview=null,platformShops=[];
+
+/* LOCAL PERSISTENT STORAGE HELPERS */
+function getHeldCarts(){
+  if(!shop?.id) return [];
+  try{ return JSON.parse(localStorage.getItem(`kivu_held_carts_${shop.id}`)||'[]'); }catch(_e){ return []; }
+}
+function saveHeldCarts(list){
+  if(!shop?.id) return;
+  try{ localStorage.setItem(`kivu_held_carts_${shop.id}`, JSON.stringify(list||[])); }catch(_e){}
+  updateHeldCartsBadge();
+}
+function updateHeldCartsBadge(){
+  const badge=$('#parkedCartsBadge'); if(badge) badge.textContent = getHeldCarts().length;
+}
+
+function getProductMetaMap(shopId){
+  const sid = shopId || shop?.id;
+  if(!sid) return {};
+  try{ return JSON.parse(localStorage.getItem(`kivu_product_meta_${sid}`)||'{}'); }catch(_e){ return {}; }
+}
+function saveProductMetaSingle(shopId, productId, patch){
+  const sid = shopId || shop?.id;
+  if(!sid || !productId) return;
+  try{
+    const map = getProductMetaMap(sid);
+    map[productId] = { ...(map[productId]||{}), ...patch };
+    localStorage.setItem(`kivu_product_meta_${sid}`, JSON.stringify(map));
+  }catch(_e){}
+}
+
+function getCreditRepayments(shopId){
+  const sid = shopId || shop?.id;
+  if(!sid) return [];
+  try{ return JSON.parse(localStorage.getItem(`kivu_credit_repayments_${sid}`)||'[]'); }catch(_e){ return []; }
+}
+function saveCreditRepayment(repayment){
+  if(!shop?.id) return;
+  try{
+    const list = getCreditRepayments(shop.id);
+    list.unshift(repayment);
+    localStorage.setItem(`kivu_credit_repayments_${shop.id}`, JSON.stringify(list));
+  }catch(_e){}
+}
+function getShiftDebtCollections(shiftId){
+  if(!shiftId || !shop?.id) return 0;
+  const list = getCreditRepayments(shop.id);
+  return list.filter(x => x.shift_id === shiftId && x.payment_method === 'Cash').reduce((a, x) => a + Number(x.amount||0), 0);
+}
+
+function getShiftPettyCashPayouts(shopId){
+  const sid = shopId || shop?.id;
+  if(!sid) return [];
+  try{ return JSON.parse(localStorage.getItem(`kivu_petty_cash_${sid}`)||'[]'); }catch(_e){ return []; }
+}
+function saveShiftPettyCashPayout(shopId, payout){
+  const sid = shopId || shop?.id;
+  if(!sid) return;
+  try{
+    const list = getShiftPettyCashPayouts(sid);
+    list.unshift(payout);
+    localStorage.setItem(`kivu_petty_cash_${sid}`, JSON.stringify(list));
+  }catch(_e){}
+}
+
+function getReceiptTendered(receiptNo){
+  if(!receiptNo || !shop?.id) return null;
+  try{ return JSON.parse(localStorage.getItem(`kivu_receipt_tendered_${shop.id}_${receiptNo}`)||'null'); }catch(_e){ return null; }
+}
+function saveReceiptTendered(receiptNo, info){
+  if(!receiptNo || !shop?.id || !info) return;
+  try{ localStorage.setItem(`kivu_receipt_tendered_${shop.id}_${receiptNo}`, JSON.stringify(info)); }catch(_e){}
+}
+
+function getSplitPaymentDetails(receiptNo){
+  if(!receiptNo || !shop?.id) return null;
+  try{ return JSON.parse(localStorage.getItem(`kivu_split_${shop.id}_${receiptNo}`)||'null'); }catch(_e){ return null; }
+}
+function saveSplitPaymentDetails(receiptNo, split){
+  if(!receiptNo || !shop?.id || !split) return;
+  try{ localStorage.setItem(`kivu_split_${shop.id}_${receiptNo}`, JSON.stringify(split)); }catch(_e){}
+}
+
 
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const money=n=>new Intl.NumberFormat('en-RW',{maximumFractionDigits:0}).format(Math.round(Number(n)||0))+' RWF';
 const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+
+/* UNIVERSAL MONEY INPUT FORMATTING (COMMAS) */
+function formatMoneyString(val){
+  if(val===null||val===undefined)return '';
+  const s=String(val).trim();
+  if(!s)return '';
+  const isNeg=s.startsWith('-');
+  const clean=s.replace(/[^0-9.]/g,'');
+  if(!clean)return isNeg?'-':'';
+  const parts=clean.split('.');
+  // Strip leading zeroes if more digits follow (e.g. "0500" -> "500"), but preserve single "0"
+  const intPart=parts[0].replace(/^0+(?=\d)/,'');
+  const decPart=parts.length>1?'.'+parts.slice(1).join(''):'';
+  const formattedInt=intPart?intPart.replace(/\B(?=(\d{3})+(?!\d))/g,','):'0';
+  return (isNeg?'-':'')+(intPart?formattedInt:'0')+decPart;
+}
+window.formatMoneyString=formatMoneyString;
+
+function parseMoney(val){
+  if(val===null||val===undefined)return 0;
+  if(typeof val==='object'&&val!==null&&'value' in val) val=val.value;
+  if(typeof val==='number')return Number.isFinite(val)?val:0;
+  const cleaned=String(val).replace(/,/g,'').trim();
+  const num=Number(cleaned);
+  return Number.isFinite(num)?num:0;
+}
+window.parseMoney=parseMoney;
+
+function attachMoneyInputFormatter(input){
+  if(!input)return;
+  if(input.dataset.moneyFormatted){
+    if(input.value&&!input.value.includes(',')){
+      input.value=formatMoneyString(input.value);
+    }
+    return;
+  }
+  input.dataset.moneyFormatted='1';
+  if(input.type==='number'){
+    input.type='text';
+    input.inputMode='decimal';
+    input.autocomplete='off';
+  }
+  if(input.value&&!input.value.includes(',')){
+    input.value=formatMoneyString(input.value);
+  }
+
+  // Smooth Backspace & Delete handling around comma separators
+  input.addEventListener('keydown',e=>{
+    const val=input.value;
+    const start=input.selectionStart, end=input.selectionEnd;
+    if(start===end&&start!=null){
+      if(e.key==='Backspace'&&start>0&&val[start-1]===','){
+        e.preventDefault();
+        // Remove comma and the digit before it
+        input.value=val.slice(0,start-2)+val.slice(start);
+        input.dispatchEvent(new Event('input',{bubbles:true}));
+      } else if(e.key==='Delete'&&start<val.length&&val[start]===','){
+        e.preventDefault();
+        // Remove comma and the digit after it
+        input.value=val.slice(0,start)+val.slice(start+2);
+        input.dispatchEvent(new Event('input',{bubbles:true}));
+      }
+    }
+  });
+
+  input.addEventListener('input',()=>{
+    const raw=input.value;
+    const selStart=input.selectionStart??raw.length;
+    const digitsBefore=raw.slice(0,selStart).replace(/[^0-9.]/g,'').length;
+    const formatted=formatMoneyString(raw);
+    input.value=formatted;
+    let newCursor=0, digitsSeen=0;
+    while(newCursor<formatted.length&&digitsSeen<digitsBefore){
+      if(/[0-9.]/.test(formatted[newCursor])) digitsSeen++;
+      newCursor++;
+    }
+    try{ input.setSelectionRange(newCursor,newCursor); }catch(_e){}
+  });
+  input.addEventListener('blur',()=>{
+    if(input.value) input.value=formatMoneyString(input.value);
+  });
+}
+window.attachMoneyInputFormatter=attachMoneyInputFormatter;
+
+function initMoneyInputs(root=document){
+  if(!root)return;
+  const selectors=[
+    'input.money-input',
+    'input[data-money-input]',
+    'input[name="cost"]',
+    'input[name="price"]',
+    'input[name="bulkPrice"]',
+    'input[name="totalCost"]',
+    'input[name="amount"]',
+    'input[name="amountPaid"]',
+    'input[name="purchaseUnitCost"]',
+    'input[name="openingCash"]',
+    'input[name="actualCash"]',
+    'input[name="discount"]',
+    'input[name="payAmount"]',
+    '#amountTenderedInput',
+    '#splitCashInput',
+    '#splitMomoInput',
+    '#splitBankInput'
+  ];
+  try{
+    const list=root.querySelectorAll(selectors.join(','));
+    list.forEach(attachMoneyInputFormatter);
+  }catch(_e){}
+}
+window.initMoneyInputs=initMoneyInputs;
 const day=d=>new Date(d).toISOString().slice(0,10);
 const fmt=d=>new Date(d).toLocaleString('en-RW',{dateStyle:'medium',timeStyle:'short'});
 const roleLabel=r=>({owner:'Owner',manager:'Manager',cashier:'Cashier',stock_clerk:'Stock Clerk',waiter:'Waiter',kitchen:'Kitchen / Bar Prep'})[r]||r;
@@ -78,7 +275,7 @@ const requireFeature=(feature,message)=>{
   return false;
 };
 
-$('#todayDate').textContent=new Date().toLocaleDateString('en-RW',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+if($('#todayDate')) $('#todayDate').textContent=new Date().toLocaleDateString('en-RW',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
 
 /* AUTH */
 $('#loginTab').onclick=()=>toggleAuth('login');
@@ -204,7 +401,7 @@ async function enter(){
     render();
   }catch(err){
     console.error(err);
-    alert(err.message||'Could not load Kivu Solutions.');
+    console.error(err); alert(err.message||'Could not load Kivu Solutions.');
     await sb.auth.signOut();
   }
 }
@@ -262,20 +459,28 @@ function applyPermissions(){
       b.title=`Upgrade to ${FEATURE_PLAN[feature]} to use ${page}`;
     }else if(badge){badge.remove();b.removeAttribute('title');}
   });
+  $$('.nav-section').forEach(sec=>{
+    const hasVisible=!!sec.querySelector('.nav:not(.hidden)');
+    sec.classList.toggle('hidden',!hasVisible);
+  });
   $$('.owner-only').forEach(x=>x.classList.toggle('hidden',profile.role!=='owner'));
   $$('.owner-manager-only').forEach(x=>x.classList.toggle('hidden',!can('owner','manager')));
-  $('#roleBadge').textContent=roleLabel(profile.role);
+  const rTxt=roleLabel(profile.role);
+  if($('#roleBadge')) $('#roleBadge').textContent=rTxt;
+  if($('#topRoleBadge')) $('#topRoleBadge').textContent=rTxt;
   $('#dukaAdminNav')?.classList.toggle('hidden',!isDukaAdmin);
 
   $('#quickSaleBtn').classList.toggle('hidden',!can('owner','manager','cashier'));
-  $$('[data-open="saleModal"]').forEach(x=>{x.classList.toggle('hidden',!can('owner','manager','cashier'));if(!x.dataset.cartHook){x.dataset.cartHook='1';x.addEventListener('click',()=>resetSaleCart());}});
+  $$('[data-open="saleModal"]').forEach(x=>{x.classList.toggle('hidden',!can('owner','manager','cashier'));if(!x.dataset.cartHook){x.dataset.cartHook='1';x.addEventListener('click',()=>{initSaleModal();});}});
   $$('[data-open="expenseModal"]').forEach(x=>x.classList.toggle('hidden',!can('owner','manager')));
   $$('[data-open="stockModal"]').forEach(x=>x.classList.toggle('hidden',!can('owner','manager','stock_clerk')));
+  $$('[data-open="purchaseModal"]').forEach(x=>x.classList.toggle('hidden',!can('owner','manager')));
   $$('[data-open="productModal"]').forEach(x=>x.classList.toggle('hidden',!can('owner','manager')));
   $$('[data-open="creditModal"]').forEach(x=>x.classList.toggle('hidden',!can('owner','manager','cashier')));
   $$('[data-open="customerModal"]').forEach(x=>x.classList.toggle('hidden',!can('owner','manager','cashier')));
   const creditOption=$('#saleForm select[name="payment"] option[value="Credit"]');
   if(creditOption){creditOption.disabled=!hasFeature('credit');creditOption.hidden=!hasFeature('credit');}
+  const creditPill=$('#posPaymentPills [data-method="Credit"]');if(creditPill) creditPill.classList.toggle('hidden',!hasFeature('credit'));
   const saleCustomerSelect=$('#saleForm select[name="customerId"]');
   saleCustomerSelect?.closest('label')?.classList.toggle('hidden',!hasFeature('customers'));
   if(!hasFeature('credit')) $('#saleCustomerWrap')?.classList.add('hidden');
@@ -292,9 +497,37 @@ function applyPermissions(){
   if(!allowed.includes(current)) showPage(allowed[0]||'dashboard');
 }
 
+function syncPaymentMethodUI(method){
+  const f=$('#saleForm'); if(!f) return; if(method==='Credit'&&!hasFeature('credit')){ requireFeature('credit','Customer credit is included in Kivu Lite.'); return; }
+  if(f.elements.payment && f.elements.payment.value !== method){
+    f.elements.payment.value = method;
+  }
+  $$('#posPaymentPills .pos-pay-pill').forEach(btn=>{
+    btn.classList.toggle('active', btn.dataset.method === method);
+  }); if(method==='Split'){ const st=saleCart.reduce((a,x)=>a+saleLinePreview(x),0),disc=Math.max(0,parseMoney(f.elements.discount?.value||0)),tot=Math.max(0,st-disc); if($('#splitCashInput')&&!parseMoney($('#splitCashInput').value)&&!parseMoney($('#splitMomoInput')?.value)&&tot>0){ $('#splitCashInput').value=formatMoneyString(Math.round(tot/2)); if($('#splitMomoInput')) $('#splitMomoInput').value=formatMoneyString(tot-Math.round(tot/2)); } }
+  updateTenderedCalculator();
+}
+window.syncPaymentMethodUI=syncPaymentMethodUI;
+
+function initSaleModal(){
+  saleSearchQuery='';
+  selectedSaleCategory='All';
+  const inp=$('#saleProductSearch'); if(inp) inp.value='';
+  $('#clearSaleSearchBtn')?.classList.add('hidden');
+  renderSaleCategoryPills();
+  renderSaleQuickResults();
+  renderSaleCart();
+  syncPaymentMethodUI('Cash');
+  updateTenderedCalculator();
+  initMoneyInputs($('#saleModal'));
+  setTimeout(()=>$('#saleProductSearch')?.focus(), 80);
+  updateHeldCartsBadge();
+}
+
 $$('.nav').forEach(b=>b.onclick=()=>showPage(b.dataset.page));
 $('#menuBtn').onclick=()=>$('.sidebar').classList.toggle('open');
-$('#quickSaleBtn').onclick=()=>{if(!ensureSubscriptionAccess())return;resetSaleCart();$('#saleModal').showModal();};
+$('#sidebarBackdrop')?.addEventListener('click',()=>$('.sidebar').classList.remove('open'));
+$('#quickSaleBtn').onclick=()=>{if(!ensureSubscriptionAccess())return;initSaleModal();$('#saleModal').showModal();};
 function ensureSubscriptionAccess(){
   if(subscriptionAllowsAccess()) return true;
   const status=effectiveSubscriptionStatus();
@@ -311,7 +544,7 @@ function showPage(name,bypassSubscription=false){
   $$('.nav').forEach(b=>b.classList.toggle('active',b.dataset.page===name));
   $$('.page').forEach(p=>p.classList.remove('active'));
   $(`#page-${name}`).classList.add('active');
-  $('#pageTitle').textContent=name==='dashboard'?'Overview':name[0].toUpperCase()+name.slice(1);
+  if($('#pageTitle')) $('#pageTitle').textContent=name==='dashboard'?'Overview':name[0].toUpperCase()+name.slice(1);
   $('.sidebar').classList.remove('open');
   if(name==='reports')renderReports();
   if(name==='dukaadmin')renderDukaAdmin();
@@ -322,8 +555,9 @@ $$('[data-open]').forEach(b=>b.addEventListener('click',()=>{
   if(!ensureSubscriptionAccess())return;
   const feature=MODAL_FEATURE[b.dataset.open];
   if(feature&&!requireFeature(feature))return;
+  if(b.dataset.open==='saleModal') initSaleModal();
   if(b.dataset.open==='purchaseModal'&&!$('#purchaseItems')?.children.length)addPurchaseItemRow();
-  document.getElementById(b.dataset.open)?.showModal();
+  const modal=document.getElementById(b.dataset.open); modal?.showModal(); if(modal) initMoneyInputs(modal);
 }));
 $('#upgradeGoBtn')?.addEventListener('click',()=>{ $('#upgradeModal')?.close(); showPage('subscription',true); });
 $$('.cancel-btn').forEach(b=>b.onclick=()=>{const d=b.closest('dialog');d?.querySelector('form')?.reset();d?.close();$('#saleCustomerWrap')?.classList.add('hidden')});
@@ -346,9 +580,20 @@ async function load(){
   [products,sales,expenses,stockPurchases]=await Promise.all([
     safeQuery(sb.from('products').select('*').eq('shop_id',id).order('name')),
     safeQuery(sb.from('sales').select('*').eq('shop_id',id).order('created_at',{ascending:false}).limit(1000)),
-    can('owner','manager') ? safeQuery(sb.from('expenses').select('*').eq('shop_id',id).order('created_at',{ascending:false}).limit(1000)) : Promise.resolve([]),
+    can('owner','manager')
+      ? safeQuery(sb.from('expenses').select('*').eq('shop_id',id).order('created_at',{ascending:false}).limit(1000))
+      : safeQuery(sb.from('expenses').select('*').eq('shop_id',id).eq('user_id',session.user.id).order('created_at',{ascending:false}).limit(200)).catch(()=>[]),
     safeQuery(sb.from('stock_purchases').select('*').eq('shop_id',id).order('created_at',{ascending:false}).limit(1000))
   ]);
+
+  const metaMap=getProductMetaMap(id);
+  products.forEach(p=>{
+    if(metaMap[p.id]){
+      if(metaMap[p.id].category&&!p.category) p.category=metaMap[p.id].category;
+      if(metaMap[p.id].bulk_price&&!p.bulk_price) p.bulk_price=metaMap[p.id].bulk_price;
+    }
+  });
+  updateHeldCartsBadge();
 
   customers=[]; credits=[]; employees=[]; shifts=[]; audits=[]; staffInvites=[]; suppliers=[]; supplierPurchases=[]; supplierPayments=[]; approvalRequests=[]; stockAdjustments=[]; currentShift=null;
 
@@ -379,6 +624,12 @@ async function load(){
 
   if(hasFeature('audit')&&can('owner','manager')){
     audits=await safeQuery(sb.from('audit_logs').select('*').eq('shop_id',id).order('created_at',{ascending:false}).limit(200));
+  }
+  try {
+    const notifs=await safeQuery(sb.from('shop_notifications').select('*').eq('shop_id',id).order('created_at',{ascending:false}).limit(50));
+    shopNotifications=notifs||[];
+  } catch(_e) {
+    shopNotifications=[];
   }
   if(hasFeature('controls')&&can('owner','manager')){
     [approvalRequests,stockAdjustments]=await Promise.all([
@@ -463,15 +714,41 @@ $('#stockAdjustForm').onsubmit=async e=>{
 $('#productForm').onsubmit=async e=>{
   e.preventDefault();
   if(!can('owner','manager'))return alert('You do not have permission to create products.');
-  const f=new FormData(e.target),p={shop_id:shop.id,name:(f.get('name')||'').trim(),qty:+f.get('qty'),cost:+f.get('cost'),price:+f.get('price'),low_stock:+f.get('low'),preferred_supplier_id:f.get('preferredSupplierId')||null,base_unit:(f.get('baseUnit')||'Piece').trim(),bulk_unit:(f.get('bulkUnit')||'Carton').trim(),units_per_bulk:+f.get('unitsPerBulk')||1,expiry_date:f.get('expiryDate')||null,expiry_reminder_days:+f.get('expiryReminderDays')||14,barcode:(f.get('barcode')||'').trim()||null};
-  const {error}=await sb.from('products').insert(p);if(error)return alert(error.message);
+  const f=new FormData(e.target);
+  const bulkPrice=parseMoney(f.get('bulkPrice'))||null;
+  const category=(f.get('category')||'').trim()||null;
+  const p={
+    shop_id:shop.id,
+    name:(f.get('name')||'').trim(),
+    qty:+f.get('qty'),
+    cost:parseMoney(f.get('cost')),
+    price:parseMoney(f.get('price')),
+    low_stock:+f.get('low'),
+    preferred_supplier_id:f.get('preferredSupplierId')||null,
+    base_unit:(f.get('baseUnit')||'Piece').trim(),
+    bulk_unit:(f.get('bulkUnit')||'Carton').trim(),
+    units_per_bulk:+f.get('unitsPerBulk')||1,
+    expiry_date:f.get('expiryDate')||null,
+    expiry_reminder_days:+f.get('expiryReminderDays')||14,
+    barcode:(f.get('barcode')||'').trim()||null
+  };
+  let {data,error}=await sb.from('products').insert({ ...p, bulk_price: bulkPrice, category }).select('id');
+  if(error && error.message?.includes('column')){
+    const retry=await sb.from('products').insert(p).select('id');
+    data=retry.data; error=retry.error;
+  }
+  if(error)return alert(error.message);
+  const newId=data?.[0]?.id;
+  if(newId && (bulkPrice || category)){
+    saveProductMetaSingle(shop.id, newId, { bulk_price: bulkPrice, category });
+  }
   await audit('created product','product',{name:p.name});e.target.reset();$('#productModal').close();await refresh();
 };
 
 $('#stockForm').onsubmit=async e=>{
   e.preventDefault();
   const f=new FormData(e.target),productId=f.get('productId');
-  const {error}=await sb.rpc('receive_stock',{p_product_id:productId,p_qty:+f.get('qty'),p_total_cost:+f.get('totalCost')});
+  const {error}=await sb.rpc('receive_stock',{p_product_id:productId,p_qty:+f.get('qty'),p_total_cost:parseMoney(f.get('totalCost'))});
   if(error)return alert(error.message);
   e.target.reset();$('#stockModal').close();await refresh();
 };
@@ -482,10 +759,12 @@ window.openEditProduct=function(id){
   const form=$('#editProductForm');
   form.elements.productId.value=p.id;
   form.elements.name.value=p.name||'';
+  if(form.elements.category) form.elements.category.value=p.category||'';
+  if(form.elements.bulkPrice) form.elements.bulkPrice.value=p.bulk_price?formatMoneyString(p.bulk_price):'';
   if(form.elements.barcode) form.elements.barcode.value=p.barcode||'';
-  form.elements.price.value=Number(p.price||0);
+  form.elements.price.value=formatMoneyString(p.price||0);
   form.elements.low.value=Number(p.low_stock||0);
-  form.elements.cost.value=Number(p.cost||0);
+  form.elements.cost.value=formatMoneyString(p.cost||0);
   form.elements.qtyDisplay.value=Number(p.qty||0);
   form.elements.baseUnit.value=baseUnitLabel(p);
   form.elements.bulkUnit.value=bulkUnitLabel(p);
@@ -495,6 +774,7 @@ window.openEditProduct=function(id){
   supplierSelect.value=p.preferred_supplier_id||'';
   if(form.elements.expiryDate) form.elements.expiryDate.value=p.expiry_date||'';
   if(form.elements.expiryReminderDays) form.elements.expiryReminderDays.value=p.expiry_reminder_days||14;
+  initMoneyInputs(form);
   $('#editProductModal').showModal();
 };
 
@@ -503,14 +783,20 @@ $('#editProductForm').onsubmit=async e=>{
   if(!can('owner','manager'))return alert('Only an owner or manager can edit products.');
   if(!ensureSubscriptionAccess())return;
   const f=new FormData(e.target);
+  const bulkPrice=parseMoney(f.get('bulkPrice'))||null;
+  const category=(f.get('category')||'').trim()||null;
+  const prodId=f.get('productId');
+  saveProductMetaSingle(shop.id, prodId, { bulk_price: bulkPrice, category });
+  try { await sb.from('products').update({ bulk_price: bulkPrice, category }).eq('id', prodId); } catch(_e){}
+
   const {error}=await sb.rpc('update_product_details_v44',{
-    p_product_id:f.get('productId'),p_name:(f.get('name')||'').trim(),p_price:+f.get('price'),p_low_stock:+f.get('low'),
-    p_preferred_supplier_id:f.get('preferredSupplierId')||null,p_cost:+f.get('cost'),
+    p_product_id:prodId,p_name:(f.get('name')||'').trim(),p_price:parseMoney(f.get('price')),p_low_stock:+f.get('low'),
+    p_preferred_supplier_id:f.get('preferredSupplierId')||null,p_cost:parseMoney(f.get('cost')),
     p_base_unit:(f.get('baseUnit')||'Piece').trim(),p_bulk_unit:(f.get('bulkUnit')||'Carton').trim(),p_units_per_bulk:+f.get('unitsPerBulk')||1,
     p_expiry_date:f.get('expiryDate')||null,p_expiry_reminder_days:+f.get('expiryReminderDays')||14
   });
   if(error)return alert(error.message);
-  const barcodeResult=await sb.rpc('update_product_barcode',{p_product_id:f.get('productId'),p_barcode:(f.get('barcode')||'').trim()||null});
+  const barcodeResult=await sb.rpc('update_product_barcode',{p_product_id:prodId,p_barcode:(f.get('barcode')||'').trim()||null});
   if(barcodeResult.error)return alert(barcodeResult.error.message);
   $('#editProductModal').close();
   await refresh();
@@ -522,21 +808,21 @@ function supplierBalance(id){return supplierPurchases.filter(x=>x.supplier_id===
 function addPurchaseItemRow(){
   const wrap=$('#purchaseItems');if(!wrap)return;
   const row=document.createElement('div');row.className='purchase-item-row form-grid';
-  row.innerHTML=`<label>Product<div class="barcode-select-row"><select name="purchaseProductId" required></select><button type="button" class="btn secondary barcode-scan-btn scan-purchase-product">📷 Scan</button></div></label><label>Qty bought<input name="purchaseQty" type="number" min="0.001" step="0.001" value="1" required></label><label>Buy as<select name="purchaseUnitMode"><option value="base">Base unit</option><option value="bulk">Bulk unit</option></select></label><label>Cost per selected unit<input name="purchaseUnitCost" type="number" min="0" step="0.01" required></label><label>Expiry date <small>(optional)</small><input name="purchaseExpiryDate" type="date"></label><label>Line total<div class="inline-total"><strong class="purchase-line-total">0 RWF</strong><button type="button" class="btn ghost remove-purchase-item">Remove</button></div></label>`;
+  row.innerHTML=`<label>Product<div class="barcode-select-row"><select name="purchaseProductId" required></select><button type="button" class="btn secondary barcode-scan-btn scan-purchase-product">📷 Scan</button></div></label><label>Qty bought<input name="purchaseQty" type="number" min="0.001" step="0.001" value="1" required></label><label>Buy as<select name="purchaseUnitMode"><option value="base">Base unit</option><option value="bulk">Bulk unit</option></select></label><label>Cost per selected unit<input name="purchaseUnitCost" type="text" inputmode="decimal" class="money-input" placeholder="0" required></label><label>Expiry date <small>(optional)</small><input name="purchaseExpiryDate" type="date"></label><label>Line total<div class="inline-total"><strong class="purchase-line-total">0 RWF</strong><button type="button" class="btn ghost remove-purchase-item">Remove</button></div></label>`;
   wrap.appendChild(row);
   row.querySelector('.remove-purchase-item').onclick=()=>{if(wrap.children.length>1)row.remove();updatePurchaseTotal();};
   row.querySelector('.scan-purchase-product')?.addEventListener('click',async()=>{const code=await window.KivuCameraScanner?.open('Scan product to receive');if(!code)return;const p=findProductByBarcode(code);if(!p)return alert('No product matches that barcode. Register the barcode in Inventory first.');const sel=row.querySelector('[name="purchaseProductId"]');sel.value=p.id;sel.dispatchEvent(new Event('change',{bubbles:true}));row.querySelector('[name="purchaseQty"]')?.focus();});
   row.querySelectorAll('input,select').forEach(x=>x.addEventListener('input',updatePurchaseTotal));
   row.querySelector('[name="purchaseProductId"]').addEventListener('change',()=>{refreshPurchaseItemOptions();updatePurchaseTotal();});
-  refreshPurchaseItemOptions();updatePurchaseTotal();
+  refreshPurchaseItemOptions();updatePurchaseTotal();initMoneyInputs(row);
 }
 function refreshPurchaseItemOptions(){
   $$('#purchaseItems select[name="purchaseProductId"]').forEach(sel=>{const current=sel.value;sel.innerHTML=products.length?products.map(p=>`<option value="${p.id}">${esc(p.name)} — ${p.qty} ${esc(baseUnitLabel(p))} in stock</option>`).join(''):'<option value="">Add products first</option>';if(current&&products.some(p=>p.id===current))sel.value=current;const row=sel.closest('.purchase-item-row'),mode=row?.querySelector('[name="purchaseUnitMode"]');if(mode){const pr=products.find(p=>p.id===sel.value);const r=unitsPerBulk(pr);mode.innerHTML=`<option value="base">${esc(baseUnitLabel(pr))}</option>`+(r>1?`<option value="bulk">${esc(bulkUnitLabel(pr))} (${r} ${esc(baseUnitLabel(pr))})</option>`:'');}});
 }
-function purchaseItemsFromForm(){return $$('#purchaseItems .purchase-item-row').map(row=>({product_id:row.querySelector('[name="purchaseProductId"]').value,entered_qty:+row.querySelector('[name="purchaseQty"]').value,unit_mode:row.querySelector('[name="purchaseUnitMode"]').value,entered_unit_cost:+row.querySelector('[name="purchaseUnitCost"]').value,expiry_date:row.querySelector('[name="purchaseExpiryDate"]')?.value||null}));}
+function purchaseItemsFromForm(){return $$('#purchaseItems .purchase-item-row').map(row=>({product_id:row.querySelector('[name="purchaseProductId"]').value,entered_qty:+row.querySelector('[name="purchaseQty"]').value,unit_mode:row.querySelector('[name="purchaseUnitMode"]').value,entered_unit_cost:parseMoney(row.querySelector('[name="purchaseUnitCost"]').value),expiry_date:row.querySelector('[name="purchaseExpiryDate"]')?.value||null}));}
 
 function updatePurchaseTotal(){
-  let total=0;$$('#purchaseItems .purchase-item-row').forEach(row=>{const qty=+row.querySelector('[name="purchaseQty"]').value||0,cost=+row.querySelector('[name="purchaseUnitCost"]').value||0,line=qty*cost;total+=line;const el=row.querySelector('.purchase-line-total');if(el)el.textContent=money(line);});
+  let total=0;$$('#purchaseItems .purchase-item-row').forEach(row=>{const qty=+row.querySelector('[name="purchaseQty"]').value||0,cost=parseMoney(row.querySelector('[name="purchaseUnitCost"]').value),line=qty*cost;total+=line;const el=row.querySelector('.purchase-line-total');if(el)el.textContent=money(line);});
   if($('#purchaseTotalPreview'))$('#purchaseTotalPreview').textContent=money(total);return total;
 }
 $('#addPurchaseItemBtn')?.addEventListener('click',addPurchaseItemRow);
@@ -554,7 +840,7 @@ $('#supplierForm').onsubmit=async e=>{
 };
 $('#purchaseForm').onsubmit=async e=>{
   e.preventDefault();if(!can('owner','manager'))return alert('Only an owner or manager can record supplier purchases.');if(!ensureSubscriptionAccess())return;
-  const f=new FormData(e.target),items=purchaseItemsFromForm(),total=updatePurchaseTotal(),paid=+f.get('amountPaid')||0;
+  const f=new FormData(e.target),items=purchaseItemsFromForm(),total=updatePurchaseTotal(),paid=parseMoney(f.get('amountPaid'));
   if(!items.length||items.some(x=>!x.product_id||x.entered_qty<=0||x.entered_unit_cost<0))return alert('Check every purchase item.');if(total<=0)return alert('Purchase total must be greater than zero.');if(paid<0||paid>total)return alert('Amount paid cannot be greater than the purchase total.');
   let supplierId=f.get('supplierId');
   if(supplierId==='__new__'){
@@ -567,10 +853,10 @@ $('#purchaseForm').onsubmit=async e=>{
   if(error)return alert(error.message);e.target.reset();$('#inlineSupplierFields')?.classList.add('hidden');$('#purchaseItems').innerHTML='';addPurchaseItemRow();$('#purchaseModal').close();await refresh();alert(`Purchase saved. Inventory increased automatically${data?.new_stock_total!==undefined?` by ${data.new_stock_total} base unit(s)`:''}.`);
 };
 window.openSupplierPayment=id=>{
-  const supplier=suppliers.find(x=>x.id===id),balance=supplierBalance(id);if(!supplier||balance<=0)return;const form=$('#supplierPaymentForm');form.reset();form.elements.supplierId.value=id;form.elements.amount.max=String(balance);$('#supplierPaymentSummary').innerHTML=`<b>${esc(supplier.name)}</b><br>Outstanding debt: <b>${money(balance)}</b>`;$('#supplierPaymentModal').showModal();
+  const supplier=suppliers.find(x=>x.id===id),balance=supplierBalance(id);if(!supplier||balance<=0)return;const form=$('#supplierPaymentForm');form.reset();form.elements.supplierId.value=id;form.elements.amount.value=formatMoneyString(balance);form.elements.amount.max=String(balance);initMoneyInputs(form);$('#supplierPaymentSummary').innerHTML=`<b>${esc(supplier.name)}</b><br>Outstanding debt: <b>${money(balance)}</b>`;$('#supplierPaymentModal').showModal();
 };
 $('#supplierPaymentForm').onsubmit=async e=>{
-  e.preventDefault();if(!can('owner','manager'))return;const f=new FormData(e.target),amount=+f.get('amount');
+  e.preventDefault();if(!can('owner','manager'))return;const f=new FormData(e.target),amount=parseMoney(f.get('amount'));
   const {error}=await sb.rpc('record_supplier_payment',{p_supplier_id:f.get('supplierId'),p_amount:amount,p_payment_method:f.get('paymentMethod'),p_note:(f.get('note')||'').trim()||null});
   if(error)return alert(error.message);e.target.reset();$('#supplierPaymentModal').close();await refresh();
 };
@@ -590,36 +876,403 @@ $('#creditForm').onsubmit=async e=>{
   if(!requireFeature('credit','Customer credit is included in Kivu Lite.'))return;
   const f=new FormData(e.target),cid=f.get('customerId')||null,name=customerName(cid)||(f.get('customer')||'').trim();
   if(!name)return alert('Select or enter a customer.');
-  const {error}=await sb.from('credits').insert({shop_id:shop.id,customer_id:cid,customer:name,amount:+f.get('amount'),due_date:f.get('dueDate')||null,note:f.get('note')||null,paid:false});
+  const creditAmt=parseMoney(f.get('amount')); const {error}=await sb.from('credits').insert({shop_id:shop.id,customer_id:cid,customer:name,amount:creditAmt,due_date:f.get('dueDate')||null,note:f.get('note')||null,paid:false});
   if(error)return alert(error.message);
-  await audit('added credit','credit',{customer:name,amount:+f.get('amount')});e.target.reset();$('#creditModal').close();await refresh();
+  await audit('added credit','credit',{customer:name,amount:creditAmt});e.target.reset();$('#creditModal').close();await refresh();
 };
-window.markPaid=async id=>{
-  if(!can('owner','manager'))return alert('Only an owner or manager can mark credit as paid.');
-  const c=credits.find(x=>x.id===id);
-  const {error}=await sb.from('credits').update({paid:true,paid_at:new Date().toISOString()}).eq('id',id);if(error)return alert(error.message);
-  await audit('marked credit paid','credit',{customer:c?.customer});await refresh();
+/* CUSTOMER AMADENI & CREDIT REPAYMENTS */
+window.markPaid=id=>{
+  openRepayCredit(id);
 };
 
-/* MULTI-PRODUCT SALES V4.5 */
+window.openRepayCredit=function(creditId){
+  const cr=credits.find(x=>x.id===creditId);
+  if(!cr)return alert('Credit record not found.');
+  const f=$('#creditRepaymentForm');
+  f.elements.creditId.value=cr.id;
+  f.elements.customerId.value=cr.customer_id||'';
+  f.elements.amount.value=formatMoneyString(cr.amount); initMoneyInputs(f);
+  f.elements.amount.max=cr.amount;
+  $('#creditRepaySummary').innerHTML=`Customer: <b>${esc(cr.customer)}</b><br>Outstanding Balance: <b>${money(cr.amount)}</b>${cr.note?`<br><small>${esc(cr.note)}</small>`:''}`;
+  $('#creditRepaymentModal').showModal();
+};
+
+window.openCustomerDebtRepay=function(customerId){
+  const c=customers.find(x=>x.id===customerId);
+  const openCrs=credits.filter(x=>!x.paid&&(x.customer_id===customerId||(c&&x.customer&&x.customer.toLowerCase()===c.name.toLowerCase())));
+  if(!openCrs.length)return alert(c?`${c.name} has no open debt.`:'No open debt found.');
+  const totalDebt=openCrs.reduce((a,x)=>a+Number(x.amount||0),0);
+  const f=$('#creditRepaymentForm');
+  f.elements.creditId.value=openCrs.length===1?openCrs[0].id:'__all__';
+  f.elements.customerId.value=customerId||'';
+  f.elements.amount.value=formatMoneyString(totalDebt); initMoneyInputs(f);
+  f.elements.amount.max=totalDebt;
+  $('#creditRepaySummary').innerHTML=`Customer: <b>${esc(c?c.name:openCrs[0].customer)}</b><br>Outstanding Balance: <b>${money(totalDebt)}</b>${openCrs.length>1?`<br><small>Paying across ${openCrs.length} credit purchase(s)</small>`:''}`;
+  $('#creditRepaymentModal').showModal();
+};
+
+$('#creditRepaymentForm')?.addEventListener('submit',async e=>{
+  e.preventDefault();
+  const f=new FormData(e.target),creditId=f.get('creditId'),customerId=f.get('customerId');
+  const repayAmount=parseMoney(f.get('amount'));
+  if(!repayAmount||repayAmount<=0)return alert('Enter a valid repayment amount.');
+  const method=f.get('paymentMethod')||'Cash';
+  const note=(f.get('note')||'').trim();
+  const now=new Date().toISOString();
+
+  let openCrs=[];
+  if(creditId==='__all__'){
+    const c=customers.find(x=>x.id===customerId);
+    openCrs=credits.filter(x=>!x.paid&&(x.customer_id===customerId||(c&&x.customer&&x.customer.toLowerCase()===c.name.toLowerCase()))).sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));
+  } else {
+    const cr=credits.find(x=>x.id===creditId);
+    if(!cr)return alert('Credit record not found.');
+    openCrs=[cr];
+  }
+  const totalDebt=openCrs.reduce((a,x)=>a+Number(x.amount||0),0);
+  if(repayAmount>totalDebt)return alert(`Repayment cannot exceed outstanding balance of ${money(totalDebt)}.`);
+
+  let remainingRepay=repayAmount;
+  for(const cr of openCrs){
+    if(remainingRepay<=0)break;
+    const curBal=Number(cr.amount||0);
+    const thisRepay=Math.min(curBal,remainingRepay);
+    remainingRepay-=thisRepay;
+    const isFull=thisRepay>=curBal;
+    const patch=isFull?{paid:true,paid_at:now}:{amount:curBal-thisRepay,note:(cr.note?cr.note+' | ':'')+`Repaid ${money(thisRepay)} via ${method} on ${day(now)}`};
+    const {error}=await sb.from('credits').update(patch).eq('id',cr.id);
+    if(error)return alert(error.message);
+
+    saveCreditRepayment({
+      id:crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random()),
+      credit_id:cr.id,customer_id:cr.customer_id||customerId,customer_name:cr.customer,
+      amount:thisRepay,payment_method:method,shift_id:currentShift?.id||null,
+      user_id:session?.user?.id||null,created_at:now,note:note||(isFull?'Full settlement':'Partial repayment')
+    });
+    await audit(isFull?'settled customer credit':'partial credit repayment','credit',{customer:cr.customer,amount:thisRepay,method,remaining:isFull?0:curBal-thisRepay});
+  }
+
+  e.target.reset();$('#creditRepaymentModal').close();await refresh();
+  alert(`Repayment of ${money(repayAmount)} recorded successfully.${method==='Cash'&&currentShift?' Cash drawer balance updated.':''}`);
+});
+
+/* CUSTOMER AMADENI LEDGER & WHATSAPP REMINDERS */
+function renderCustomerLedgerModal(c){
+  $('#ledgerCustomerName').textContent=c.name;
+  $('#ledgerCustomerPhone').textContent=c.phone?`Phone: ${c.phone}`:'No phone recorded';
+  const entries=[];
+  const custCredits=credits.filter(x=>x.customer_id===c.id||(x.customer&&x.customer.toLowerCase()===c.name.toLowerCase()));
+  const repayments=getCreditRepayments(shop.id).filter(r=>r.customer_id===c.id||(r.customer_name&&r.customer_name.toLowerCase()===c.name.toLowerCase()));
+
+  custCredits.forEach(cr=>{
+    const crRepaid=repayments.filter(r=>r.credit_id===cr.id).reduce((a,r)=>a+Number(r.amount||0),0);
+    const originalDebit=cr.paid?Math.max(Number(cr.amount||0),crRepaid):(Number(cr.amount||0)+crRepaid);
+    entries.push({date:cr.created_at,type:'Credit Purchase',note:cr.note||'Credit sale',debit:originalDebit,credit:0});
+  });
+  repayments.forEach(r=>{
+    entries.push({date:r.created_at,type:`Repayment (${r.payment_method})`,note:r.note||`Paid via ${r.payment_method}`,debit:0,credit:Number(r.amount||0)});
+  });
+  entries.sort((a,b)=>new Date(a.date)-new Date(b.date));
+  let running=0;
+  const rows=entries.map(e=>{
+    running+=e.debit-e.credit;
+    return `<tr><td>${fmt(e.date)}</td><td><span class="badge ${e.debit>0?'warn':'badge-success'}">${esc(e.type)}</span></td><td>${esc(e.note)}</td><td>${e.debit>0?money(e.debit):'—'}</td><td>${e.credit>0?`<b class="text-success">-${money(e.credit)}</b>`:'—'}</td><td><b>${money(running)}</b></td></tr>`;
+  });
+  const openBalance=custCredits.filter(x=>!x.paid).reduce((a,x)=>a+Number(x.amount||0),0);
+  $('#ledgerCustomerBalance').textContent=money(openBalance);
+  $('#ledgerTableBody').innerHTML=rows.length?rows.join(''):'<tr><td colspan="6">No ledger transactions found.</td></tr>';
+  const waBtn=$('#whatsappReminderBtn'); if(waBtn) waBtn.onclick=()=>sendWhatsappDebtReminderForCustomer(c,openBalance);
+  const prBtn=$('#printLedgerBtn'); if(prBtn) prBtn.onclick=()=>window.print();
+  $('#customerLedgerModal').showModal();
+}
+window.openCustomerLedger=id=>{const c=customers.find(x=>x.id===id); if(c)renderCustomerLedgerModal(c);};
+window.openCustomerLedgerByName=name=>{const c=customers.find(x=>x.name.toLowerCase()===String(name).toLowerCase())||{id:null,name,phone:''}; renderCustomerLedgerModal(c);};
+
+function sendWhatsappDebtReminderForCustomer(customer,balance){
+  if(!balance||balance<=0)return alert(`${customer.name} has no outstanding debt.`);
+  let phone=customer.phone?normalizeRwPhone(customer.phone).replace(/\D/g,''):'';
+  if(!phone){
+    const promptPhone=prompt(`Enter WhatsApp phone number for ${customer.name}:`,'0788...');
+    if(!promptPhone)return;
+    phone=normalizeRwPhone(promptPhone).replace(/\D/g,'');
+    if(customer.id&&phone){
+      sb.from('customers').update({phone:'+'+phone}).eq('id',customer.id).then(()=>{customer.phone='+'+phone;}).catch(()=>{});
+    }
+  }
+  const msg=`Muraho ${customer.name},\nTubibukije ko mufite umwenda wa ${money(balance)} muri ${shop.name}.\nMurakoze cyane!\n\nDear ${customer.name},\nThis is a polite reminder of your outstanding balance of ${money(balance)} at ${shop.name}.\nThank you!`;
+  window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`,'_blank');
+}
+window.sendWhatsappDebtReminder=id=>{const c=customers.find(x=>x.id===id); if(!c)return; const debt=credits.filter(x=>!x.paid&&(x.customer_id===c.id||(x.customer&&x.customer.toLowerCase()===c.name.toLowerCase()))).reduce((a,x)=>a+Number(x.amount||0),0); sendWhatsappDebtReminderForCustomer(c,debt);};
+window.sendWhatsappDebtReminderByName=name=>{const clean=String(name||'').trim(); const c=customers.find(x=>x.name.toLowerCase()===clean.toLowerCase())||{id:null,name:clean,phone:''}; const debt=credits.filter(x=>!x.paid&&((c.id&&x.customer_id===c.id)||(x.customer&&x.customer.toLowerCase()===clean.toLowerCase()))).reduce((a,x)=>a+Number(x.amount||0),0); sendWhatsappDebtReminderForCustomer(c,debt);};
+window.sendWhatsappReminderForCredit=id=>{const cr=credits.find(x=>x.id===id); if(!cr)return; const c=customers.find(x=>x.id===cr.customer_id||(x.name&&x.name.toLowerCase()===cr.customer.toLowerCase()))||{name:cr.customer,phone:''}; sendWhatsappDebtReminderForCustomer(c,Number(cr.amount||0));};
+
+/* WHOLESALE DIFFERENTIAL PRICING & MULTI-PRODUCT SALES */
+function getBulkSellingPrice(p){
+  const b=Number(p.bulk_price);
+  if(b>0) return b;
+  return Number(p.price||0)*unitsPerBulk(p);
+}
 function saleLinePreview(item){
   const p=products.find(x=>x.id===item.product_id); if(!p)return 0;
-  const ratio=item.unit_mode==='bulk'?unitsPerBulk(p):1;
-  return Number(p.price||0)*Number(item.entered_qty||0)*ratio;
+  if(item.unit_mode==='bulk') return getBulkSellingPrice(p)*Number(item.entered_qty||0);
+  return Number(p.price||0)*Number(item.entered_qty||0);
 }
 function renderSaleCart(){
   const box=$('#saleCart'),empty=$('#saleCartEmpty'); if(!box)return;
   empty?.classList.toggle('hidden',saleCart.length>0);
-  box.innerHTML=saleCart.map((item,i)=>{const p=products.find(x=>x.id===item.product_id);if(!p)return'';const unit=item.unit_mode==='bulk'?(p.bulk_unit||'Bulk'):(p.base_unit||'Piece');return `<div class="sale-cart-row"><div><b>${esc(p.name)}</b><small>${item.entered_qty} ${esc(unit)} × ${money(item.unit_mode==='bulk'?Number(p.price||0)*unitsPerBulk(p):p.price)}</small></div><strong>${money(saleLinePreview(item))}</strong><button type="button" class="btn ghost sale-cart-remove" onclick="removeSaleCartItem(${i})">Remove</button></div>`}).join('');
-  const subtotal=saleCart.reduce((a,x)=>a+saleLinePreview(x),0),discount=Math.max(0,Number($('#saleForm input[name="discount"]')?.value||0));
+  box.innerHTML=saleCart.map((item,i)=>{
+    const p=products.find(x=>x.id===item.product_id);if(!p)return'';
+    const isBulk=item.unit_mode==='bulk';
+    const unit=isBulk?(p.bulk_unit||'Bulk'):(p.base_unit||'Piece');
+    const unitPrice=isBulk?getBulkSellingPrice(p):Number(p.price||0); const hasBulk=unitsPerBulk(p)>1;
+    return `<div class="sale-cart-row">
+      <div class="cart-item-info">
+        <div class="cart-item-title-row"><b>${esc(p.name)}</b>${hasBulk?`<button type="button" class="btn-unit-chip" onclick="toggleCartItemUnit(${i})" title="Switch between piece and bulk unit">${esc(unit)} ⇄</button>`:`<span class="unit-static-badge">${esc(unit)}</span>`}</div>
+        <small>${item.entered_qty} ${esc(unit)} × ${money(unitPrice)}${isBulk&&Number(p.bulk_price)>0?' (bulk rate)':''}</small>
+      </div>
+      <div class="cart-qty-ctrl">
+        <button type="button" class="cart-qty-btn" onclick="updateSaleCartQty(${i},-1)" title="Decrease quantity">−</button>
+        <input type="number" min="0.001" step="any" class="cart-qty-input" value="${item.entered_qty}" onchange="setSaleCartQty(${i},this.value)" aria-label="Quantity for ${esc(p.name)}">
+        <button type="button" class="cart-qty-btn" onclick="updateSaleCartQty(${i},1)" title="Increase quantity">+</button>
+      </div>
+      <strong class="cart-line-total">${money(saleLinePreview(item))}</strong>
+      <button type="button" class="btn ghost sale-cart-remove" onclick="removeSaleCartItem(${i})">✕</button>
+    </div>`;
+  }).join('');
+  const subtotal=saleCart.reduce((a,x)=>a+saleLinePreview(x),0),discount=Math.max(0,parseMoney($('#saleForm input[name="discount"]')?.value||0));
   if($('#saleCartSubtotal'))$('#saleCartSubtotal').textContent=money(subtotal);
   if($('#saleCartTotal'))$('#saleCartTotal').textContent=money(Math.max(0,subtotal-discount));
+  updateTenderedCalculator();
 }
-window.removeSaleCartItem=i=>{saleCart.splice(i,1);renderSaleCart();};
-function resetSaleCart(){saleCart=[];renderSaleCart();}
-$('#saleForm select[name="payment"]').onchange=e=>$('#saleCustomerWrap').classList.toggle('hidden',e.target.value!=='Credit');
+window.updateSaleCartQty=function(i,delta){
+  const item=saleCart[i]; if(!item)return;
+  const p=products.find(x=>x.id===item.product_id); if(!p)return;
+  const newQty=Number(item.entered_qty)+delta;
+  if(newQty<=0){
+    saleCart.splice(i,1);
+    renderSaleCart(); renderSaleQuickResults();
+    return;
+  }
+  const ratio=item.unit_mode==='bulk'?unitsPerBulk(p):1;
+  const otherLinesBase=saleCart.filter((x,idx)=>idx!==i&&x.product_id===item.product_id).reduce((a,x)=>a+Number(x.entered_qty)*(x.unit_mode==='bulk'?unitsPerBulk(p):1),0);
+  if((newQty*ratio)+otherLinesBase > Number(p.qty||0)){
+    return alert(`Not enough stock. Maximum available: ${p.qty} ${baseUnitLabel(p)}.`);
+  }
+  item.entered_qty=newQty;
+  renderSaleCart(); renderSaleQuickResults();
+};
+window.removeSaleCartItem=i=>{saleCart.splice(i,1);renderSaleCart();renderSaleQuickResults();};
+window.setSaleCartQty=function(i,val){
+  const item=saleCart[i]; if(!item)return;
+  const p=products.find(x=>x.id===item.product_id); if(!p)return;
+  const newQty=Number(val);
+  if(!newQty||newQty<=0){
+    saleCart.splice(i,1);
+    renderSaleCart(); renderSaleQuickResults();
+    return;
+  }
+  const ratio=item.unit_mode==='bulk'?unitsPerBulk(p):1;
+  const otherLinesBase=saleCart.filter((x,idx)=>idx!==i&&x.product_id===item.product_id).reduce((a,x)=>a+Number(x.entered_qty)*(x.unit_mode==='bulk'?unitsPerBulk(p):1),0);
+  if((newQty*ratio)+otherLinesBase > Number(p.qty||0)){
+    alert(`Not enough stock. Maximum available: ${p.qty} ${baseUnitLabel(p)}.`);
+    renderSaleCart();
+    return;
+  }
+  item.entered_qty=newQty;
+  renderSaleCart(); renderSaleQuickResults();
+};
+function resetSaleCart(){
+  saleCart=[];
+  const f=$('#saleForm');
+  if(f){
+    if(f.elements.discount) f.elements.discount.value='0';
+    if($('#splitCashInput')) $('#splitCashInput').value='0';
+    if($('#splitMomoInput')) $('#splitMomoInput').value='0';
+    if($('#splitBankInput')) $('#splitBankInput').value='0';
+    if($('#amountTenderedInput')) $('#amountTenderedInput').value='';
+  }
+  lastTenderedInfo=null;
+  renderSaleCart();
+  renderSaleQuickResults();
+}
+window.toggleCartItemUnit=function(i){
+  const item=saleCart[i]; if(!item)return;
+  const p=products.find(x=>x.id===item.product_id); if(!p)return;
+  if(unitsPerBulk(p)<=1)return;
+  const ratio=unitsPerBulk(p);
+  const isCurrentlyBulk=item.unit_mode==='bulk';
+  const newMode=isCurrentlyBulk?'base':'bulk';
+  const newQty=isCurrentlyBulk ? Math.round(Number(item.entered_qty)*ratio) : (Number(item.entered_qty)>=ratio ? Math.floor(Number(item.entered_qty)/ratio) : 1);
+  const newRatio=newMode==='bulk'?ratio:1;
+  const otherLinesBase=saleCart.filter((x,idx)=>idx!==i&&x.product_id===item.product_id).reduce((a,x)=>a+Number(x.entered_qty)*(x.unit_mode==='bulk'?ratio:1),0);
+  if((newQty*newRatio)+otherLinesBase>Number(p.qty||0)){
+    return alert(`Not enough stock. Available: ${p.qty} ${baseUnitLabel(p)}.`);
+  }
+  item.entered_qty=newQty;
+  item.unit_mode=newMode;
+  renderSaleCart();
+  renderSaleQuickResults();
+};
+
+/* COUNTER POS LIVE SEARCH & CATEGORY QUICK PILLS */
+function renderSaleCategoryPills(){
+  const box=$('#saleCategoryPills'); if(!box)return;
+  const cats=['All',...new Set(products.map(p=>p.category).filter(Boolean))];
+  box.innerHTML=cats.map(c=>{
+    const active=c===selectedSaleCategory;
+    return `<button type="button" class="pill-btn ${active?'active':''}" onclick="selectSaleCategory('${esc(c)}')">${esc(c)}</button>`;
+  }).join('');
+}
+window.selectSaleCategory=function(cat){
+  selectedSaleCategory=cat;
+  renderSaleCategoryPills();
+  renderSaleQuickResults();
+};
+
+function renderSaleQuickResults(){
+  const resBox=$('#saleQuickResults'); if(!resBox)return;
+  const q=saleSearchQuery.toLowerCase().trim();
+  // POS catalog is always visible for 1-tap ordering
+  resBox.classList.remove('hidden');
+  /* catalog always ready */
+  let filtered=products;
+  if(selectedSaleCategory!=='All') filtered=filtered.filter(p=>p.category===selectedSaleCategory);
+  if(q) filtered=filtered.filter(p=>(p.name&&p.name.toLowerCase().includes(q))||(p.barcode&&p.barcode.toLowerCase().includes(q)));
+  if(!filtered.length){
+    resBox.classList.remove('hidden'); resBox.innerHTML='<div class="notice mini">No matching products found.</div>'; return;
+  }
+  resBox.classList.remove('hidden');
+  const maxItems=q?36:48; resBox.innerHTML=filtered.slice(0,maxItems).map(p=>{
+    const stockQty=Number(p.qty||0),stockOk=stockQty>0,isLow=stockQty<=Number(p.low_stock||0); const inCartQty=saleCart.filter(x=>x.product_id===p.id).reduce((a,x)=>a+Number(x.entered_qty||0),0);
+    return `<div class="pos-quick-card ${stockOk?'':'out-of-stock'} ${inCartQty>0?'in-cart':''}" onclick="quickAddProductToCart('${p.id}')">${inCartQty>0?`<span class="pos-cart-badge" title="${inCartQty} in cart">✓ ${inCartQty}</span>`:''}<div class="pos-card-main"><b class="pos-card-name">${esc(p.name)}</b><div class="pos-card-price">${money(p.price)}</div></div><div class="pos-card-foot"><span class="pos-stock-tag ${!stockOk?'stock-out':(isLow?'stock-low':'stock-ok')}">${stockOk?`${stockQty} ${esc(baseUnitLabel(p))}`:'Out of stock'}</span></div></div>`;
+  }).join('');
+}
+
+window.quickAddProductToCart=function(productId){
+  const p=products.find(x=>x.id===productId); if(!p)return;
+  if(Number(p.qty)<=0)return alert(`${p.name} is out of stock.`);
+  const alreadyBase=saleCart.filter(x=>x.product_id===productId).reduce((a,x)=>a+Number(x.entered_qty)*(x.unit_mode==='bulk'?unitsPerBulk(p):1),0);
+  if(alreadyBase+1>Number(p.qty))return alert(`Not enough stock. Available: ${p.qty} ${baseUnitLabel(p)}.`);
+  const existing=saleCart.find(x=>x.product_id===productId&&x.unit_mode==='base');
+  if(existing) existing.entered_qty+=1;
+  else saleCart.push({product_id:productId,entered_qty:1,unit_mode:'base'});
+  const f=$('#saleForm');
+  if(f?.elements?.productId){
+    f.elements.productId.value=productId;
+    refreshSaleUnitOptions();
+  }
+  renderSaleCart(); renderSaleQuickResults();
+};
+
+$('#saleProductSearch')?.addEventListener('input',e=>{
+  saleSearchQuery=e.target.value;
+  $('#clearSaleSearchBtn')?.classList.toggle('hidden',!saleSearchQuery);
+  renderSaleQuickResults();
+});
+$('#saleProductSearch')?.addEventListener('keydown',e=>{
+  if(e.key==='Enter'){
+    e.preventDefault();
+    const q=(saleSearchQuery||'').trim(); if(!q)return;
+    const match=products.find(p=>p.barcode&&String(p.barcode).trim().toLowerCase()===q.toLowerCase())||
+      (products.filter(p=>(p.name&&p.name.toLowerCase().includes(q.toLowerCase()))||(p.barcode&&String(p.barcode).toLowerCase().includes(q.toLowerCase()))).length===1
+        ? products.find(p=>(p.name&&p.name.toLowerCase().includes(q.toLowerCase()))||(p.barcode&&String(p.barcode).toLowerCase().includes(q.toLowerCase())))
+        : null);
+    if(match){
+      quickAddProductToCart(match.id);
+      $('#saleProductSearch').value=''; saleSearchQuery='';
+      $('#clearSaleSearchBtn')?.classList.add('hidden');
+      renderSaleQuickResults();
+    }
+  }
+});
+$('#clearSaleSearchBtn')?.addEventListener('click',()=>{
+  $('#saleProductSearch').value=''; saleSearchQuery='';
+  $('#clearSaleSearchBtn').classList.add('hidden');
+  renderSaleQuickResults();
+});
+
+/* AMOUNT TENDERED & CHANGE DUE CALCULATOR + RETAIL SPLIT PAYMENTS */
+function updateTenderedCalculator(){
+  const f=$('#saleForm'); if(!f)return;
+  const payMethod=f.elements.payment.value;
+  $('#splitPaymentSection')?.classList.toggle('hidden',payMethod!=='Split');
+  $('#saleCustomerWrap')?.classList.toggle('hidden',payMethod!=='Credit');
+
+  const subtotal=saleCart.reduce((a,x)=>a+saleLinePreview(x),0);
+  const discount=Math.max(0,parseMoney(f.elements.discount?.value||0));
+  const total=Math.max(0,subtotal-discount);
+
+  let cashTarget=total;
+  if(payMethod==='Split'){
+    const sc=Math.max(0,parseMoney($('#splitCashInput')?.value||0));
+    const sm=Math.max(0,parseMoney($('#splitMomoInput')?.value||0));
+    const sbk=Math.max(0,parseMoney($('#splitBankInput')?.value||0));
+    const allocated=sc+sm+sbk, remaining=total-allocated;
+    if($('#splitAllocatedDisplay')) $('#splitAllocatedDisplay').textContent=money(allocated);
+    if($('#splitRemainingDisplay')) $('#splitRemainingDisplay').textContent=money(remaining);
+    $('#splitRemainingWrap')?.classList.toggle('text-danger',remaining!==0);
+    cashTarget=sc;
+  }
+
+  const hasCash=payMethod==='Cash'||(payMethod==='Split'&&parseMoney($('#splitCashInput')?.value||0)>0);
+  $('#tenderedSection')?.classList.toggle('hidden',!hasCash);
+
+  const tendered=parseMoney($('#amountTenderedInput')?.value||0);
+  const changeDisplay=$('#changeDueDisplay');
+  if(!changeDisplay)return;
+  if(tendered>0){
+    const change=tendered-cashTarget;
+    if(change>=0){
+      changeDisplay.textContent=money(change);
+      changeDisplay.className='text-success change-amount';
+      lastTenderedInfo={tendered,change};
+    } else {
+      changeDisplay.textContent=`Short ${money(Math.abs(change))}`;
+      changeDisplay.className='text-warning change-amount';
+      lastTenderedInfo=null;
+    }
+  } else {
+    changeDisplay.textContent='0 RWF';
+    changeDisplay.className='change-amount';
+    lastTenderedInfo=null;
+  }
+}
+
+$$('.cash-quick-btn').forEach(btn=>{
+  btn.onclick=()=>{
+    const f=$('#saleForm'); if(!f)return;
+    const subtotal=saleCart.reduce((a,x)=>a+saleLinePreview(x),0);
+    const discount=Math.max(0,parseMoney(f.elements.discount?.value||0));
+    const total=Math.max(0,subtotal-discount);
+    const target=f.elements.payment.value==='Split'?Math.max(0,parseMoney($('#splitCashInput')?.value||0)):total;
+    const amt=btn.dataset.amt;
+    const inp=$('#amountTenderedInput'); if(!inp)return;
+    if(amt==='exact') inp.value=formatMoneyString(target);
+    else { const delta=Number(amt); inp.value=formatMoneyString(target>0?Math.max(target,Math.ceil(target/delta)*delta):delta); }
+    updateTenderedCalculator();
+  };
+});
+$('#amountTenderedInput')?.addEventListener('input',updateTenderedCalculator);
+$('#splitCashInput')?.addEventListener('input',updateTenderedCalculator);
+$('#splitMomoInput')?.addEventListener('input',updateTenderedCalculator);
+$('#splitBankInput')?.addEventListener('input',updateTenderedCalculator);
+
+$('#saleForm select[name="payment"]').onchange=()=>{
+  const f=$('#saleForm'); syncPaymentMethodUI(f.elements.payment.value);
+  if(f.elements.payment.value==='Split'){
+    const subtotal=saleCart.reduce((a,x)=>a+saleLinePreview(x),0);
+    const discount=Math.max(0,parseMoney(f.elements.discount?.value||0));
+    const total=Math.max(0,subtotal-discount);
+    if($('#splitCashInput')&&!parseMoney($('#splitCashInput').value)&&!parseMoney($('#splitMomoInput')?.value)) {
+      $('#splitCashInput').value=formatMoneyString(Math.round(total/2));
+      if($('#splitMomoInput')) $('#splitMomoInput').value=formatMoneyString(total-Math.round(total/2));
+    }
+  }
+  updateTenderedCalculator();
+}; $$('#posPaymentPills .pos-pay-pill').forEach(btn=>{ btn.onclick=()=>syncPaymentMethodUI(btn.dataset.method); });
 $('#saleForm select[name="productId"]')?.addEventListener('change',refreshSaleUnitOptions);
 $('#saleForm input[name="discount"]')?.addEventListener('input',renderSaleCart);
+
 $('#addSaleItemBtn')?.addEventListener('click',()=>{
   const f=$('#saleForm'),pid=f.elements.productId.value,qty=Number(f.elements.qty.value),mode=f.elements.saleUnit.value||'base',p=products.find(x=>x.id===pid);
   if(!p)return alert('Select a product.'); if(!qty||qty<=0)return alert('Enter a quantity greater than zero.');
@@ -629,36 +1282,167 @@ $('#addSaleItemBtn')?.addEventListener('click',()=>{
   const same=saleCart.find(x=>x.product_id===pid&&x.unit_mode===mode); if(same)same.entered_qty+=qty; else saleCart.push({product_id:pid,entered_qty:qty,unit_mode:mode});
   f.elements.qty.value='1';renderSaleCart();
 });
+
+/* PARK / HOLD CART */
+$('#parkCartBtn')?.addEventListener('click',()=>{
+  if(!saleCart.length)return alert('Cart is empty. Add products before holding.');
+  const notePrompt=prompt('Enter a note or customer name for this held cart (e.g. "Customer getting cash"):','Customer waiting');
+  if(notePrompt===null) return;
+  const note=notePrompt.trim()||'Held cart';
+  const f=$('#saleForm');
+  const discount=Number(f?.elements?.discount?.value||0),cid=f?.elements?.customerId?.value||'',customerName=f?.elements?.customerName?.value||'';
+  const subtotal=saleCart.reduce((a,x)=>a+saleLinePreview(x),0);
+  const held={
+    id:crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random()),
+    items:JSON.parse(JSON.stringify(saleCart)),discount,customerId:cid,customerName,
+    note,total:Math.max(0,subtotal-discount),savedAt:new Date().toISOString()
+  };
+  const list=getHeldCarts(); list.unshift(held); saveHeldCarts(list);
+  resetSaleCart(); if(f) f.reset();
+  initSaleModal();
+  alert('Cart held safely. You can now serve the next customer.');
+});
+$('#viewParkedCartsBtn')?.addEventListener('click',()=>{renderParkedCartsModal();$('#parkedCartsModal').showModal();});
+
+function renderParkedCartsModal(){
+  const list=getHeldCarts(),box=$('#parkedCartsList'); if(!box)return;
+  box.innerHTML=list.length?list.map(c=>`
+    <div class="parked-cart-item"><div><b>${esc(c.note)}</b><small>${fmt(c.savedAt)} · ${c.items.length} item(s)</small><strong>${money(c.total)}</strong></div><div class="parked-cart-actions"><button type="button" class="btn primary" onclick="resumeParkedCart('${c.id}')">Resume</button><button type="button" class="btn danger" onclick="discardParkedCart('${c.id}')">Discard</button></div></div>
+  `).join(''):'<div class="notice mini">No held carts currently.</div>';
+}
+window.resumeParkedCart=function(id){
+  const list=getHeldCarts(),c=list.find(x=>x.id===id); if(!c)return alert('Held cart not found.');
+  if(saleCart.length>0&&!confirm('Active cart has items. Replace active cart with held cart?'))return;
+  const validItems=c.items.filter(it=>products.some(p=>p.id===it.product_id));
+  if(!validItems.length) return alert('Cannot resume cart: products in this held cart no longer exist in inventory.');
+  saleCart=JSON.parse(JSON.stringify(validItems));
+  const f=$('#saleForm');
+  if(f){
+    if(f.elements.discount) f.elements.discount.value=c.discount||0;
+    if(f.elements.customerId) f.elements.customerId.value=c.customerId||'';
+    if(f.elements.customerName) f.elements.customerName.value=c.customerName||'';
+    if(c.customerId) $('#saleCustomerWrap')?.classList.remove('hidden');
+  }
+  saveHeldCarts(list.filter(x=>x.id!==id));
+  $('#parkedCartsModal')?.close();
+  if(!$('#saleModal')?.open) $('#saleModal')?.showModal();
+  renderSaleCart();
+  updateTenderedCalculator();
+};
+window.discardParkedCart=function(id){
+  if(!confirm('Discard this held cart?'))return;
+  const list=getHeldCarts(); saveHeldCarts(list.filter(x=>x.id!==id)); renderParkedCartsModal();
+};
+
+/* SALE SUBMISSION */
 $('#saleForm').onsubmit=async e=>{
   e.preventDefault(); if(!saleCart.length)return alert('Add at least one product to the cart.');
-  const f=new FormData(e.target),cid=f.get('customerId')||null,name=customerName(cid)||(f.get('customerName')||'').trim()||null,payment=f.get('payment'),discount=+f.get('discount')||0;
-  if(payment==='Credit'&&!cid&&!name)return alert('Select or enter a customer for a credit sale.');
-  const payload={items:saleCart.map(x=>({...x})),payment,discount,customer_id:cid,customer_name:name,client_ref:window.KivuOffline?.newClientRef?.()||crypto.randomUUID()};
+  const f=new FormData(e.target),cid=f.get('customerId')||null,name=customerName(cid)||(f.get('customerName')||'').trim()||null,rawPayment=f.get('payment'),discount=parseMoney(f.get('discount'));
+  if(rawPayment==='Credit'&&!cid&&!name)return alert('Select or enter a customer for a credit sale.');
+
+  const subtotal=saleCart.reduce((a,x)=>a+saleLinePreview(x),0);
+  const total=Math.max(0,subtotal-discount);
+  let paymentStr=rawPayment, splitDetails=null;
+
+  if(rawPayment==='Split'){
+    const sc=Math.max(0,parseMoney($('#splitCashInput')?.value||0));
+    const sm=Math.max(0,parseMoney($('#splitMomoInput')?.value||0));
+    const sbk=Math.max(0,parseMoney($('#splitBankInput')?.value||0));
+    if(Math.round(sc+sm+sbk)!==Math.round(total)){
+      return alert(`Split payment amounts (${money(sc+sm+sbk)}) do not match total to pay (${money(total)}). Please adjust.`);
+    }
+    splitDetails={cash:sc,momo:sm,bank:sbk};
+    paymentStr=`Split (Cash ${sc}, MoMo ${sm}${sbk?`, Bank ${sbk}`:''})`;
+  }
+
+  const tendered=parseMoney($('#amountTenderedInput')?.value||0);
+  const cashTarget=rawPayment==='Split'?(splitDetails?.cash||0):(rawPayment==='Cash'?total:0);
+  if(cashTarget>0&&tendered>0&&tendered<cashTarget){
+    if(!confirm(`Tendered cash (${money(tendered)}) is less than cash due (${money(cashTarget)}). Continue anyway?`))return;
+  }
+  let currentSaleTendered=null;
+  if(tendered>0&&cashTarget>0){
+    currentSaleTendered={tendered,change:Math.max(0,tendered-cashTarget)};
+  }
+
+  const clientRef=window.KivuOffline?.newClientRef?.()||crypto.randomUUID();
+  const payloadItems=saleCart.map(x=>{
+    const p=products.find(pr=>pr.id===x.product_id);
+    const isB=x.unit_mode==='bulk';
+    return {
+      ...x,
+      unit_price: isB?getBulkSellingPrice(p):Number(p?.price||0),
+      line_total: saleLinePreview(x)
+    };
+  });
+  const payload={items:payloadItems,payment:paymentStr,discount,customer_id:cid,customer_name:name,client_ref:clientRef};
+
   if(!navigator.onLine){
     if(!window.KivuOffline)return alert('Offline queue is not available. Reconnect before recording this sale.');
     await window.KivuOffline.enqueueSale({shop_id:shop.id,user_id:session.user.id,...payload});
     applyOfflineStockDraft(payload.items);
+    if(splitDetails) saveSplitPaymentDetails(clientRef, splitDetails);
+    if(currentSaleTendered) saveReceiptTendered(clientRef, currentSaleTendered);
     e.target.reset();resetSaleCart();$('#saleCustomerWrap').classList.add('hidden');$('#saleModal').close();saveOfflineSnapshot();await updateConnectivityUI();
-    alert('Sale saved safely on this device. It will sync when internet returns. A final receipt will be issued after server stock validation.');
+    alert('Sale saved safely on this device. It will sync when internet returns.');
     return;
   }
-  const {data:receiptNo,error}=await sb.rpc('record_sale_cart_v48',{p_items:payload.items,p_payment:payment,p_discount:discount,p_customer_id:cid,p_customer_name:name,p_client_ref:payload.client_ref});
+
+  let {data:receiptNo,error}=await sb.rpc('record_sale_cart_v48',{p_items:payload.items,p_payment:paymentStr,p_discount:discount,p_customer_id:cid,p_customer_name:name,p_client_ref:payload.client_ref});
+  if(error&&rawPayment==='Split'&&(error.message?.includes('violates check constraint')||error.message?.includes('payment'))){
+    const fallback=(splitDetails.cash>=splitDetails.momo)?'Cash':'Mobile Money';
+    const retry=await sb.rpc('record_sale_cart_v48',{p_items:payload.items,p_payment:fallback,p_discount:discount,p_customer_id:cid,p_customer_name:name,p_client_ref:payload.client_ref});
+    if(!retry.error){receiptNo=retry.data; error=null;}
+  }
   if(error)return alert(error.message);
+
+  if(splitDetails) saveSplitPaymentDetails(receiptNo, splitDetails);
+  if(currentSaleTendered) saveReceiptTendered(receiptNo, currentSaleTendered);
+
   const {data:lines,error:se}=await sb.from('sales').select('*').eq('shop_id',shop.id).eq('receipt_no',receiptNo).order('created_at',{ascending:true});
   if(se)return alert(se.message);
-  e.target.reset();resetSaleCart();$('#saleCustomerWrap').classList.add('hidden');$('#saleModal').close();await refresh();showReceiptGroup(lines||[]);
+  e.target.reset();resetSaleCart();$('#saleCustomerWrap').classList.add('hidden');$('#saleModal').close();await refresh();showReceiptGroup(lines||[], currentSaleTendered);
 };
 
-/* EXPENSES V3.5.1 — owner/manager only */
+/* EXPENSES & PETTY CASH */
 $('#expenseForm').onsubmit=async e=>{
   e.preventDefault();
   if(!can('owner','manager'))return alert('Only an owner or manager can record expenses.');
   if(!ensureSubscriptionAccess())return;
   const f=new FormData(e.target);
-  const {data:expenseId,error}=await sb.rpc('record_expense',{p_description:(f.get('description')||'').trim(),p_amount:+f.get('amount'),p_category:f.get('category')||'Other'});
+  const {data:expenseId,error}=await sb.rpc('record_expense',{p_description:(f.get('description')||'').trim(),p_amount:parseMoney(f.get('amount')),p_category:f.get('category')||'Other'});
   if(error)return alert(error.message);
   e.target.reset();$('#expenseModal').close();await refresh();
 };
+
+$('#pettyCashBtn')?.addEventListener('click',()=>{
+  if(!currentShift)return alert('You must have an open shift to log a petty cash drawer payout.');
+  $('#pettyCashModal').showModal();
+});
+$('#pettyCashForm')?.addEventListener('submit',async e=>{
+  e.preventDefault();
+  if(!currentShift)return alert('No open shift found.');
+  const f=new FormData(e.target),amt=parseMoney(f.get('amount'));
+  if(!amt||amt<=0)return alert('Enter a valid amount.');
+  if(amt>5000)return alert('Petty cash payouts from the drawer must be under 5,000 RWF. Larger expenses require owner/manager recording.');
+  const reason=(f.get('description')||'').trim(),cat=f.get('category')||'Supplies',paidTo=(f.get('paidTo')||'').trim();
+  const desc=`Petty cash payout: ${reason}${paidTo?` (Paid to: ${paidTo})`:''}`;
+
+  const payoutRecord={
+    id:crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random()),
+    shift_id:currentShift.id,amount:amt,category:cat,description:desc,reason,paid_to:paidTo,
+    user_id:session?.user?.id,user_name:profile.full_name||roleLabel(profile.role),created_at:new Date().toISOString()
+  };
+  saveShiftPettyCashPayout(shop.id, payoutRecord);
+
+  try {
+    await sb.rpc('record_expense',{p_description:desc,p_amount:amt,p_category:cat});
+  } catch(_e){}
+
+  await audit('logged petty cash payout','shift',{shift_id:currentShift.id,amount:amt,reason});
+  e.target.reset();$('#pettyCashModal').close();await refresh();
+  alert(`Petty cash payout of ${money(amt)} recorded and deducted from cash drawer.`);
+});
 
 /* STAFF INVITES */
 $('#staffInviteForm').onsubmit=async e=>{
@@ -674,54 +1458,202 @@ $('#staffInviteForm').onsubmit=async e=>{
   alert(`Staff invite created.\n\nInvite code: ${code}\nPhone: ${phone}\n\nThe employee should choose Join as staff, enter this code and phone number, then create a 6-digit PIN. The invite expires in 14 days.`);
 };
 
-/* SHIFTS */
+/* SHIFTS & RECONCILIATION */
 $('#openShiftBtn').onclick=()=>{if(!requireFeature('shifts','Shift management is included from Kivu Business.'))return;currentShift?alert('You already have an open shift.'):$('#openShiftModal').showModal()};
 $('#openShiftForm').onsubmit=async e=>{
   e.preventDefault();
   if(!can('owner','manager','cashier'))return alert('Your role does not use cash shifts.');
   if(!requireFeature('shifts','Shift management is included from Kivu Business.'))return;
   const f=new FormData(e.target);
-  const {error}=await sb.from('shifts').insert({shop_id:shop.id,user_id:session.user.id,employee_name:profile.full_name||roleLabel(profile.role),opening_cash:+f.get('openingCash'),status:'open'});
+  const openingAmt=parseMoney(f.get('openingCash')); const {error}=await sb.from('shifts').insert({shop_id:shop.id,user_id:session.user.id,employee_name:profile.full_name||roleLabel(profile.role),opening_cash:openingAmt,status:'open'});
   if(error)return alert(error.message);
-  await audit('opened shift','shift',{opening_cash:+f.get('openingCash')});e.target.reset();$('#openShiftModal').close();await refresh();
+  await audit('opened shift','shift',{opening_cash:openingAmt});e.target.reset();$('#openShiftModal').close();await refresh();
 };
-function calcShift(s){
-  const ss=sales.filter(x=>x.shift_id===s.id&&x.status!=='voided'),ee=expenses.filter(x=>x.shift_id===s.id&&x.approval_status!=='rejected');
-  const cash=ss.filter(x=>x.payment==='Cash').reduce((a,x)=>a+Number(x.total),0);
-  const momo=ss.filter(x=>x.payment==='Mobile Money').reduce((a,x)=>a+Number(x.total),0);
-  const bank=ss.filter(x=>x.payment==='Bank').reduce((a,x)=>a+Number(x.total),0);
-  const credit=ss.filter(x=>x.payment==='Credit').reduce((a,x)=>a+Number(x.total),0);
-  const total=ss.reduce((a,x)=>a+Number(x.total),0),ex=ee.reduce((a,x)=>a+Number(x.amount),0);
-  return{cash,momo,bank,credit,total,ex,expected:Number(s.opening_cash)+cash-ex};
+
+function getSalePaymentBreakdown(s){
+  const pay=String(s.payment||'Cash');
+  let isSplit=pay.toLowerCase().includes('split');
+  let savedSplit=null;
+  if(s.receipt_no){
+    savedSplit=getSplitPaymentDetails(s.receipt_no);
+    if(savedSplit) isSplit=true;
+  }
+
+  if(!isSplit){
+    if(pay==='Cash') return {cash:Number(s.total)||0,momo:0,bank:0,credit:0};
+    if(pay==='Mobile Money'||pay==='MoMo') return {cash:0,momo:Number(s.total)||0,bank:0,credit:0};
+    if(pay==='Bank') return {cash:0,momo:0,bank:Number(s.total)||0,credit:0};
+    if(pay==='Credit') return {cash:0,momo:0,bank:0,credit:Number(s.total)||0};
+    return {cash:Number(s.total)||0,momo:0,bank:0,credit:0};
+  }
+
+  let totalCash=0,totalMomo=0,totalBank=0;
+  if(savedSplit){
+    totalCash=Number(savedSplit.cash||0);
+    totalMomo=Number(savedSplit.momo||0);
+    totalBank=Number(savedSplit.bank||0);
+  } else {
+    const mc=pay.match(/Cash\s*([0-9.,]+)/i);
+    const mm=pay.match(/(?:MoMo|Mobile Money)\s*([0-9.,]+)/i);
+    const mb=pay.match(/Bank\s*([0-9.,]+)/i);
+    if(mc) totalCash=Number(mc[1].replace(/,/g,''))||0;
+    if(mm) totalMomo=Number(mm[1].replace(/,/g,''))||0;
+    if(mb) totalBank=Number(mb[1].replace(/,/g,''))||0;
+    if(totalCash+totalMomo+totalBank===0) totalCash=Number(s.total)||0;
+  }
+
+  const sTotal=Number(s.total)||0;
+  if(s.receipt_no){
+    const group=sales.filter(x=>x.receipt_no===s.receipt_no&&x.status!=='voided');
+    if(group.length>1){
+      const sumTotal=group.reduce((sum,item)=>sum+Number(item.total||0),0);
+      const ratio=sumTotal>0?(sTotal/sumTotal):(1/group.length);
+      return {
+        cash:Math.round(totalCash*ratio),
+        momo:Math.round(totalMomo*ratio),
+        bank:Math.round(totalBank*ratio),
+        credit:0
+      };
+    }
+  }
+
+  return {cash:totalCash,momo:totalMomo,bank:totalBank,credit:0};
 }
+
+function calcShift(s){
+  const ss=sales.filter(x=>x.shift_id===s.id&&x.status!=='voided');
+  const ee=expenses.filter(x=>x.shift_id===s.id&&x.approval_status!=='rejected');
+  let cash=0,momo=0,bank=0,credit=0;
+  ss.forEach(x=>{
+    const b=getSalePaymentBreakdown(x);
+    cash+=b.cash; momo+=b.momo; bank+=b.bank; credit+=b.credit;
+  });
+  const debtCash=getShiftDebtCollections(s.id);
+  const localPetty=getShiftPettyCashPayouts(shop.id).filter(x=>x.shift_id===s.id);
+  const localPettyTotal=localPetty.reduce((a,x)=>a+Number(x.amount||0),0);
+  const eePettyTotal=ee.filter(x=>x.is_petty_cash||x.category==='Petty Cash'||(x.description&&x.description.toLowerCase().includes('petty cash'))).reduce((a,x)=>a+Number(x.amount||0),0);
+  const pettyCash=Math.max(localPettyTotal, eePettyTotal);
+  const otherExpenses=Math.max(0, ee.reduce((a,x)=>a+Number(x.amount||0),0) - eePettyTotal);
+  const ex=pettyCash + otherExpenses;
+  const total=ss.reduce((a,x)=>a+Number(x.total||0),0);
+  const expected=Number(s.opening_cash||0)+cash+debtCash-ex;
+  return{cash,momo,bank,credit,total,ex,debtCash,pettyCash,otherExpenses,expected};
+}
+
 $('#closeShiftBtn').onclick=()=>{
   if(!currentShift)return;
   const c=calcShift(currentShift);
-  $('#closeShiftPreview').innerHTML=`Opening cash: <b>${money(currentShift.opening_cash)}</b><br>Cash sales: <b>${money(c.cash)}</b><br>Mobile Money: <b>${money(c.momo)}</b><br>Bank: <b>${money(c.bank)}</b><br>Credit sales: <b>${money(c.credit)}</b><br>Expenses: <b>${money(c.ex)}</b><br>Total sales: <b>${money(c.total)}</b><br>Expected physical cash: <b>${money(c.expected)}</b>`;
+  $('#closeShiftPreview').innerHTML=`Opening float: <b>${money(currentShift.opening_cash)}</b><br>Cash sales: <b>${money(c.cash)}</b><br>Mobile Money: <b>${money(c.momo)}</b><br>Bank: <b>${money(c.bank)}</b><br>Credit sales: <b>${money(c.credit)}</b><br>Cash debt collections: <b>${money(c.debtCash)}</b><br>Petty cash payouts: <b>-${money(c.pettyCash)}</b><br>Other shift expenses: <b>-${money(c.otherExpenses)}</b><br>Total sales: <b>${money(c.total)}</b><br><hr>Expected physical cash in drawer: <b>${money(c.expected)}</b>`;
   $('#closeShiftModal').showModal();
 };
+
 $('#closeShiftForm').onsubmit=async e=>{
   e.preventDefault();if(!currentShift)return;
-  const f=new FormData(e.target),c=calcShift(currentShift),actual=+f.get('actualCash');
+  const f=new FormData(e.target),c=calcShift(currentShift),actual=parseMoney(f.get('actualCash'));
   const diff=actual-c.expected,reason=(f.get('varianceReason')||'').trim();
   if(Math.abs(diff)>0.001&&!reason)return alert('Enter a reason for the cash difference before closing the shift.');
-  const {error}=await sb.rpc('close_shift_controlled',{p_shift_id:currentShift.id,p_actual_cash:actual,p_variance_reason:reason||null});
+  const closedId=currentShift.id;
+  const {error}=await sb.rpc('close_shift_controlled',{p_shift_id:closedId,p_actual_cash:actual,p_variance_reason:reason||null});
   if(error)return alert(error.message);
+  try{ await sb.from('shifts').update({expected_cash:c.expected, difference:diff, actual_cash:actual}).eq('id',closedId); }catch(_e){}
   e.target.reset();$('#closeShiftModal').close();await refresh();
+  openShiftZReport(closedId);
 };
 
+/* PRINTABLE 80MM SHIFT Z-REPORT */
+window.openShiftZReport=function(shiftId){
+  const s=shifts.find(x=>x.id===shiftId)||currentShift;
+  if(!s)return alert('Shift not found.');
+  const c=calcShift(s);
+  const diff=s.actual_cash!=null ? (Number(s.actual_cash) - c.expected) : (s.difference!=null ? Number(s.difference) : null);
+  const varianceStatus=diff==null?'PENDING COUNT':diff===0?'BALANCED (0 RWF)':diff>0?`OVERAGE (+${money(diff)})`:`SHORTAGE (${money(diff)})`;
+  const varianceClass=diff==null?'':diff===0?'text-success':diff>0?'text-warning':'text-danger';
+  const shiftSales=sales.filter(x=>x.shift_id===s.id&&x.status!=='voided');
+
+  $('#zReportContent').innerHTML=`
+    <div class="z-report-slip">
+      <div class="receipt-center">
+        <h2>${esc(shop.name)}</h2>
+        <div>${esc(shop.phone||'')}</div>
+        <div>${esc(shop.district||shop.province||'')}</div>
+        <div class="receipt-line"></div>
+        <b>SHIFT Z-REPORT</b>
+        <div><small>End of Shift Reconciliation Slip</small></div>
+      </div>
+      <div class="receipt-line"></div>
+      <div class="receipt-row"><span>Shift ID:</span><span><b>${esc(String(s.id||'').slice(0,8))}</b></span></div>
+      <div class="receipt-row"><span>Cashier / Staff:</span><span><b>${esc(s.employee_name||'Staff')}</b></span></div>
+      <div class="receipt-row"><span>Shift Status:</span><span><b>${esc(String(s.status||'').toUpperCase())}</b></span></div>
+      <div class="receipt-row"><span>Opened:</span><span>${fmt(s.opened_at)}</span></div>
+      <div class="receipt-row"><span>Closed:</span><span>${s.closed_at?fmt(s.closed_at):'Still open'}</span></div>
+      
+      <div class="receipt-line"></div>
+      <div class="z-section-title"><b>SALES BY PAYMENT METHOD</b></div>
+      <div class="receipt-row"><span>Cash Sales:</span><span>${money(c.cash)}</span></div>
+      <div class="receipt-row"><span>Mobile Money (MoMo):</span><span>${money(c.momo)}</span></div>
+      <div class="receipt-row"><span>Bank / Card:</span><span>${money(c.bank)}</span></div>
+      <div class="receipt-row"><span>Credit Sales (Amadeni):</span><span>${money(c.credit)}</span></div>
+      <div class="receipt-row"><b>GROSS SALES TOTAL:</b><b>${money(c.total)}</b></div>
+      <div class="receipt-row"><small>Transactions count:</small><small>${shiftSales.length}</small></div>
+
+      <div class="receipt-line"></div>
+      <div class="z-section-title"><b>CASH DRAWER RECONCILIATION</b></div>
+      <div class="receipt-row"><span>(+) Opening Float:</span><span>${money(s.opening_cash)}</span></div>
+      <div class="receipt-row"><span>(+) Cash Sales:</span><span>${money(c.cash)}</span></div>
+      <div class="receipt-row"><span>(+) Cash Debt Collections:</span><span>${money(c.debtCash)}</span></div>
+      <div class="receipt-row"><span>(-) Petty Cash Payouts:</span><span>-${money(c.pettyCash)}</span></div>
+      <div class="receipt-row"><span>(-) Other Shift Expenses:</span><span>-${money(Math.max(0,c.ex-c.pettyCash))}</span></div>
+      <div class="receipt-line"></div>
+      <div class="receipt-row"><b>(=) EXPECTED PHYSICAL CASH:</b><b>${money(c.expected)}</b></div>
+      <div class="receipt-row"><b>ACTUAL CASH COUNTED:</b><b>${s.actual_cash!=null?money(s.actual_cash):'Pending close'}</b></div>
+      <div class="receipt-row"><b>CASH VARIANCE:</b><b class="${varianceClass}">${varianceStatus}</b></div>
+      ${s.variance_reason?`<div class="receipt-row"><small>Variance Reason: ${esc(s.variance_reason)}</small></div>`:''}
+
+      <div class="receipt-line"></div>
+      <div class="z-signatures">
+        <div class="sig-box"><div class="sig-line"></div><small>Cashier Signature</small></div>
+        <div class="sig-box"><div class="sig-line"></div><small>Manager / Owner Signature</small></div>
+      </div>
+      <div class="receipt-line"></div>
+      <div class="receipt-center">
+        <small>Printed: ${fmt(new Date())}</small><br>
+        <small>Kivu Solutions POS · Platinum Tech</small>
+      </div>
+    </div>
+  `;
+  $('#zReportModal').showModal();
+};
+$('#printCurrentShiftZBtn')?.addEventListener('click',()=>{if(!currentShift)return alert('No shift open.');openShiftZReport(currentShift.id);});
+$('#printZReportBtn')?.addEventListener('click',()=>window.print());
+
 /* RECEIPTS */
-window.viewReceipt=id=>{const s=sales.find(x=>x.id===id);if(!s)return;const lines=sales.filter(x=>x.receipt_no&&x.receipt_no===s.receipt_no);showReceiptGroup(lines.length?lines:[s]);};
-function showReceipt(s){showReceiptGroup([s]);}
-function showReceiptGroup(lines){
+window.viewReceipt=id=>{const s=sales.find(x=>x.id===id);if(!s)return;const lines=sales.filter(x=>x.receipt_no&&x.receipt_no===s.receipt_no);showReceiptGroup(lines.length?lines:[s], getReceiptTendered(s.receipt_no));};
+function showReceipt(s){showReceiptGroup([s], getReceiptTendered(s?.receipt_no));}
+function showReceiptGroup(lines, optTendered){
   if(!requireFeature('receipts','Digital receipts are included in Kivu Lite.'))return;if(!lines?.length)return;
   const s=lines[0],gross=lines.reduce((a,x)=>a+Number(x.total||0)+Number(x.discount||0),0),discount=lines.reduce((a,x)=>a+Number(x.discount||0),0),total=lines.reduce((a,x)=>a+Number(x.total||0),0);
   const rate=Math.max(0,Number(shop.tax_rate||0)),tax=rate>0?total*rate/(100+rate):0,taxLabel=shop.tax_label||'VAT';
   const items=lines.map(x=>`<div class="receipt-row"><span>${esc(x.product_name)} × ${x.entered_qty?`${x.entered_qty} ${esc(x.sold_unit||'')}`:x.qty}</span><span>${money(Number(x.total||0)+Number(x.discount||0))}</span></div>`).join('');
-  $('#receiptContent').innerHTML=`<div class="receipt-center"><h2>${esc(shop.name)}</h2>${esc(shop.phone||'')}${shop.tax_number?`<br>${esc(taxLabel)} No: ${esc(shop.tax_number)}`:''}<br>${esc(shop.receipt_footer||'Thank you for your business')}</div><div class="receipt-line"></div><div>Receipt: <b>${esc(s.receipt_no||'—')}</b></div><div>Date: ${fmt(s.created_at)}</div><div>Cashier: ${esc(s.employee_name||'Owner')}</div><div class="receipt-line"></div>${items}${discount?`<div class="receipt-row"><span>Subtotal</span><span>${money(gross)}</span></div><div class="receipt-row"><span>Discount</span><span>-${money(discount)}</span></div>`:''}<div class="receipt-line"></div><div class="receipt-row"><b>TOTAL</b><b>${money(total)}</b></div>${rate>0?`<div class="receipt-row"><span>${esc(taxLabel)} included (${rate}%)</span><span>${money(tax)}</span></div>`:''}<div class="receipt-row"><span>Payment</span><span>${esc(s.payment)}</span></div><div class="receipt-line"></div><div class="receipt-center">Kivu Solutions digital receipt</div><div class="receipt-center"><small>Powered by Platinum Tech</small></div><div class="receipt-center"><small>This is a Kivu sales receipt, not an RRA EBM fiscal receipt unless a separately approved EBM integration is active.</small></div>`;
+
+  const savedSplit=(s.receipt_no?getSplitPaymentDetails(s.receipt_no):null)||(s.client_ref?getSplitPaymentDetails(s.client_ref):null);
+  const isSplit=String(s.payment||'').toLowerCase().includes('split')||!!savedSplit;
+  let paymentHtml=`<div class="receipt-row"><span>Payment</span><span>${isSplit?'Split Payment':esc(s.payment)}</span></div>`;
+  const breakdown=getSalePaymentBreakdown(s);
+  if(isSplit){
+    paymentHtml+=`<div class="receipt-row mini-row"><span>· Cash portion</span><span>${money(breakdown.cash)}</span></div><div class="receipt-row mini-row"><span>· Mobile Money portion</span><span>${money(breakdown.momo)}</span></div>`;
+    if(breakdown.bank>0) paymentHtml+=`<div class="receipt-row mini-row"><span>· Bank portion</span><span>${money(breakdown.bank)}</span></div>`;
+  }
+  const tenderedInfo=optTendered||(s.receipt_no?getReceiptTendered(s.receipt_no):null)||(s.client_ref?getReceiptTendered(s.client_ref):null);
+  let changeHtml='';
+  if(tenderedInfo&&tenderedInfo.tendered>0){
+    changeHtml=`<div class="receipt-row"><span>Amount Tendered</span><span>${money(tenderedInfo.tendered)}</span></div><div class="receipt-row"><b>Change Due</b><b>${money(tenderedInfo.change)}</b></div>`;
+  }
+
+  $('#receiptContent').innerHTML=`<div class="receipt-center"><h2>${esc(shop.name)}</h2>${esc(shop.phone||'')}${shop.tax_number?`<br>${esc(taxLabel)} No: ${esc(shop.tax_number)}`:''}<br>${esc(shop.receipt_footer||'Thank you for your business')}</div><div class="receipt-line"></div><div>Receipt: <b>${esc(s.receipt_no||'—')}</b></div><div>Date: ${fmt(s.created_at)}</div><div>Cashier: ${esc(s.employee_name||'Owner')}</div><div class="receipt-line"></div>${items}${discount?`<div class="receipt-row"><span>Subtotal</span><span>${money(gross)}</span></div><div class="receipt-row"><span>Discount</span><span>-${money(discount)}</span></div>`:''}<div class="receipt-line"></div><div class="receipt-row"><b>TOTAL</b><b>${money(total)}</b></div>${rate>0?`<div class="receipt-row"><span>${esc(taxLabel)} included (${rate}%)</span><span>${money(tax)}</span></div>`:''}${paymentHtml}${changeHtml}<div class="receipt-line"></div><div class="receipt-center">Kivu Solutions digital receipt</div><div class="receipt-center"><small>Powered by Platinum Tech</small></div><div class="receipt-center"><small>This is a Kivu sales receipt, not an RRA EBM fiscal receipt unless a separately approved EBM integration is active.</small></div>`;
   $('#receiptModal').showModal();
 }
 $('#printReceiptBtn').onclick=()=>window.print();
+
 
 /* OWNER SETTINGS + PLAN TESTING */
 $$('.plan-btn').forEach(b=>b.onclick=async()=>{
@@ -760,46 +1692,605 @@ $('#reportPeriod').onchange=renderReports;
 /* RENDER */
 function render(){
   applyPermissions();
-  $('#shopLabel').textContent=shop.name;$('#roleBadge').textContent=roleLabel(profile.role);const sub=effectiveSubscriptionStatus();$('#planChip').textContent=`${planLabel().toUpperCase()} · ${sub.toUpperCase()}`;
-  fill();renderDashboard();renderAttention();renderSales();renderInventory();renderSuppliers();renderExpenses();renderCustomers();renderEmployees();renderShifts();renderControls();renderReports();renderPlans();renderSubscriptionStatus();renderSettings();
+  if($('#shopLabel')) $('#shopLabel').textContent=shop.name;const rTxt=roleLabel(profile.role);if($('#roleBadge'))$('#roleBadge').textContent=rTxt;if($('#topRoleBadge'))$('#topRoleBadge').textContent=rTxt;const sub=effectiveSubscriptionStatus();if($('#planChip')) $('#planChip').textContent=`${planLabel().toUpperCase()} · ${sub.toUpperCase()}`;
+  fill();renderDashboard();renderSales();renderInventory();renderSuppliers();renderExpenses();renderCustomers();renderEmployees();renderShifts();renderControls();renderReports();renderPlans();renderSubscriptionStatus();renderSettings();renderNotifications();
 }
 function renderDashboard(){
-  const t=day(new Date()),ss=sales.filter(x=>day(x.created_at)===t),ee=expenses.filter(x=>day(x.created_at)===t&&x.approval_status!=='rejected'),sa=ss.reduce((a,x)=>a+Number(x.total),0),ex=ee.reduce((a,x)=>a+Number(x.amount),0),cogs=ss.reduce((a,x)=>a+Number(x.cost),0),cr=credits.filter(x=>!x.paid).reduce((a,x)=>a+Number(x.amount),0),low=products.filter(x=>Number(x.qty)<=Number(x.low_stock));
-  $('#salesToday').textContent=money(sa);$('#expensesToday').textContent=money(ex);$('#profitToday').textContent=money(sa-cogs-ex);$('#creditTotal').textContent=money(cr);$('#lowStockCount').textContent=low.length;$('#stockValue').textContent=money(products.reduce((a,x)=>a+Number(x.qty)*Number(x.cost),0));
-  $('#shiftStatusCard').textContent=currentShift?`My shift open · ${profile.full_name||roleLabel(profile.role)}`:'No open shift';
-  let msg=ss.length?`${ss.length} recorded sale(s) worth ${money(sa)} today.`:'No sales recorded today.';
-  const subStatus=effectiveSubscriptionStatus();
-  if(!subscriptionAllowsAccess()) msg=`Your subscription is ${subStatus}. Business data is preserved, but operational features are locked until the owner renews a plan.`;
-  else if(subStatus==='trial'&&shop.trial_ends_at){const days=Math.max(0,Math.ceil((new Date(shop.trial_ends_at)-new Date())/86400000));msg+=` Free trial ends in ${days} day(s).`;}
-  else if(subStatus==='grace'&&shop.grace_ends_at){const days=Math.max(0,Math.ceil((new Date(shop.grace_ends_at)-new Date())/86400000));msg+=` Subscription is in grace period; renew within ${days} day(s).`;}
-  else if(subStatus==='active'&&shop.current_period_end){const days=Math.ceil((new Date(shop.current_period_end)-new Date())/86400000);if(days>=0&&days<=3)msg+=` Subscription renews/expires in ${days} day(s).`;}
-  if(low.length&&subscriptionAllowsAccess())msg+=` ${low.length} product(s) are low in stock.`;
-  if(hasFeature('credit')&&cr&&can('owner','manager','cashier'))msg+=` Outstanding customer credit is ${money(cr)}.`;
-  if(can('owner','manager')){const sd=supplierPurchases.reduce((a,x)=>a+Number(x.balance_due||0),0);if(sd>0)msg+=` Supplier debt is ${money(sd)}.`;}
-  $('#assistantMessage').textContent=msg;
-  const act=[...sales.slice(0,5).map(x=>({n:`Sale · ${x.product_name}`,d:x.created_at,v:x.total})),...expenses.slice(0,5).map(x=>({n:`Expense · ${x.description}`,d:x.created_at,v:-x.amount}))].sort((a,b)=>new Date(b.d)-new Date(a.d)).slice(0,8);
-  $('#activityList').innerHTML=act.length?act.map(x=>`<div class="item"><div><b>${esc(x.n)}</b><small>${fmt(x.d)}</small></div><b>${money(x.v)}</b></div>`).join(''):'No activity yet.';
+  const t=day(new Date()),ss=sales.filter(x=>day(x.created_at)===t&&x.status!=='voided'),ee=expenses.filter(x=>day(x.created_at)===t&&x.approval_status!=='rejected'),sa=ss.reduce((a,x)=>a+Number(x.total||0),0),ex=ee.reduce((a,x)=>a+Number(x.amount||0),0),cogs=ss.reduce((a,x)=>a+Number(x.cost||0),0),cr=credits.filter(x=>!x.paid).reduce((a,x)=>a+Number(x.amount||0),0),low=products.filter(x=>Number(x.qty)<=Number(x.low_stock));
+  if($('#salesToday'))$('#salesToday').textContent=money(sa);
+  if($('#expensesToday'))$('#expensesToday').textContent=money(ex);
+  if($('#profitToday'))$('#profitToday').textContent=money(sa-cogs-ex);
+  if($('#creditTotal'))$('#creditTotal').textContent=money(cr);
+  if($('#lowStockCount'))$('#lowStockCount').textContent=low.length;
+  if($('#stockValue'))$('#stockValue').textContent=money(products.reduce((a,x)=>a+Number(x.qty)*Number(x.cost),0));
+  if($('#shiftStatusCard'))$('#shiftStatusCard').textContent=currentShift?`My shift open · ${profile.full_name||roleLabel(profile.role)}`:'No open shift';
+
+  /* 1. Today's Payment Channels & Performance */
+  let todayCash=0,todayMomo=0,todayBank=0,todayCredit=0;
+  const cashReceipts=new Set(), momoReceipts=new Set(), bankReceipts=new Set(), creditReceipts=new Set();
+  const txSet=new Set();
+
+  ss.forEach(x=>{
+    const b=getSalePaymentBreakdown(x);
+    todayCash+=b.cash; todayMomo+=b.momo; todayBank+=b.bank; todayCredit+=b.credit;
+    const key=x.receipt_no||x.id;
+    txSet.add(key);
+    if(b.cash>0) cashReceipts.add(key);
+    if(b.momo>0) momoReceipts.add(key);
+    if(b.bank>0) bankReceipts.add(key);
+    if(b.credit>0) creditReceipts.add(key);
+  });
+  const grossSalesToday=todayCash+todayMomo+todayBank+todayCredit;
+  const txCount=txSet.size;
+  const avgBasket=txCount>0?(grossSalesToday/txCount):0;
+
+  if($('#overviewTxCount'))$('#overviewTxCount').textContent=txCount;
+  if($('#overviewAvgBasket'))$('#overviewAvgBasket').textContent=money(avgBasket);
+  if($('#overviewGrossSales'))$('#overviewGrossSales').textContent=money(grossSalesToday);
+
+  const pctCash=(grossSalesToday>0&&todayCash>0)?Math.round((todayCash/grossSalesToday)*100):0;
+  const pctMomo=(grossSalesToday>0&&todayMomo>0)?Math.round((todayMomo/grossSalesToday)*100):0;
+  const pctBank=(grossSalesToday>0&&todayBank>0)?Math.round((todayBank/grossSalesToday)*100):0;
+  const pctCredit=(grossSalesToday>0&&todayCredit>0)?Math.round((todayCredit/grossSalesToday)*100):0;
+
+  if($('#barCash'))$('#barCash').style.width=(grossSalesToday>0&&todayCash>0?((todayCash/grossSalesToday)*100).toFixed(1)+'%':'0%');
+  if($('#barMomo'))$('#barMomo').style.width=(grossSalesToday>0&&todayMomo>0?((todayMomo/grossSalesToday)*100).toFixed(1)+'%':'0%');
+  if($('#barBank'))$('#barBank').style.width=(grossSalesToday>0&&todayBank>0?((todayBank/grossSalesToday)*100).toFixed(1)+'%':'0%');
+  if($('#barCredit'))$('#barCredit').style.width=(grossSalesToday>0&&todayCredit>0?((todayCredit/grossSalesToday)*100).toFixed(1)+'%':'0%');
+
+  const channelsList=$('#paymentChannelsList');
+  if(channelsList){
+    const channels=[
+      {name:'Cash',icon:'💵',amount:todayCash,count:cashReceipts.size,pct:pctCash,colorClass:'cash'},
+      {name:'MTN Mobile Money',icon:'📱',amount:todayMomo,count:momoReceipts.size,pct:pctMomo,colorClass:'momo'},
+      {name:'Bank Transfer',icon:'🏦',amount:todayBank,count:bankReceipts.size,pct:pctBank,colorClass:'bank'},
+      {name:'Customer Credit',icon:'📝',amount:todayCredit,count:creditReceipts.size,pct:pctCredit,colorClass:'credit'}
+    ];
+    channelsList.innerHTML=channels.map(ch=>`
+      <div class="channel-row">
+        <div class="channel-left">
+          <span class="channel-icon ${ch.colorClass}">${ch.icon}</span>
+          <div>
+            <strong class="channel-name">${ch.name}</strong>
+            <small class="channel-sub">${ch.count} receipt(s) · ${ch.pct}% of sales</small>
+          </div>
+        </div>
+        <div class="channel-right">
+          <strong class="channel-amt">${money(ch.amount)}</strong>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  /* 2. Live Register & Cash Drawer Status */
+  const activeShift=currentShift||shifts.find(x=>x.status==='open')||null;
+  const drawerBox=$('#overviewDrawerBox');
+  if(drawerBox){
+    if(activeShift){
+      const c=calcShift(activeShift);
+      const cashierName=activeShift.employee_name||'Active Cashier';
+      const isMyShift=currentShift&&currentShift.id===activeShift.id;
+      drawerBox.innerHTML=`
+        <div class="drawer-hero-box">
+          <div class="drawer-hero-top">
+            <span class="drawer-status-pill live"><span class="pulse-dot"></span> Active Register</span>
+            <div class="drawer-duty-meta">
+              <span class="drawer-cashier-label">On duty: <b>${esc(cashierName)}</b>${isMyShift?' (You)':''}</span>
+              <small class="drawer-opened-at">Opened ${fmt(activeShift.opened_at)}</small>
+            </div>
+          </div>
+          <div class="drawer-hero-amount">
+            <span class="drawer-amt-sub">Expected Cash in Drawer</span>
+            <strong class="drawer-amt-val">${money(c.expected)}</strong>
+          </div>
+          <div class="drawer-stats-row">
+            <div class="drawer-stat">
+              <span>Opening float</span>
+              <b>${money(activeShift.opening_cash)}</b>
+            </div>
+            <div class="drawer-stat">
+              <span>Cash collected</span>
+              <b class="text-success">+${money(c.cash+c.debtCash)}</b>
+            </div>
+            <div class="drawer-stat">
+              <span>Expenses / Payouts</span>
+              <b class="text-danger">-${money(c.ex)}</b>
+            </div>
+          </div>
+        </div>
+        <div class="drawer-footer-actions">
+          <button type="button" class="btn secondary btn-sm" onclick="showPage('shifts')">
+            <span>⚖️</span> Shifts & Reconciliation
+          </button>
+          <button type="button" class="btn secondary btn-sm" onclick="openDrawerPettyCash()">
+            <span>💸</span> Petty Cash Payout
+          </button>
+          <button type="button" class="btn ghost btn-sm" onclick="openShiftZReport('${activeShift.id}')">
+            <span>🖨️</span> Z-Report
+          </button>
+        </div>
+      `;
+    }else{
+      drawerBox.innerHTML=`
+        <div class="drawer-hero-box inactive">
+          <div class="drawer-hero-top">
+            <span class="drawer-status-pill closed">Shift Closed</span>
+            <span class="drawer-cashier-label">No cashier on duty</span>
+          </div>
+          <div class="drawer-hero-amount">
+            <span class="drawer-amt-sub">Register Drawer</span>
+            <strong class="drawer-amt-val" style="color:var(--muted)">0 RWF</strong>
+          </div>
+          <p class="drawer-inactive-hint">Open a cashier shift to track live drawer balance, log cash sales, and record cash drawer payouts.</p>
+        </div>
+        <div class="drawer-footer-actions">
+          <button type="button" class="btn primary btn-sm" onclick="showPage('shifts');$('#openShiftModal')?.showModal();">
+            <span>➕</span> Open Shift
+          </button>
+          <button type="button" class="btn ghost btn-sm" onclick="showPage('shifts')">
+            Shift Records →
+          </button>
+        </div>
+      `;
+    }
+  }
+
+  /* 3. Top Selling Products (Fast Movers) */
+  const prodMap={};
+  sales.filter(s=>s.status!=='voided').forEach(s=>{
+    const key=s.product_id||s.product_name;
+    if(!key)return;
+    if(!prodMap[key]){
+      prodMap[key]={id:s.product_id,name:s.product_name,qty:0,revenue:0};
+    }
+    prodMap[key].qty+=Number(s.qty||s.entered_qty||1);
+    prodMap[key].revenue+=Number(s.total||0);
+  });
+  const topProducts=Object.values(prodMap)
+    .sort((a,b)=>b.qty-a.qty||b.revenue-a.revenue)
+    .slice(0,5);
+
+  const fastMoversList=$('#fastMoversList');
+  if(fastMoversList){
+    if(topProducts.length===0){
+      fastMoversList.innerHTML=`
+        <div class="overview-empty-state">
+          <span class="empty-icon">📈</span>
+          <p>No sales recorded yet. Top moving products and velocity rankings will appear here as you sell.</p>
+        </div>
+      `;
+    }else{
+      fastMoversList.innerHTML=topProducts.map((item,idx)=>{
+        const p=products.find(x=>(item.id&&x.id===item.id)||(x.name&&x.name.toLowerCase()===item.name.toLowerCase()));
+        const rank=idx+1;
+        const rankClass=rank===1?'rank-gold':rank===2?'rank-silver':rank===3?'rank-bronze':'rank-normal';
+        let stockBadge='';
+        if(p){
+          const curQty=Number(p.qty||0);
+          const lowThresh=Number(p.low_stock||0);
+          const unit=p.base_unit||'units';
+          if(curQty<=0){
+            stockBadge=`<span class="stock-pill stock-out">Out of stock (0)</span>`;
+          }else if(curQty<=lowThresh){
+            stockBadge=`<span class="stock-pill stock-low">Low stock (${curQty} ${esc(unit)})</span>`;
+          }else{
+            stockBadge=`<span class="stock-pill stock-ok">${curQty} ${esc(unit)} in stock</span>`;
+          }
+        }else{
+          stockBadge=`<span class="stock-pill stock-out">Archived item</span>`;
+        }
+        return `
+          <div class="leaderboard-row">
+            <div class="rank-badge ${rankClass}">#${rank}</div>
+            <div class="leader-info">
+              <div class="leader-name-row">
+                <strong class="leader-name">${esc(item.name)}</strong>
+                ${stockBadge}
+              </div>
+              <div class="leader-metrics">
+                <span><b>${item.qty}</b> ${p?.base_unit||'sold'}</span>
+                <span class="sep">·</span>
+                <span class="text-revenue"><b>${money(item.revenue)}</b> gross</span>
+                ${p?.category?`<span class="sep">·</span><span class="cat-tag">${esc(p.category)}</span>`:''}
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+  }
+
+  /* 4. Customer Credit / "Amadeni" Watchlist */
+  const unpaidCredits=credits.filter(c=>!c.paid);
+  const debtorMap={};
+  unpaidCredits.forEach(cr=>{
+    const custName=(cr.customer||'').trim();
+    const cObj=customers.find(c=>(cr.customer_id&&c.id===cr.customer_id)||(c.name&&c.name.toLowerCase()===custName.toLowerCase()));
+    const key=cObj?.id||custName||'Unknown';
+    if(!debtorMap[key]){
+      debtorMap[key]={
+        id:cObj?.id||null,
+        name:cObj?.name||custName||'Debtor',
+        phone:cObj?.phone||'',
+        totalDebt:0,
+        earliestDue:null,
+        count:0
+      };
+    }
+    debtorMap[key].totalDebt+=Number(cr.amount||0);
+    debtorMap[key].count+=1;
+    if(cr.due_date){
+      if(!debtorMap[key].earliestDue||cr.due_date<debtorMap[key].earliestDue){
+        debtorMap[key].earliestDue=cr.due_date;
+      }
+    }
+  });
+  const topDebtors=Object.values(debtorMap)
+    .sort((a,b)=>b.totalDebt-a.totalDebt)
+    .slice(0,5);
+
+  const creditWatchlist=$('#creditWatchlist');
+  if(creditWatchlist){
+    if(topDebtors.length===0){
+      creditWatchlist.innerHTML=`
+        <div class="overview-empty-state">
+          <span class="empty-icon">🤝</span>
+          <p>No outstanding customer debts! All credit balances are paid up.</p>
+        </div>
+      `;
+    }else{
+      const todayStr=day(new Date());
+      creditWatchlist.innerHTML=topDebtors.map(d=>{
+        const isOverdue=d.earliestDue&&d.earliestDue<todayStr;
+        const safeJsName=String(d.name||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+        const ledgerCall=d.id?`openCustomerLedger('${d.id}')`:`openCustomerLedgerByName('${safeJsName}')`;
+        const waCall=d.id?`sendWhatsappDebtReminder('${d.id}')`:`sendWhatsappDebtReminderByName('${safeJsName}')`;
+        return `
+          <div class="debtor-row">
+            <div class="debtor-main">
+              <div class="debtor-title-row">
+                <strong class="debtor-name">${esc(d.name)}</strong>
+                ${isOverdue?'<span class="overdue-tag">⚠️ Overdue</span>':''}
+              </div>
+              <div class="debtor-sub">
+                <span>${d.phone?esc(d.phone):'No phone recorded'}</span>
+                <span class="sep">·</span>
+                <span>${d.count} credit record(s)</span>
+                ${d.earliestDue?`<span class="sep">·</span><span>Due ${esc(d.earliestDue)}</span>`:''}
+              </div>
+            </div>
+            <div class="debtor-actions">
+              <strong class="debt-amount">${money(d.totalDebt)}</strong>
+              <div class="debtor-btns">
+                <button type="button" class="btn-wa-reminder" onclick="${waCall}" title="Send WhatsApp debt reminder">
+                  💬 WhatsApp
+                </button>
+                <button type="button" class="btn ghost btn-xs" onclick="${ledgerCall}" title="Open customer ledger">
+                  📋 Statement
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+  }
+
+  /* 5. Critical Stock & Reorder Alerts */
+  const criticalProducts=products.filter(p=>Number(p.qty||0)<=Number(p.low_stock||0))
+    .sort((a,b)=>Number(a.qty)-Number(b.qty));
+  const stockAlertsList=$('#stockAlertsList');
+  if(stockAlertsList){
+    if(criticalProducts.length===0){
+      stockAlertsList.innerHTML=`
+        <div class="overview-empty-state">
+          <span class="empty-icon">✅</span>
+          <p>Stock levels are healthy! All products have inventory above their low-stock reorder thresholds.</p>
+        </div>
+      `;
+    }else{
+      const canRestock=can('owner','manager','stock_clerk');
+      stockAlertsList.innerHTML=`
+        <div class="table-wrap">
+          <table class="stock-alerts-table">
+            <thead>
+              <tr>
+                <th>Product</th>
+                <th>Category</th>
+                <th>Current Stock</th>
+                <th>Reorder Point</th>
+                <th>Status</th>
+                <th>Preferred Supplier</th>
+                <th style="text-align:right">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${criticalProducts.slice(0,8).map(p=>{
+                const curQty=Number(p.qty||0);
+                const minQty=Number(p.low_stock||0);
+                const isOut=curQty<=0;
+                const unit=p.base_unit||'units';
+                const supName=p.preferred_supplier_id?supplierName(p.preferred_supplier_id):'No preferred supplier';
+                const supObj=suppliers.find(s=>s.id===p.preferred_supplier_id);
+                return `
+                  <tr>
+                    <td>
+                      <div class="stock-item-name">
+                        <b>${esc(p.name)}</b>
+                        ${p.barcode?`<small class="barcode-sub">${esc(p.barcode)}</small>`:''}
+                      </div>
+                    </td>
+                    <td>${esc(p.category||'General')}</td>
+                    <td><b class="${isOut?'text-danger':'text-warn'}">${curQty} ${esc(unit)}</b></td>
+                    <td>${minQty} ${esc(unit)}</td>
+                    <td>
+                      <span class="badge ${isOut?'danger':'warn'}">
+                        ${isOut?'Out of stock':'Low stock'}
+                      </span>
+                    </td>
+                    <td>
+                      <span>${esc(supName)}</span>
+                      ${supObj?.phone?`<br><small class="text-muted">${esc(supObj.phone)}</small>`:''}
+                    </td>
+                    <td style="text-align:right">
+                      ${canRestock?`
+                        <button type="button" class="btn secondary btn-sm" onclick="openQuickAddStock('${p.id}')">
+                          ↥ Add stock
+                        </button>
+                      `:'—'}
+                    </td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+  }
 }
+window.openDrawerPettyCash=function(){
+  const activeShift=currentShift||shifts.find(x=>x.status==='open');
+  if(!activeShift) return alert('An active open shift is required to record a drawer petty cash payout.');
+  $('#pettyCashModal')?.showModal();
+};
+window.openQuickAddStock=function(productId){
+  if(!ensureSubscriptionAccess())return;
+  if(!can('owner','manager','stock_clerk')) return alert('You do not have permission to add stock.');
+  const modal=$('#stockModal');
+  if(!modal)return;
+  const sel=modal.querySelector('select[name="productId"]');
+  if(sel&&productId)sel.value=productId;
+  modal.showModal();
+};
 function renderSales(){
-  $('#salesBody').innerHTML=sales.length?sales.map(s=>{
+  const pillsBox=$('#salesCategoryPills');
+  if(pillsBox){
+    const cats=['All',...new Set(products.map(p=>p.category).filter(Boolean))];
+    pillsBox.innerHTML=cats.map(c=>{
+      const active=(c==='All'&&(!selectedSalesCategory||selectedSalesCategory==='All'))||selectedSalesCategory===c;
+      const count=c==='All'?sales.length:sales.filter(s=>{
+        const prod=products.find(p=>p.id===s.product_id||p.name===s.product_name);
+        return prod?.category===c;
+      }).length;
+      return `<button type="button" class="pill-btn ${active?'active':''}" onclick="filterSalesCategory('${esc(c)}')">${esc(c)} <small>(${count})</small></button>`;
+    }).join('');
+  }
+
+  let list=sales;
+  if(selectedSalesCategory&&selectedSalesCategory!=='All'){
+    list=list.filter(s=>{
+      const prod=products.find(p=>p.id===s.product_id||p.name===s.product_name);
+      return prod?.category===selectedSalesCategory;
+    });
+  }
+  if(salesSearchQuery){
+    const q=salesSearchQuery.toLowerCase().trim();
+    list=list.filter(s=>
+      (s.receipt_no&&s.receipt_no.toLowerCase().includes(q))||
+      (s.product_name&&s.product_name.toLowerCase().includes(q))||
+      (s.customer&&s.customer.toLowerCase().includes(q))||
+      (s.payment&&s.payment.toLowerCase().includes(q))||
+      (s.employee_name&&s.employee_name.toLowerCase().includes(q))
+    );
+  }
+
+  // Active date filter (All Time, Today, Yesterday, Last 7 Days)
+  if(window.salesDateFilter && window.salesDateFilter !== 'all'){
+    const now = new Date();
+    const todayStr = day(now);
+    if(window.salesDateFilter === 'today'){
+      list = list.filter(s => day(s.created_at) === todayStr);
+    } else if(window.salesDateFilter === 'yesterday'){
+      const yest = new Date(now); yest.setDate(yest.getDate() - 1);
+      const yestStr = day(yest);
+      list = list.filter(s => day(s.created_at) === yestStr);
+    } else if(window.salesDateFilter === 'week'){
+      const weekAgo = new Date(now); weekAgo.setDate(weekAgo.getDate() - 7);
+      list = list.filter(s => new Date(s.created_at) >= weekAgo);
+    }
+  }
+
+  if($('#salesCountPill')){
+    $('#salesCountPill').textContent = list.length + (list.length===1 ? ' sale' : ' sales');
+  }
+
+  $('#salesBody').innerHTML=list.length?list.map(s=>{
     const voided=s.status==='voided';
     const action=[];
-    if(hasFeature('receipts')) action.push(`<button class="btn secondary" onclick="viewReceipt('${s.id}')">Receipt</button>`);
-    if(!voided&&can('owner','manager','cashier')) action.push(`<button class="btn ${can('owner','manager')?'danger':'secondary'}" onclick="openVoidSale('${s.id}')">${can('owner','manager')?'Void':'Request void'}</button>`);
+    if(hasFeature('receipts')) action.push(`<button class="btn secondary btn-sm" onclick="viewReceipt('${s.id}')">🧾 Receipt</button>`);
+    if(!voided&&can('owner','manager','cashier')) action.push(`<button class="btn ${can('owner','manager')?'ghost-danger':'secondary'} btn-sm" onclick="openVoidSale('${s.id}')">${can('owner','manager')?'Void':'Request void'}</button>`);
     if(voided) action.push('<span class="badge danger-badge">VOIDED</span>');
-    return `<tr class="${voided?'muted-row':''}"><td>${fmt(s.created_at)}</td><td>${esc(s.receipt_no||'—')}</td><td>${esc(s.product_name)}</td><td>${s.entered_qty?`${s.entered_qty} ${esc(s.sold_unit||'')}`:`${s.qty}`}</td><td>${esc(s.payment)}</td><td>${esc(s.customer||'Walk-in')}</td><td><b>${money(s.total)}</b></td><td class="action-cell">${action.join(' ')||'—'}</td></tr>`
-  }).join(''):'<tr><td colspan="8">No sales yet.</td></tr>';
+
+    const pLow = (s.payment||'').toLowerCase();
+    let payClass = 'pay-cash';
+    if(pLow.includes('momo') || pLow.includes('mobile')) payClass = 'pay-momo';
+    else if(pLow.includes('bank') || pLow.includes('card')) payClass = 'pay-bank';
+    else if(pLow.includes('credit')) payClass = 'pay-credit';
+    else if(pLow.includes('+') || pLow.includes('split')) payClass = 'pay-split';
+
+    const d = new Date(s.created_at);
+    const dateStr = d.toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' });
+    const timeStr = d.toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
+
+    return `<tr class="${voided?'muted-row':''}">
+      <td>
+        <div class="cell-date">
+          <span>${dateStr}</span>
+          <small>${timeStr}</small>
+        </div>
+      </td>
+      <td><span class="receipt-code">${esc(s.receipt_no||'—')}</span></td>
+      <td>
+        <div class="cell-product">
+          <strong class="prod-name">${esc(s.product_name)}</strong>
+        </div>
+      </td>
+      <td><span class="qty-pill">${s.entered_qty?`${s.entered_qty} ${esc(s.sold_unit||'')}`:`${s.qty}`}</span></td>
+      <td><span class="pay-chip ${payClass}"><span class="chip-dot"></span>${esc(s.payment||'Cash')}</span></td>
+      <td>
+        <div class="cell-customer">
+          ${s.customer ? `<span class="cust-named">👤 ${esc(s.customer)}</span>` : `<span class="cust-walkin">Walk-in</span>`}
+        </div>
+      </td>
+      <td><strong class="sale-total-text">${money(s.total)}</strong></td>
+      <td class="action-cell text-right">${action.join(' ')||'—'}</td>
+    </tr>`;
+  }).join(''):`<tr><td colspan="8"><div class="empty-table-state"><span class="empty-icon">🧾</span><p>${sales.length?'No matching transactions found for this filter.':'No transactions recorded yet.'}</p></div></td></tr>`;
+
   const t=day(new Date()),today=sales.filter(x=>day(x.created_at)===t&&x.status!=='voided');
-  const sum=m=>today.filter(x=>x.payment===m).reduce((a,x)=>a+Number(x.total||0),0);
-  if($('#salesCashToday'))$('#salesCashToday').textContent=money(sum('Cash'));
-  if($('#salesMomoToday'))$('#salesMomoToday').textContent=money(sum('Mobile Money'));
-  if($('#salesBankToday'))$('#salesBankToday').textContent=money(sum('Bank'));
-  if($('#salesCreditToday'))$('#salesCreditToday').textContent=money(sum('Credit'));
+  let todayCash=0,todayMomo=0,todayBank=0,todayCredit=0;
+  today.forEach(x=>{
+    const b=getSalePaymentBreakdown(x);
+    todayCash+=b.cash; todayMomo+=b.momo; todayBank+=b.bank; todayCredit+=b.credit;
+  });
+  if($('#salesCashToday'))$('#salesCashToday').textContent=money(todayCash);
+  if($('#salesMomoToday'))$('#salesMomoToday').textContent=money(todayMomo);
+  if($('#salesBankToday'))$('#salesBankToday').textContent=money(todayBank);
+  if($('#salesCreditToday'))$('#salesCreditToday').textContent=money(todayCredit);
 }
 
+window.filterSalesCategory=function(cat){
+  selectedSalesCategory=cat;
+  renderSales();
+};
+
+/* SALES ENHANCEMENTS: DATE FILTER & CSV EXPORT */
+window.salesDateFilter = 'all';
+window.setSalesDateFilter = function(filter){
+  window.salesDateFilter = filter;
+  document.querySelectorAll('.sales-filter-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.filter === filter);
+  });
+  renderSales();
+};
+
+window.exportSalesCsv = function(){
+  if(!sales || !sales.length) return alert('No sales data to export.');
+  const headers = ['Receipt No', 'Date', 'Time', 'Product', 'Quantity', 'Unit', 'Payment Method', 'Customer', 'Cashier', 'Total (RWF)', 'Status'];
+  const rows = sales.map(s => {
+    const d = new Date(s.created_at);
+    return [
+      s.receipt_no || '',
+      d.toLocaleDateString('en-GB'),
+      d.toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' }),
+      `"${(s.product_name||'').replace(/"/g, '""')}"`,
+      s.entered_qty || s.qty || 1,
+      s.sold_unit || 'pcs',
+      `"${(s.payment||'Cash').replace(/"/g, '""')}"`,
+      `"${(s.customer||'Walk-in').replace(/"/g, '""')}"`,
+      `"${(s.employee_name||'User').replace(/"/g, '""')}"`,
+      s.total || 0,
+      s.status || 'completed'
+    ].join(',');
+  });
+  const csvContent = '\uFEFF' + [headers.join(','), ...rows].join('\r\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `kivu-sales-${day(new Date())}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+};
+$('#salesSearchInput')?.addEventListener('input',e=>{
+  salesSearchQuery=e.target.value;
+  $('#clearSalesSearchBtn')?.classList.toggle('hidden',!salesSearchQuery);
+  renderSales();
+});
+$('#clearSalesSearchBtn')?.addEventListener('click',()=>{
+  $('#salesSearchInput').value=''; salesSearchQuery='';
+  $('#clearSalesSearchBtn').classList.add('hidden');
+  renderSales();
+});
+
 function renderInventory(){
-  $('#productsBody').innerHTML=products.length?products.map(p=>{const exp=p.expiry_date?new Date(p.expiry_date+'T00:00:00'):null;const days=exp?Math.ceil((exp-new Date())/86400000):null;const expText=!exp?'—':days<0?`Expired ${Math.abs(days)}d ago`:days===0?'Expires today':`${p.expiry_date} (${days}d)`;return `<tr><td><b>${esc(p.name)}</b></td><td>${stockDisplay(p)}</td><td>${can('owner','manager')?money(p.cost)+' / '+esc(baseUnitLabel(p)):'Hidden'}</td><td>${money(p.price)}</td><td>${can('owner','manager')?money(Number(p.price)-Number(p.cost)):'Hidden'}</td><td>${p.preferred_supplier_id?esc(supplierName(p.preferred_supplier_id)):'—'}</td><td>${esc(expText)}</td><td><span class="badge">${Number(p.qty)<=Number(p.low_stock)?'Low stock':'OK'}</span></td><td>${can('owner','manager')?`<button class="btn secondary" onclick="openEditProduct('${p.id}')">Edit</button> <button class="btn secondary" onclick="openStockAdjustFor('${p.id}')">Adjust</button>`:'—'}</td></tr>`}).join(''):'<tr><td colspan="9">No products yet.</td></tr>';
+  const pillsBox=$('#inventoryCategoryPills');
+  const cats=['All',...new Set(products.map(p=>p.category).filter(Boolean))];
+  if(pillsBox){
+    pillsBox.innerHTML=cats.map(c=>{
+      const active=(c==='All'&&(!selectedInventoryCategory||selectedInventoryCategory==='All'))||selectedInventoryCategory===c;
+      const count=c==='All'?products.length:products.filter(p=>p.category===c).length;
+      return `<button type="button" class="pill-btn ${active?'active':''}" onclick="filterInventoryCategory('${esc(c)}')">${esc(c)} <small>(${count})</small></button>`;
+    }).join('');
+  }
+  const dl=$('#categoryDatalist');
+  if(dl){
+    dl.innerHTML=[...new Set(products.map(p=>p.category).filter(Boolean))].map(c=>`<option value="${esc(c)}">`).join('');
+  }
+
+  let list=products;
+  if(selectedInventoryCategory&&selectedInventoryCategory!=='All'){
+    list=list.filter(p=>p.category===selectedInventoryCategory);
+  }
+  if(inventorySearchQuery){
+    const q=inventorySearchQuery.toLowerCase().trim();
+    list=list.filter(p=>
+      (p.name&&p.name.toLowerCase().includes(q))||
+      (p.barcode&&p.barcode.toLowerCase().includes(q))||
+      (p.category&&p.category.toLowerCase().includes(q))||
+      (p.preferred_supplier_id&&supplierName(p.preferred_supplier_id).toLowerCase().includes(q))
+    );
+  }
+
+  $('#productsBody').innerHTML=list.length?list.map(p=>{
+    const exp=p.expiry_date?new Date(p.expiry_date+'T00:00:00'):null;
+    const days=exp?Math.ceil((exp-new Date())/86400000):null;
+    const expText=!exp?'—':days<0?`Expired ${Math.abs(days)}d ago`:days===0?'Expires today':`${p.expiry_date} (${days}d)`;
+    const bulkHtml=Number(p.bulk_price)>0?`<br><small class="text-muted">Bulk: ${money(p.bulk_price)} / ${esc(bulkUnitLabel(p))}</small>`:'';
+    const isLow=Number(p.qty)<=Number(p.low_stock);
+    return `<tr>
+      <td><b>${esc(p.name)}</b>${p.barcode?`<br><small class="barcode-tag">${esc(p.barcode)}</small>`:''}</td>
+      <td>${p.category?`<span class="category-tag">${esc(p.category)}</span>`:'<span class="text-muted">—</span>'}</td>
+      <td>${stockDisplay(p)}</td>
+      <td>${can('owner','manager')?money(p.cost)+' / '+esc(baseUnitLabel(p)):'Hidden'}</td>
+      <td><b>${money(p.price)}</b> / ${esc(baseUnitLabel(p))}${bulkHtml}</td>
+      <td>${can('owner','manager')?money(Number(p.price)-Number(p.cost)):'Hidden'}</td>
+      <td>${p.preferred_supplier_id?esc(supplierName(p.preferred_supplier_id)):'—'}</td>
+      <td>${esc(expText)}</td>
+      <td><span class="badge ${isLow?'danger-badge':'badge-success'}">${isLow?'Low stock':'OK'}</span></td>
+      <td>${can('owner','manager')?`<button class="btn secondary" onclick="openEditProduct('${p.id}')">Edit</button> <button class="btn secondary" onclick="openStockAdjustFor('${p.id}')">Adjust</button>`:'—'}</td>
+    </tr>`;
+  }).join(''):`<tr><td colspan="10">${products.length?'No matching products found.':'No products yet.'}</td></tr>`;
 }
+
+window.filterInventoryCategory=function(cat){
+  selectedInventoryCategory=cat;
+  renderInventory();
+};
+$('#inventorySearchInput')?.addEventListener('input',e=>{
+  inventorySearchQuery=e.target.value;
+  $('#clearInventorySearchBtn')?.classList.toggle('hidden',!inventorySearchQuery);
+  renderInventory();
+});
+$('#clearInventorySearchBtn')?.addEventListener('click',()=>{
+  $('#inventorySearchInput').value=''; inventorySearchQuery='';
+  $('#clearInventorySearchBtn').classList.add('hidden');
+  renderInventory();
+});
+
 window.openStockAdjustFor=id=>{if(!requireFeature('controls','Controlled stock adjustments are included in Kivu Control.'))return;const f=$('#stockAdjustForm');if(f){f.elements.productId.value=id;$('#stockAdjustModal').showModal();}};
 function renderSuppliers(){
   if(!can('owner','manager')||!$('#suppliersBody'))return;
@@ -807,8 +2298,8 @@ function renderSuppliers(){
   supplierPurchases.forEach(x=>purchaseTotalBySupplier[x.supplier_id]=(purchaseTotalBySupplier[x.supplier_id]||0)+Number(x.total_amount||0));
   supplierPayments.forEach(x=>paidBySupplier[x.supplier_id]=(paidBySupplier[x.supplier_id]||0)+Number(x.amount||0));
   const debt=supplierPurchases.reduce((a,x)=>a+Number(x.balance_due||0),0);
-  $('#supplierDebtTotal').textContent=money(debt);$('#suppliersOwedCount').textContent=suppliers.filter(x=>supplierBalance(x.id)>0).length;
-  const now=new Date(),monthStart=new Date(now.getFullYear(),now.getMonth(),1);$('#supplierPurchasesMonth').textContent=money(supplierPurchases.filter(x=>new Date(x.created_at)>=monthStart).reduce((a,x)=>a+Number(x.total_amount||0),0));
+  if($('#supplierDebtTotal')) $('#supplierDebtTotal').textContent=money(debt);if($('#suppliersOwedCount')) $('#suppliersOwedCount').textContent=suppliers.filter(x=>supplierBalance(x.id)>0).length;
+  const now=new Date(),monthStart=new Date(now.getFullYear(),now.getMonth(),1);if($('#supplierPurchasesMonth')) $('#supplierPurchasesMonth').textContent=money(supplierPurchases.filter(x=>new Date(x.created_at)>=monthStart).reduce((a,x)=>a+Number(x.total_amount||0),0));
   $('#suppliersBody').innerHTML=suppliers.length?suppliers.map(x=>{const bal=supplierBalance(x.id);return`<tr class="${x.active===false?'muted-row':''}"><td><b>${esc(x.name)}</b>${x.active===false?' <span class="badge">Archived</span>':''}<small>${x.address?`<br>${esc(x.address)}`:''}</small></td><td>${esc(x.phone||'—')}</td><td>${money(purchaseTotalBySupplier[x.id]||0)}</td><td>${money(paidBySupplier[x.id]||0)}</td><td><b>${money(bal)}</b></td><td>${x.active!==false&&bal>0?`<button class="btn secondary" onclick="openSupplierPayment('${x.id}')">Pay debt</button> `:''}<button class="btn secondary" onclick="openEditSupplier('${x.id}')">Edit</button> ${x.active!==false?`<button class="btn danger" onclick="removeSupplier('${x.id}')">Delete</button>`:''}</td></tr>`}).join(''):'<tr><td colspan="6">No suppliers yet.</td></tr>';
   $('#supplierPurchasesBody').innerHTML=supplierPurchases.length?supplierPurchases.map(x=>`<tr><td>${fmt(x.created_at)}</td><td>${esc(supplierName(x.supplier_id))}</td><td>${esc(x.invoice_no||'—')}</td><td>${money(x.total_amount)}</td><td>${money(x.paid_amount)}</td><td><b>${money(x.balance_due)}</b></td><td><span class="badge">${esc(x.status)}</span></td><td>${x.due_date?new Date(x.due_date+'T00:00:00').toLocaleDateString('en-RW'):'—'}</td></tr>`).join(''):'<tr><td colspan="8">No supplier purchases yet.</td></tr>';
   $('#supplierPaymentsBody').innerHTML=supplierPayments.length?supplierPayments.map(x=>`<tr><td>${fmt(x.created_at)}</td><td>${esc(supplierName(x.supplier_id))}</td><td>${esc(x.payment_method||'—')}</td><td>${esc(x.note||'—')}</td><td><b>${money(x.amount)}</b></td></tr>`).join(''):'<tr><td colspan="5">No supplier payments yet.</td></tr>';
@@ -820,8 +2311,36 @@ function renderExpenses(){
 }
 function renderCustomers(){
   const debt={};credits.filter(x=>!x.paid).forEach(x=>debt[x.customer_id||x.customer]=(debt[x.customer_id||x.customer]||0)+Number(x.amount));
-  $('#customersBody').innerHTML=customers.length?customers.map(c=>`<tr class="${c.active===false?'muted-row':''}"><td><b>${esc(c.name)}</b>${c.active===false?' <span class="badge">Archived</span>':''}</td><td>${esc(c.phone||'—')}</td><td>${esc(c.email||'—')}</td><td>${money(debt[c.id]||0)}</td><td>${can('owner','manager')?`<button class="btn secondary" onclick="openEditCustomer('${c.id}')">Edit</button> ${c.active!==false?`<button class="btn danger" onclick="removeCustomer('${c.id}')">Delete</button>`:''}`:'—'}</td></tr>`).join(''):'<tr><td colspan="5">No customers yet.</td></tr>';
-  const open=credits.filter(x=>!x.paid);$('#creditList').innerHTML=open.length?open.map(c=>`<div class="item"><div><b>${esc(c.customer)}</b><small>${esc(c.note||'Customer credit')}${c.due_date?' · due '+esc(c.due_date):''}</small></div><div><b>${money(c.amount)}</b>${can('owner','manager')?` <button class="btn secondary" onclick="markPaid('${c.id}')">Paid</button>`:''}</div></div>`).join(''):'No outstanding credit.';
+  $('#customersBody').innerHTML=customers.length?customers.map(c=>{
+    const bal=debt[c.id]||debt[c.name]||0;
+    return `<tr class="${c.active===false?'muted-row':''}">
+      <td><b>${esc(c.name)}</b>${c.active===false?' <span class="badge">Archived</span>':''}</td>
+      <td>${esc(c.phone||'—')}</td>
+      <td>${esc(c.email||'—')}</td>
+      <td><b class="${bal>0?'text-danger':''}">${money(bal)}</b></td>
+      <td class="action-cell">
+        <button class="btn secondary" onclick="openCustomerLedger('${c.id}')" title="View Statement">📋 Statement</button>
+        ${bal>0?`<button class="btn secondary" onclick="openCustomerDebtRepay('${c.id}')">Repay</button> `:''}
+        ${bal>0?`<button class="btn ghost whatsapp-btn" onclick="sendWhatsappDebtReminder('${c.id}')" title="WhatsApp Reminder">💬 WA</button> `:''}
+        ${can('owner','manager')?`<button class="btn secondary" onclick="openEditCustomer('${c.id}')">Edit</button> ${c.active!==false?`<button class="btn danger" onclick="removeCustomer('${c.id}')">Delete</button>`:''}`:''}
+      </td>
+    </tr>`;
+  }).join(''):'<tr><td colspan="5">No customers yet.</td></tr>';
+  const open=credits.filter(x=>!x.paid);
+  $('#creditList').innerHTML=open.length?open.map(c=>`
+    <div class="item">
+      <div>
+        <b>${esc(c.customer)}</b>
+        <small>${esc(c.note||'Customer credit')}${c.due_date?' · due '+esc(c.due_date):''}</small>
+      </div>
+      <div class="credit-actions">
+        <b>${money(c.amount)}</b>
+        <button class="btn secondary" onclick="openRepayCredit('${c.id}')">Repay</button>
+        <button class="btn ghost" onclick="openCustomerLedgerByName('${esc(c.customer)}')">Statement</button>
+        <button class="btn ghost whatsapp-btn" onclick="sendWhatsappReminderForCredit('${c.id}')">💬 WA</button>
+      </div>
+    </div>
+  `).join(''):'No outstanding credit.';
 }
 
 window.openEditCustomer=function(id){
@@ -855,10 +2374,10 @@ window.removeSupplier=async function(id){
 function renderDukaAdmin(){
   if(!isDukaAdmin)return;
   const o=platformOverview||{};
-  $('#adminTotalShops').textContent=o.total_shops||0;
-  $('#adminActiveShops').textContent=(o.active_shops||0)+(o.trial_shops||0);
-  $('#adminInactiveShops').textContent=(o.expired_shops||0)+(o.suspended_shops||0)+(o.cancelled_shops||0);
-  $('#adminMrr').textContent=money(o.estimated_mrr||0);
+  if($('#adminTotalShops')) $('#adminTotalShops').textContent=o.total_shops||0;
+  if($('#adminActiveShops')) $('#adminActiveShops').textContent=(o.active_shops||0)+(o.trial_shops||0);
+  if($('#adminInactiveShops')) $('#adminInactiveShops').textContent=(o.expired_shops||0)+(o.suspended_shops||0)+(o.cancelled_shops||0);
+  if($('#adminMrr')) $('#adminMrr').textContent=money(o.estimated_mrr||0);
   const pm=o.plan_mix||{};
   $('#adminPlanMix').innerHTML=Object.keys(pm).length?Object.entries(pm).map(([k,v])=>`<span class="badge">${esc(k)}: ${v}</span>`).join(' '):'No shops yet.';
   $('#adminShopsBody').innerHTML=platformShops.length?platformShops.map(s=>`<tr><td><b>${esc(s.name)}</b></td><td>${esc(s.plan)}</td><td><span class="badge">${esc(s.subscription_status||'active')}</span></td><td>${s.current_period_end?fmt(s.current_period_end):'—'}</td><td>${fmt(s.created_at)}</td></tr>`).join(''):'<tr><td colspan="5">No shops yet.</td></tr>';
@@ -885,30 +2404,7 @@ $('#changePinForm')?.addEventListener('submit',async e=>{
   e.target.reset();$('#changePinModal').close();alert('Your PIN has been changed.');
 });
 
-function renderAttention(){
-  const list=$('#attentionList');if(!list)return;
-  const today=day(new Date()), items=[];
-  const low=products.filter(x=>Number(x.qty)<=Number(x.low_stock));
-  low.slice(0,8).forEach(p=>items.push({label:`Low stock · ${p.name}`,detail:`${stockDisplay(p)} remaining`,page:'inventory'}));
-  products.filter(p=>p.expiry_date).forEach(p=>{
-    const days=Math.ceil((new Date(p.expiry_date+'T00:00:00')-new Date())/86400000),warn=Number(p.expiry_reminder_days||14);
-    if(days<=warn) items.push({label:days<0?`Expired · ${p.name}`:`Expiry warning · ${p.name}`,detail:days<0?`Expired ${Math.abs(days)} day(s) ago`:`Expires in ${days} day(s) · ${p.expiry_date}`,page:'inventory'});
-  });
-  if(can('owner','manager')){
-    const overdueSupplier=supplierPurchases.filter(x=>Number(x.balance_due||0)>0&&x.due_date&&x.due_date<today);
-    overdueSupplier.slice(0,8).forEach(x=>items.push({label:`Supplier debt overdue · ${supplierName(x.supplier_id)}`,detail:`${money(x.balance_due)} due ${x.due_date}`,page:'suppliers'}));
-    const supplierDebt=supplierPurchases.filter(x=>Number(x.balance_due||0)>0&&!x.due_date);
-    if(supplierDebt.length)items.push({label:'Supplier balances outstanding',detail:`${money(supplierDebt.reduce((a,x)=>a+Number(x.balance_due||0),0))} without a due date`,page:'suppliers'});
-    const overdueCredit=credits.filter(x=>!x.paid&&x.due_date&&x.due_date<today);
-    overdueCredit.slice(0,8).forEach(x=>items.push({label:`Customer credit overdue · ${x.customer}`,detail:`${money(x.amount)} due ${x.due_date}`,page:'customers'}));
-    const pending=approvalRequests.filter(x=>x.status==='pending');
-    if(pending.length)items.push({label:'Pending control approvals',detail:`${pending.length} request(s) waiting`,page:'controls'});
-    const unreviewed=shifts.filter(x=>x.status==='closed'&&x.review_status==='pending');
-    if(unreviewed.length)items.push({label:'Cash variances need review',detail:`${unreviewed.length} closed shift(s)`,page:'controls'});
-  }
-  $('#attentionCount').textContent=items.length;
-  list.innerHTML=items.length?items.slice(0,15).map(x=>`<div class="item"><div><b>${esc(x.label)}</b><small>${esc(x.detail)}</small></div><button class="btn secondary" onclick="showPage('${x.page}')">Open</button></div>`).join(''):'<div class="notice mini">Nothing urgent right now.</div>';
-}
+
 
 function renderEmployees(){
   if(!$('#employeesBody')||!hasFeature('employees'))return;
@@ -925,22 +2421,61 @@ function renderEmployees(){
 function renderShifts(){
   if(profile.role==='stock_clerk'||!hasFeature('shifts'))return;
   if(currentShift){
-    const c=calcShift(currentShift);$('#openShiftBtn').classList.add('hidden');$('#closeShiftBtn').classList.remove('hidden');$('#shiftBreakdown').classList.remove('hidden');$('#currentShiftTitle').textContent=`Open — ${profile.full_name||roleLabel(profile.role)}`;$('#currentShiftDetails').textContent=`Opened ${fmt(currentShift.opened_at)}`;$('#shiftOpeningCash').textContent=money(currentShift.opening_cash);$('#shiftExpectedCash').textContent=money(c.expected);$('#shiftDifference').textContent='Pending count';$('#shiftCashSales').textContent=money(c.cash);$('#shiftMomoSales').textContent=money(c.momo);$('#shiftBankSales').textContent=money(c.bank);$('#shiftCreditSales').textContent=money(c.credit);$('#shiftExpenses').textContent=money(c.ex);$('#shiftTotalSales').textContent=money(c.total);
+    const c=calcShift(currentShift);
+    $('#openShiftBtn').classList.add('hidden');
+    $('#closeShiftBtn').classList.remove('hidden');
+    $('#pettyCashBtn')?.classList.remove('hidden');
+    $('#printCurrentShiftZBtn')?.classList.remove('hidden');
+    $('#shiftBreakdown').classList.remove('hidden');
+    if($('#currentShiftTitle')) $('#currentShiftTitle').textContent=`Open — ${profile.full_name||roleLabel(profile.role)}`;
+    if($('#currentShiftDetails')) $('#currentShiftDetails').textContent=`Opened ${fmt(currentShift.opened_at)}`;
+    if($('#shiftOpeningCash')) $('#shiftOpeningCash').textContent=money(currentShift.opening_cash);
+    if($('#shiftExpectedCash')) $('#shiftExpectedCash').textContent=money(c.expected);
+    if($('#shiftDifference')) $('#shiftDifference').textContent='Pending count';
+    if($('#shiftCashSales')) $('#shiftCashSales').textContent=money(c.cash);
+    if($('#shiftMomoSales')) $('#shiftMomoSales').textContent=money(c.momo);
+    if($('#shiftBankSales')) $('#shiftBankSales').textContent=money(c.bank);
+    if($('#shiftCreditSales')) $('#shiftCreditSales').textContent=money(c.credit);
+    if($('#shiftDebtCollections')) $('#shiftDebtCollections').textContent=money(c.debtCash);
+    if($('#shiftPettyCash')) $('#shiftPettyCash').textContent=money(c.pettyCash);
+    if($('#shiftExpenses')) $('#shiftExpenses').textContent=money(c.ex);
+    if($('#shiftTotalSales')) $('#shiftTotalSales').textContent=money(c.total);
   }else{
-    $('#openShiftBtn').classList.remove('hidden');$('#closeShiftBtn').classList.add('hidden');$('#shiftBreakdown').classList.add('hidden');$('#currentShiftTitle').textContent='No open shift';$('#currentShiftDetails').textContent='Open a shift to start cash accountability.';$('#shiftOpeningCash').textContent='0 RWF';$('#shiftExpectedCash').textContent='0 RWF';$('#shiftDifference').textContent='—';
+    $('#openShiftBtn').classList.remove('hidden');
+    $('#closeShiftBtn').classList.add('hidden');
+    $('#pettyCashBtn')?.classList.add('hidden');
+    $('#printCurrentShiftZBtn')?.classList.add('hidden');
+    $('#shiftBreakdown').classList.add('hidden');
+    if($('#currentShiftTitle')) $('#currentShiftTitle').textContent='No open shift';
+    if($('#currentShiftDetails')) $('#currentShiftDetails').textContent='Open a shift to start cash accountability.';
+    if($('#shiftOpeningCash')) $('#shiftOpeningCash').textContent='0 RWF';
+    if($('#shiftExpectedCash')) $('#shiftExpectedCash').textContent='0 RWF';
+    if($('#shiftDifference')) $('#shiftDifference').textContent='—';
   }
-  $('#shiftHistoryBody').innerHTML=shifts.length?shifts.map(s=>{const c=calcShift(s),diff=s.difference==null?null:Number(s.difference);return`<tr><td>${fmt(s.opened_at)}</td><td>${esc(s.employee_name||'User')}</td><td>${money(c.total)}</td><td>${s.status==='closed'?money(s.expected_cash??c.expected):money(c.expected)}</td><td>${s.actual_cash==null?'—':money(s.actual_cash)}</td><td>${diff==null?'—':money(diff)}</td><td><span class="badge">${esc(s.status)}</span></td></tr>`}).join(''):'<tr><td colspan="7">No shifts yet.</td></tr>';
+  $('#shiftHistoryBody').innerHTML=shifts.length?shifts.map(s=>{
+    const c=calcShift(s),diff=s.difference==null?null:Number(s.difference);
+    return `<tr>
+      <td>${fmt(s.opened_at)}</td>
+      <td>${esc(s.employee_name||'User')}</td>
+      <td>${money(c.total)}</td>
+      <td>${s.status==='closed'?money(s.expected_cash??c.expected):money(c.expected)}</td>
+      <td>${s.actual_cash==null?'—':money(s.actual_cash)}</td>
+      <td>${diff==null?'—':money(diff)}</td>
+      <td><span class="badge ${s.status==='closed'?'badge-neutral':'badge-success'}">${esc(s.status)}</span></td>
+      <td><button class="btn secondary" onclick="openShiftZReport('${s.id}')">🖨️ Z-Report</button></td>
+    </tr>`;
+  }).join(''):'<tr><td colspan="8">No shifts yet.</td></tr>';
 }
 function renderControls(){
   if(!$('#approvalsList'))return;
   if(!hasFeature('controls')||!can('owner','manager'))return;
   const pending=approvalRequests.filter(x=>x.status==='pending');
-  $('#pendingApprovalCount').textContent=pending.length;
+  if($('#pendingApprovalCount')) $('#pendingApprovalCount').textContent=pending.length;
   const t=day(new Date());
-  $('#voidedSalesToday').textContent=sales.filter(x=>x.status==='voided'&&day(x.voided_at||x.created_at)===t).length;
-  $('#stockAdjustmentsToday').textContent=stockAdjustments.filter(x=>day(x.created_at)===t).length;
+  if($('#voidedSalesToday')) $('#voidedSalesToday').textContent=sales.filter(x=>x.status==='voided'&&day(x.voided_at||x.created_at)===t).length;
+  if($('#stockAdjustmentsToday')) $('#stockAdjustmentsToday').textContent=stockAdjustments.filter(x=>day(x.created_at)===t).length;
   const varTotal=shifts.filter(x=>x.status==='closed'&&day(x.closed_at||x.opened_at)===t).reduce((a,x)=>a+Math.abs(Number(x.difference||0)),0);
-  $('#cashVarianceToday').textContent=money(varTotal);
+  if($('#cashVarianceToday')) $('#cashVarianceToday').textContent=money(varTotal);
   $('#approvalsList').innerHTML=pending.length?pending.map(x=>`<div class="item control-item"><div><b>${esc(x.request_type.replaceAll('_',' '))}</b><small>${esc(x.requested_by_name||'Staff')} · ${fmt(x.created_at)}<br>${esc(x.reason||'No reason')}</small></div><div><button class="btn primary" onclick="reviewApproval('${x.id}','approved')">Approve</button> <button class="btn danger" onclick="reviewApproval('${x.id}','rejected')">Reject</button></div></div>`).join(''):'No pending approvals.';
   const alerts=[];
   sales.filter(x=>x.status==='voided').slice(0,15).forEach(x=>alerts.push({d:x.voided_at||x.created_at,t:`Voided sale · ${x.receipt_no||x.product_name}`,s:`${money(x.total)} · ${x.void_reason||'No reason'}`}));
@@ -952,7 +2487,7 @@ function renderControls(){
 
 function renderReports(){
   if(!can('owner','manager'))return;
-  const days=+$('#reportPeriod').value,cut=new Date();cut.setDate(cut.getDate()-days);const ss=sales.filter(x=>new Date(x.created_at)>=cut),ee=expenses.filter(x=>new Date(x.created_at)>=cut&&x.approval_status!=='rejected'),sa=ss.reduce((a,x)=>a+Number(x.total),0),ex=ee.reduce((a,x)=>a+Number(x.amount),0),cogs=ss.reduce((a,x)=>a+Number(x.cost),0);$('#reportSales').textContent=money(sa);$('#reportExpenses').textContent=money(ex);$('#reportProfit').textContent=money(sa-cogs-ex);$('#reportTransactions').textContent=new Set(ss.map(x=>x.receipt_no||x.id)).size;
+  const days=+$('#reportPeriod').value,cut=new Date();cut.setDate(cut.getDate()-days);const ss=sales.filter(x=>new Date(x.created_at)>=cut),ee=expenses.filter(x=>new Date(x.created_at)>=cut&&x.approval_status!=='rejected'),sa=ss.reduce((a,x)=>a+Number(x.total),0),ex=ee.reduce((a,x)=>a+Number(x.amount),0),cogs=ss.reduce((a,x)=>a+Number(x.cost),0);if($('#reportSales')) $('#reportSales').textContent=money(sa);if($('#reportExpenses')) $('#reportExpenses').textContent=money(ex);if($('#reportProfit')) $('#reportProfit').textContent=money(sa-cogs-ex);if($('#reportTransactions')) $('#reportTransactions').textContent=new Set(ss.map(x=>x.receipt_no||x.id)).size;
 }
 function renderPlans(){
   $$('.pricing article').forEach(x=>{
@@ -966,20 +2501,41 @@ function renderPlans(){
     }
   });
 }
+window.toggleBillingCycle = function(cycle) {
+  const isAnnual = cycle === 'annual';
+  const mBtn = document.getElementById('billingMonthlyBtn');
+  const aBtn = document.getElementById('billingAnnualBtn');
+  if (mBtn) mBtn.classList.toggle('active', !isAnnual);
+  if (aBtn) aBtn.classList.toggle('active', isAnnual);
+  document.querySelectorAll('.pricing article').forEach(card => {
+    const val = card.querySelector('.price-val');
+    const cycleEl = card.querySelector('.price-cycle');
+    const sub = card.querySelector('.price-subtext');
+    if (val && val.dataset.monthly && val.dataset.annual) {
+      val.textContent = isAnnual ? val.dataset.annual : val.dataset.monthly;
+    }
+    if (cycleEl && cycleEl.dataset.monthly && cycleEl.dataset.annual) {
+      cycleEl.textContent = isAnnual ? cycleEl.dataset.annual : cycleEl.dataset.monthly;
+    }
+    if (sub && sub.dataset.monthly && sub.dataset.annual) {
+      sub.textContent = isAnnual ? sub.dataset.annual : sub.dataset.monthly;
+    }
+  });
+};
 function renderSubscriptionStatus(){
   if(!$('#subscriptionStatusBadge'))return;
   const status=effectiveSubscriptionStatus();
   const labels={trial:'Free trial',active:'Active',grace:'Grace period',expired:'Expired',suspended:'Suspended',cancelled:'Cancelled'};
-  $('#subscriptionStatusBadge').textContent=labels[status]||status;
+  if($('#subscriptionStatusBadge')) $('#subscriptionStatusBadge').textContent=labels[status]||status;
   $('#subscriptionStatusBadge').className=`subscription-status ${status}`;
-  $('#subscriptionPlanName').textContent=planLabel();
+  if($('#subscriptionPlanName')) $('#subscriptionPlanName').textContent=planLabel();
   let end=null,label='';
   if(status==='trial'){end=toDate(shop.trial_ends_at);label='Trial ends';}
   else if(status==='active'){end=toDate(shop.current_period_end);label='Renews / expires';}
   else if(status==='grace'){end=toDate(shop.grace_ends_at);label='Grace ends';}
   else if(status==='cancelled'){end=toDate(shop.cancelled_at);label='Cancelled';}
-  $('#subscriptionDateLabel').textContent=label||'Access';
-  $('#subscriptionDateValue').textContent=shop?.plan==='one_time'?'No monthly renewal':(end?end.toLocaleDateString():(status==='active'?'No expiry set':'—'));
+  if($('#subscriptionDateLabel')) $('#subscriptionDateLabel').textContent=label||'Access';
+  if($('#subscriptionDateValue')) $('#subscriptionDateValue').textContent=shop?.plan==='one_time'?'No monthly renewal':(end?end.toLocaleDateString():(status==='active'?'No expiry set':'—'));
   const banner=$('#subscriptionBanner');
   if(!banner)return;
   if(status==='trial'){banner.innerHTML=`<b>Free trial:</b> ${planLabel()} features are available until ${end?end.toLocaleDateString():'the trial end date'}. Choose a plan before the trial expires.`;banner.className='subscription-banner trial';}
@@ -1031,11 +2587,11 @@ function renderDukaAdmin(){
   if(!isDukaAdmin)return;
   $('#modeSwitchBtn')?.classList.remove('hidden');
   const o=platformOverview||{};
-  $('#adminTotalShops').textContent=o.total_shops||0;
-  $('#adminActiveShops').textContent=o.active_shops||0;
-  $('#adminInactiveShops').textContent=o.inactive_shops||0;
-  $('#adminNeedsHelp').textContent=o.needs_assistance||0;
-  $('#adminMrr').textContent=money(o.estimated_mrr||0);
+  if($('#adminTotalShops')) $('#adminTotalShops').textContent=o.total_shops||0;
+  if($('#adminActiveShops')) $('#adminActiveShops').textContent=o.active_shops||0;
+  if($('#adminInactiveShops')) $('#adminInactiveShops').textContent=o.inactive_shops||0;
+  if($('#adminNeedsHelp')) $('#adminNeedsHelp').textContent=o.needs_assistance||0;
+  if($('#adminMrr')) $('#adminMrr').textContent=money(o.estimated_mrr||0);
   $('#adminScopeNotice').innerHTML=`<b>${esc(supportAccessText(platformAdminProfile))}</b> · You can only inspect shops within your assigned scope. Support mode is read-only unless you choose a controlled action.`;
   renderAdminShopRows();renderAdminUsers();renderPlatformAudit();renderPlatformStatus();
 }
@@ -1058,8 +2614,8 @@ window.openShopSupport=async function(id){
 
 function renderShopSupport(){
   const d=selectedSupportData;if(!d)return;const s=d.shop||{};
-  $('#supportShopTitle').textContent=s.name||'Shop';
-  $('#supportShopMeta').textContent=[s.district,s.province,PLAN_CONFIG[s.plan||'basic']?.label||s.plan,s.subscription_status,s.onboarding_status,s.app_version?'App '+s.app_version:null].filter(Boolean).join(' · ');
+  if($('#supportShopTitle')) $('#supportShopTitle').textContent=s.name||'Shop';
+  if($('#supportShopMeta')) $('#supportShopMeta').textContent=[s.district,s.province,PLAN_CONFIG[s.plan||'basic']?.label||s.plan,s.subscription_status,s.onboarding_status,s.app_version?'App '+s.app_version:null].filter(Boolean).join(' · ');
   $('#supportSummary').innerHTML=`<article><span>Sales today</span><strong>${money(d.sales_today||0)}</strong></article><article><span>Transactions</span><strong>${d.transactions_today||0}</strong></article><article><span>Low stock</span><strong>${d.low_stock||0}</strong></article><article><span>Supplier debt</span><strong>${money(d.supplier_debt||0)}</strong></article><article><span>Customer credit</span><strong>${money(d.customer_credit||0)}</strong></article><article><span>Expenses 30d</span><strong>${money(d.expenses_30d||0)}</strong></article><article><span>Pending approvals</span><strong>${d.pending_approvals||0}</strong></article>`;
   const staff=d.staff||[], shifts=d.open_shifts||[];
   $('#supportStaffList').innerHTML=(staff.length?staff.map(x=>`<div class="item"><div><b>${esc(x.name)}</b><small>${esc(x.role||'')} · ${esc(x.phone||'No phone')}</small></div><span class="badge">${x.active?'Active':'Disabled'}</span></div>`).join(''):'<div class="notice mini">No staff.</div>')+(shifts.length?`<p><b>Open shifts</b></p>`+shifts.map(x=>`<div class="item"><div><b>${esc(x.employee_name||'Employee')}</b><small>Opened ${fmt(x.opened_at)}</small></div><span>${money(x.opening_cash||0)}</span></div>`).join(''):'');
@@ -1079,7 +2635,7 @@ async function setShopSuspension(flag){if(!selectedSupportShopId)return;const re
 $('#suspendShopBtn')?.addEventListener('click',()=>setShopSuspension(true));$('#reactivateShopBtn')?.addEventListener('click',()=>setShopSuspension(false));
 
 $('#confirmPaymentBtn')?.addEventListener('click',()=>{if(!selectedSupportShopId)return;const f=$('#adminPaymentForm');f.elements.shopId.value=selectedSupportShopId;const now=new Date(),end=new Date();end.setDate(end.getDate()+29);f.elements.from.value=day(now);f.elements.to.value=day(end);$('#adminPaymentModal').showModal();});
-$('#adminPaymentForm')?.addEventListener('submit',async e=>{e.preventDefault();const f=new FormData(e.target);const {error}=await sb.rpc('duka_confirm_subscription_payment',{p_shop_id:f.get('shopId'),p_amount:+f.get('amount'),p_plan:f.get('plan'),p_payment_method:f.get('method'),p_reference:f.get('reference')||null,p_covered_from:f.get('from'),p_covered_to:f.get('to'),p_note:f.get('note')||null});if(error)return alert(error.message);$('#adminPaymentModal').close();e.target.reset();await loadPlatformV41();await openShopSupport(selectedSupportShopId);renderDukaAdmin();});
+$('#adminPaymentForm')?.addEventListener('submit',async e=>{e.preventDefault();const f=new FormData(e.target);const {error}=await sb.rpc('duka_confirm_subscription_payment',{p_shop_id:f.get('shopId'),p_amount:parseMoney(f.get('amount')),p_plan:f.get('plan'),p_payment_method:f.get('method'),p_reference:f.get('reference')||null,p_covered_from:f.get('from'),p_covered_to:f.get('to'),p_note:f.get('note')||null});if(error)return alert(error.message);$('#adminPaymentModal').close();e.target.reset();await loadPlatformV41();await openShopSupport(selectedSupportShopId);renderDukaAdmin();});
 
 $('#onboardingStatusBtn')?.addEventListener('click',async()=>{if(!selectedSupportShopId)return;const status=prompt('Status: registered, setup_incomplete, active, needs_assistance',selectedSupportData?.shop?.onboarding_status||'setup_incomplete');if(!status)return;const reason=prompt('Reason / note:','Support update')||'Support update';const {error}=await sb.rpc('duka_set_onboarding_status',{p_shop_id:selectedSupportShopId,p_status:status,p_reason:reason});if(error)return alert(error.message);await loadPlatformV41();await openShopSupport(selectedSupportShopId);renderDukaAdmin();});
 
@@ -1103,9 +2659,312 @@ setInterval(()=>deviceHeartbeat().catch(()=>{}),60000);setTimeout(()=>deviceHear
 async function checkAppStatus(){const {data,error}=await sb.rpc('duka_app_status');if(error)return;appStatusCache=data||{};if(appStatusCache.maintenance_mode&&!isDukaAdmin){alert(appStatusCache.maintenance_message||'Kivu Solutions is temporarily under maintenance. Please try again later.');}}
 setTimeout(()=>checkAppStatus().catch(()=>{}),1800);
 
-// Notifications center: stored notices + live business attention items.
-async function loadNotifications(){if(!shop)return;const {data}=await sb.from('shop_notifications').select('*').eq('shop_id',shop.id).order('created_at',{ascending:false}).limit(50);shopNotifications=data||[];$('#notificationCount').textContent=shopNotifications.filter(x=>!x.read_at).length;$('#notificationsList').innerHTML=shopNotifications.length?shopNotifications.map(n=>`<div class="item"><div><b>${esc(n.title)}</b><small>${esc(n.message)} · ${fmt(n.created_at)}</small></div></div>`).join(''):'<div class="notice mini">No notifications.</div>';}
-$('#notificationsBtn')?.addEventListener('click',async()=>{await loadNotifications();$('#notificationsModal').showModal();});setTimeout(()=>loadNotifications().catch(()=>{}),3000);
+// Notifications Center: persistent state, live business alerts, and modern card rendering.
+let dismissedAlertsKey = 'kivu_dismissed_alerts_';
+function getDismissedAlerts() {
+  if (!shop?.id) return {};
+  try { return JSON.parse(localStorage.getItem(dismissedAlertsKey + shop.id) || '{}'); } catch(_e) { return {}; }
+}
+function dismissAllAlerts(alertIds) {
+  if (!shop?.id) return;
+  const map = getDismissedAlerts();
+  const now = Date.now();
+  (alertIds || []).forEach(id => { map[id] = now; });
+  localStorage.setItem(dismissedAlertsKey + shop.id, JSON.stringify(map));
+}
+
+async function loadNotifications() {
+  if (!shop) return;
+  try {
+    const { data } = await sb.from('shop_notifications').select('*').eq('shop_id', shop.id).order('created_at', { ascending: false }).limit(50);
+    shopNotifications = data || [];
+  } catch (_e) {
+    shopNotifications = [];
+  }
+  renderNotifications();
+}
+
+function renderNotifications() {
+  const dismissedMap = getDismissedAlerts();
+  const listEl = $('#notificationsList');
+  const countBadge = $('#notificationCount');
+  const modalBadge = $('#notifUnreadBadge');
+
+  const allNotifs = [];
+
+  // 1. Stored notifications from backend
+  (shopNotifications || []).forEach(n => {
+    let type = 'system';
+    let icon = 'ℹ️';
+    let typeClass = 'notif-type-system';
+    let typeLabel = 'System';
+    let actionText = '';
+    let actionPage = '';
+
+    const t = (n.title || '').toLowerCase();
+    const m = (n.message || '').toLowerCase();
+
+    if (t.includes('subscription') || t.includes('plan') || t.includes('billing') || m.includes('subscription')) {
+      type = 'billing';
+      icon = '💳';
+      typeClass = 'notif-type-billing';
+      typeLabel = 'Subscription';
+      actionText = 'Review Plan →';
+      actionPage = 'subscription';
+    } else if (t.includes('stock') || t.includes('inventory') || m.includes('stock')) {
+      type = 'stock';
+      icon = '⚠️';
+      typeClass = 'notif-type-stock';
+      typeLabel = 'Stock Alert';
+      actionText = 'View Inventory →';
+      actionPage = 'inventory';
+    } else if (t.includes('credit') || t.includes('debt') || m.includes('credit')) {
+      type = 'credit';
+      icon = '💰';
+      typeClass = 'notif-type-credit';
+      typeLabel = 'Customer Debt';
+      actionText = 'View Debtors →';
+      actionPage = 'customers';
+    } else if (t.includes('invite') || t.includes('staff') || t.includes('employee')) {
+      type = 'staff';
+      icon = '👥';
+      typeClass = 'notif-type-staff';
+      typeLabel = 'Team & Staff';
+      actionText = 'Manage Staff →';
+      actionPage = 'employees';
+    }
+
+    allNotifs.push({
+      id: 'stored_' + (n.id || Math.random()),
+      isStored: true,
+      raw: n,
+      title: n.title,
+      message: n.message,
+      time: n.created_at ? fmt(n.created_at) : 'Recent',
+      timestamp: n.created_at ? new Date(n.created_at).getTime() : 0,
+      read: Boolean(n.read_at),
+      type,
+      icon,
+      typeClass,
+      typeLabel,
+      actionText,
+      actionPage
+    });
+  });
+
+  // 2. Dynamic live alerts generated from real-time business conditions
+  const subStatus = effectiveSubscriptionStatus();
+  if (subStatus === 'grace' || subStatus === 'expired' || subStatus === 'trial') {
+    const subAlertId = 'live_sub_' + subStatus;
+    allNotifs.push({
+      id: subAlertId,
+      isStored: false,
+      title: `Subscription Status: ${subStatus.toUpperCase()}`,
+      message: subStatus === 'grace' 
+        ? 'Your account is currently in grace period. Please renew to avoid interruption.'
+        : subStatus === 'trial'
+        ? 'Your free trial of Kivu Control is active. Review plans to ensure uninterrupted access.'
+        : 'Your subscription has expired. Operational access is locked until renewed.',
+      time: 'Realtime Alert',
+      timestamp: Date.now() + 10000,
+      read: Boolean(dismissedMap[subAlertId]),
+      type: 'billing',
+      icon: '💳',
+      typeClass: 'notif-type-billing',
+      typeLabel: 'Subscription & Billing',
+      actionText: 'Review Plan →',
+      actionPage: 'subscription'
+    });
+  }
+
+  const lowProducts = products.filter(p => Number(p.qty || 0) <= Number(p.low_stock || 0));
+  if (lowProducts.length > 0) {
+    const outCount = lowProducts.filter(p => Number(p.qty || 0) <= 0).length;
+    const stockAlertId = 'live_stock_' + lowProducts.length + '_' + outCount;
+    allNotifs.push({
+      id: stockAlertId,
+      isStored: false,
+      title: `${lowProducts.length} product(s) low or out of stock`,
+      message: outCount > 0 
+        ? `${outCount} item(s) are completely out of stock (${lowProducts.slice(0, 3).map(p=>p.name).join(', ')}...). Restock now.`
+        : `${lowProducts.length} item(s) are at or below reorder threshold (${lowProducts.slice(0, 3).map(p=>p.name).join(', ')}...).`,
+      time: 'Active Alert',
+      timestamp: Date.now() + 9000,
+      read: Boolean(dismissedMap[stockAlertId]),
+      type: 'stock',
+      icon: '⚠️',
+      typeClass: 'notif-type-stock',
+      typeLabel: 'Stock & Inventory',
+      actionText: 'Check Stock →',
+      actionPage: 'inventory'
+    });
+  }
+
+  const todayStr = day(new Date());
+  const overdueCredit = credits.filter(x => !x.paid && x.due_date && x.due_date < todayStr);
+  const totalUnpaidCredit = credits.filter(x => !x.paid).reduce((a, x) => a + Number(x.amount || 0), 0);
+  if (overdueCredit.length > 0 || totalUnpaidCredit > 0) {
+    const creditAlertId = 'live_credit_' + overdueCredit.length + '_' + Math.round(totalUnpaidCredit);
+    allNotifs.push({
+      id: creditAlertId,
+      isStored: false,
+      title: overdueCredit.length > 0 ? `${overdueCredit.length} customer credit invoice(s) overdue` : 'Outstanding Customer Credit (Amadeni)',
+      message: overdueCredit.length > 0
+        ? `${money(overdueCredit.reduce((a, x) => a + Number(x.amount || 0), 0))} is overdue. Send WhatsApp reminders or review customer ledger.`
+        : `Total customer debt outstanding: ${money(totalUnpaidCredit)}. Keep debt under control.`,
+      time: 'Customer Ledger',
+      timestamp: Date.now() + 8000,
+      read: Boolean(dismissedMap[creditAlertId]),
+      type: 'credit',
+      icon: '💰',
+      typeClass: 'notif-type-credit',
+      typeLabel: 'Customer Debt',
+      actionText: 'View Debtors →',
+      actionPage: 'customers'
+    });
+  }
+
+  if (can('owner', 'manager')) {
+    const overdueSuppliers = supplierPurchases.filter(x => Number(x.balance_due || 0) > 0 && x.due_date && x.due_date < todayStr);
+    if (overdueSuppliers.length > 0) {
+      const supTotal = overdueSuppliers.reduce((a, x) => a + Number(x.balance_due || 0), 0);
+      const supplierAlertId = 'live_sup_' + overdueSuppliers.length + '_' + Math.round(supTotal);
+      allNotifs.push({
+        id: supplierAlertId,
+        isStored: false,
+        title: `${overdueSuppliers.length} supplier balance(s) overdue`,
+        message: `Total ${money(supTotal)} is overdue to suppliers. Review supplier balances.`,
+        time: 'Supplier Accounts',
+        timestamp: Date.now() + 7000,
+        read: Boolean(dismissedMap[supplierAlertId]),
+        type: 'supplier',
+        icon: '🚚',
+        typeClass: 'notif-type-supplier',
+        typeLabel: 'Supplier Balances',
+        actionText: 'View Suppliers →',
+        actionPage: 'suppliers'
+      });
+    }
+
+    const pendingApprovals = approvalRequests.filter(x => x.status === 'pending');
+    const unreviewedShifts = shifts.filter(x => x.status === 'closed' && x.review_status === 'pending');
+    if (pendingApprovals.length > 0 || unreviewedShifts.length > 0) {
+      const totalRequests = pendingApprovals.length + unreviewedShifts.length;
+      const controlAlertId = 'live_controls_' + pendingApprovals.length + '_' + unreviewedShifts.length;
+      allNotifs.push({
+        id: controlAlertId,
+        isStored: false,
+        title: `${totalRequests} control action(s) need owner approval`,
+        message: `${pendingApprovals.length} void/adjustment request(s) and ${unreviewedShifts.length} closed shift variance(s) waiting for review.`,
+        time: 'Anti-Theft Controls',
+        timestamp: Date.now() + 6000,
+        read: Boolean(dismissedMap[controlAlertId]),
+        type: 'control',
+        icon: '🛡️',
+        typeClass: 'notif-type-control',
+        typeLabel: 'Anti-Theft Controls',
+        actionText: 'Review Approvals →',
+        actionPage: 'controls'
+      });
+    }
+
+    const pendingInvites = staffInvites.filter(i => !i.used_at && new Date(i.expires_at) > new Date());
+    if (pendingInvites.length > 0) {
+      const inviteAlertId = 'live_invites_' + pendingInvites.length;
+      allNotifs.push({
+        id: inviteAlertId,
+        isStored: false,
+        title: `${pendingInvites.length} pending staff invite(s)`,
+        message: `Staff invite code(s) waiting to be activated by your team.`,
+        time: 'Staff Management',
+        timestamp: Date.now() + 5000,
+        read: Boolean(dismissedMap[inviteAlertId]),
+        type: 'staff',
+        icon: '👥',
+        typeClass: 'notif-type-staff',
+        typeLabel: 'Staff & Team',
+        actionText: 'Manage Staff →',
+        actionPage: 'employees'
+      });
+    }
+  }
+
+  window._currentDynamicAlertIds = allNotifs.filter(x => !x.isStored).map(x => x.id);
+
+  allNotifs.sort((a, b) => {
+    if (a.read !== b.read) return a.read ? 1 : -1;
+    return b.timestamp - a.timestamp;
+  });
+
+  const unreadCount = allNotifs.filter(n => !n.read).length;
+
+  if (countBadge) countBadge.textContent = unreadCount;
+  if (modalBadge) modalBadge.textContent = `${unreadCount} unread`;
+
+  const markBtn = $('#markAllReadBtn');
+  if (markBtn) {
+    markBtn.disabled = unreadCount === 0;
+    markBtn.style.opacity = unreadCount === 0 ? '0.6' : '1';
+  }
+
+  if (!listEl) return;
+
+  if (allNotifs.length === 0) {
+    listEl.innerHTML = `
+      <div class="notif-empty-state">
+        <div class="notif-empty-icon">🔔</div>
+        <h4>All caught up!</h4>
+        <p>No new notifications, cashier alerts, or business reminders right now.</p>
+      </div>
+    `;
+    return;
+  }
+
+  listEl.innerHTML = allNotifs.map(n => `
+    <div class="notif-card ${n.read ? 'read' : 'unread'}" data-notif-id="${n.id}">
+      <div class="notif-badge-col">
+        <span class="notif-type-icon ${n.typeClass}">${n.icon}</span>
+      </div>
+      <div class="notif-content-col">
+        <div class="notif-top-row">
+          <span class="notif-type-tag ${n.typeClass}">${n.typeLabel}</span>
+          <span class="notif-time">${esc(n.time)}</span>
+        </div>
+        <div class="notif-title">${esc(n.title)}</div>
+        <div class="notif-message">${esc(n.message)}</div>
+        ${n.actionText ? `
+          <div class="notif-actions">
+            <button type="button" class="notif-action-link" onclick="$('#notificationsModal')?.close();showPage('${n.actionPage}')">
+              ${n.actionText}
+            </button>
+          </div>
+        ` : ''}
+      </div>
+      ${!n.read ? '<span class="notif-unread-dot" title="Unread notification"></span>' : ''}
+    </div>
+  `).join('');
+}
+
+window.markAllNotificationsRead = async function() {
+  dismissAllAlerts(window._currentDynamicAlertIds || []);
+  if (shop?.id && sb) {
+    try {
+      await sb.from('shop_notifications').update({ read_at: new Date().toISOString() }).eq('shop_id', shop.id).is('read_at', null);
+    } catch (_e) {}
+  }
+  (shopNotifications || []).forEach(n => {
+    if (!n.read_at) n.read_at = new Date().toISOString();
+  });
+  renderNotifications();
+};
+
+window.renderNotifications = renderNotifications;
+
+$('#notificationsBtn')?.addEventListener('click', async () => {
+  await loadNotifications();
+  $('#notificationsModal')?.showModal();
+});
+setTimeout(() => loadNotifications().catch(() => {}), 3000);
 
 // Backup / export controls.
 function downloadText(name,text,type='text/plain'){const b=new Blob([text],{type}),u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),1000);}
@@ -1114,8 +2973,8 @@ $('#exportCsvBtn')?.addEventListener('click',()=>{const blocks=[['products',prod
 $('#exportBackupBtn')?.addEventListener('click',()=>downloadText(`kivu-solutions-backup-${day(new Date())}.json`,JSON.stringify({version:DUKA_APP_VERSION,exported_at:new Date().toISOString(),shop,products,sales,customers,credits,suppliers,supplierPurchases,supplierPayments,expenses,employees,shifts},null,2),'application/json'));
 
 // Language shell (major navigation + common controls). Detailed transaction data remains unchanged.
-const I18N={en:{dashboard:'Overview',sales:'Sales',hospitality:'Tables & Orders',inventory:'Inventory',suppliers:'Suppliers',expenses:'Expenses',customers:'Customers',employees:'Employees',shifts:'Shifts',controls:'Controls',reports:'Reports',subscription:'Subscription',settings:'Settings',dukaadmin:'Platinum Tech Admin'},rw:{dashboard:'Incamake',sales:'Ibyagurishijwe',hospitality:"Ameza n'Ibicuruzwa",inventory:'Ububiko',suppliers:'Abatanga ibicuruzwa',expenses:'Amafaranga yasohotse',customers:'Abakiriya',employees:'Abakozi',shifts:'Amashifuti',controls:'Igenzura',reports:'Raporo',subscription:'Ifatabuguzi',settings:'Igenamiterere',dukaadmin:'Ubuyobozi bwa Platinum Tech'},fr:{dashboard:'Aperçu',sales:'Ventes',hospitality:'Tables & Commandes',inventory:'Stock',suppliers:'Fournisseurs',expenses:'Dépenses',customers:'Clients',employees:'Employés',shifts:'Services',controls:'Contrôles',reports:'Rapports',subscription:'Abonnement',settings:'Paramètres',dukaadmin:'Admin Platinum Tech'}};
-function applyLanguage(lang){lang=['en','rw','fr'].includes(lang)?lang:'en';localStorage.setItem('duka_lang',lang);$('#languageSelect').value=lang;$$('.nav[data-page]').forEach(b=>{const page=b.dataset.page;const lock=b.querySelector('.nav-lock');const txt=I18N[lang][page]||page;b.childNodes[0].nodeValue=txt+(lock?' ':'');});}
+const I18N={en:{dashboard:'Overview',sales:'Sales',hospitality:'Tables & Orders',inventory:'Inventory',suppliers:'Suppliers',expenses:'Expenses',customers:'Customers',employees:'Employees',shifts:'Shifts',controls:'Controls',reports:'Reports',subscription:'Subscription',settings:'Settings',dukaadmin:'Platinum Tech Admin',work:'WORK',operations:'OPERATIONS',manage:'MANAGE',logout:'Logout',plan:'Plan',account:'Account'},rw:{dashboard:'Incamake',sales:'Ibyagurishijwe',hospitality:"Ameza n'Ibicuruzwa",inventory:'Ububiko',suppliers:'Abatanga ibicuruzwa',expenses:'Amafaranga yasohotse',customers:'Abakiriya',employees:'Abakozi',shifts:'Amashifuti',controls:'Igenzura',reports:'Raporo',subscription:'Ifatabuguzi',settings:'Igenamiterere',dukaadmin:'Ubuyobozi bwa Platinum Tech',work:'AKAZI',operations:'IBIKORWA',manage:'UBUYOBOZI',logout:'Sohoka',plan:'Ifatabuguzi',account:'Konti'},fr:{dashboard:'Aperçu',sales:'Ventes',hospitality:'Tables & Commandes',inventory:'Stock',suppliers:'Fournisseurs',expenses:'Dépenses',customers:'Clients',employees:'Employés',shifts:'Services',controls:'Contrôles',reports:'Rapports',subscription:'Abonnement',settings:'Paramètres',dukaadmin:'Admin Platinum Tech',work:'TRAVAIL',operations:'OPÉRATIONS',manage:'GESTION',logout:'Déconnexion',plan:'Forfait',account:'Compte'}};
+function applyLanguage(lang){lang=['en','rw','fr'].includes(lang)?lang:'en';localStorage.setItem('duka_lang',lang);$('#languageSelect').value=lang;$$('.nav[data-page]').forEach(b=>{const page=b.dataset.page;const lock=b.querySelector('.nav-lock');const txt=I18N[lang][page]||page;const lbl=b.querySelector('.nav-label');if(lbl){lbl.textContent=txt;}else if(b.childNodes[0]&&b.childNodes[0].nodeType===Node.TEXT_NODE){b.childNodes[0].nodeValue=txt+(lock?' ':'');}});$$('[data-i18n]').forEach(el=>{const k=el.dataset.i18n;if(I18N[lang]&&I18N[lang][k])el.textContent=I18N[lang][k];});}
 $('#languageSelect')?.addEventListener('change',e=>applyLanguage(e.target.value));setTimeout(()=>applyLanguage(shop?.preferred_language||localStorage.getItem('duka_lang')||'en'),2200);
 
 // Enhance settings with location + language without disturbing existing V4.0 settings save.
@@ -1128,9 +2987,7 @@ $('#settingsForm')?.addEventListener('submit',async()=>{if(profile?.role!=='owne
 const oldApplyPermissions=applyPermissions;
 applyPermissions=function(){oldApplyPermissions();$('#modeSwitchBtn')?.classList.toggle('hidden',!isDukaAdmin);};
 
-// Initial onboarding guidance for new owner shops.
-const oldRenderDashboard=renderDashboard;
-renderDashboard=function(){oldRenderDashboard();if(profile?.role==='owner'&&shop?.onboarding_status&&shop.onboarding_status!=='active'){const a=$('#assistantMessage');if(a)a.innerHTML+=`<br><br><b>Getting started:</b> Complete business location, add your first product, invite staff if needed, then record your first sale. Current setup status: ${esc(shop.onboarding_status)}.`;}};
+// Onboarding guidance is integrated into the notification center.
 
 // Ensure any Platinum Tech employee role can enter the platform console when granted admin access.
 Object.values(rolePages).forEach(a=>{if(!a.includes('dukaadmin'))a.push('dukaadmin');});
@@ -1169,22 +3026,7 @@ renderSettingsV41=function(){oldRenderSettingsV41();renderOwnerDevices().catch((
 $('#featureFlagBtn')?.addEventListener('click',async()=>{if(!selectedSupportShopId)return;const key=prompt('Feature key to enable/disable (example: new_reports):');if(!key)return;const enabled=confirm('Enable this feature? OK = enable, Cancel = disable');const note=prompt('Reason / note:','Pilot feature')||'';const {error}=await sb.rpc('duka_set_feature_flag',{p_shop_id:selectedSupportShopId,p_key:key,p_enabled:enabled,p_note:note});if(error)return alert(error.message);alert(`Feature ${key} ${enabled?'enabled':'disabled'} for this shop.`);});
 $('#generateExpiryAlertsBtn')?.addEventListener('click',async()=>{const {data,error}=await sb.rpc('generate_subscription_notifications');if(error)return alert(error.message);alert(`${data||0} subscription expiry notification(s) generated.`);});
 
-// Enrich notification center with live shop conditions.
-const originalLoadNotifications=loadNotifications;
-loadNotifications=async function(){
-  await originalLoadNotifications();
-  if(!shop)return;
-  const live=[];
-  products.filter(p=>Number(p.qty)<=Number(p.low_stock)).slice(0,8).forEach(p=>live.push({title:`Low stock: ${p.name}`,message:`${stockDisplay(p)} remaining`}));
-  const supplierDebt=supplierPurchases.filter(x=>Number(x.balance_due||0)>0);if(supplierDebt.length)live.push({title:'Supplier debt',message:`${money(supplierDebt.reduce((a,x)=>a+Number(x.balance_due||0),0))} outstanding`});
-  const credit=credits.filter(x=>!x.paid);if(credit.length)live.push({title:'Customer credit',message:`${money(credit.reduce((a,x)=>a+Number(x.amount||0),0))} outstanding`});
-  const pending=approvalRequests.filter(x=>x.status==='pending');if(pending.length)live.push({title:'Approvals waiting',message:`${pending.length} control request(s) need review`});
-  const status=effectiveSubscriptionStatus();if(status==='grace'||status==='expired'||status==='trial')live.push({title:`Subscription: ${status}`,message:'Open Subscription to review your Kivu Solutions access dates.'});
-  const stored=(shopNotifications||[]).map(n=>`<div class="item"><div><b>${esc(n.title)}</b><small>${esc(n.message)} · ${fmt(n.created_at)}</small></div></div>`).join('');
-  const liveHtml=live.map(n=>`<div class="item"><div><b>${esc(n.title)}</b><small>${esc(n.message)}</small></div></div>`).join('');
-  $('#notificationsList').innerHTML=(liveHtml+stored)||'<div class="notice mini">No notifications.</div>';
-  $('#notificationCount').textContent=live.length+shopNotifications.filter(x=>!x.read_at).length;
-};
+// Live notification conditions are handled directly inside renderNotifications().
 
 
 /* V4.6 market-ready mobile navigation */
@@ -1255,11 +3097,11 @@ function renderHospitality(){
   if(!hospitalityEnabled())return;
   fillHospitalitySelects();
   const open=hOpenTabs(),today=day(new Date());
-  $('#hospitalityTitle').textContent=shop.business_type==='bar'?'Bar tabs & service':shop.business_type==='restaurant'?'Restaurant tables & service':'Tables, bar tabs & service';
-  $('#openTabsCount').textContent=open.length;
-  $('#openTabsValue').textContent=money(open.reduce((n,t)=>n+hTabTotal(t.id),0));
-  $('#occupiedTablesCount').textContent=new Set(open.map(t=>t.table_id).filter(Boolean)).size;
-  $('#closedTabsToday').textContent=hospitalityTabs.filter(t=>t.status==='closed'&&t.closed_at&&day(t.closed_at)===today).length;
+  if($('#hospitalityTitle')) $('#hospitalityTitle').textContent=shop.business_type==='bar'?'Bar tabs & service':shop.business_type==='restaurant'?'Restaurant tables & service':'Tables, bar tabs & service';
+  if($('#openTabsCount')) $('#openTabsCount').textContent=open.length;
+  if($('#openTabsValue')) $('#openTabsValue').textContent=money(open.reduce((n,t)=>n+hTabTotal(t.id),0));
+  if($('#occupiedTablesCount')) $('#occupiedTablesCount').textContent=new Set(open.map(t=>t.table_id).filter(Boolean)).size;
+  if($('#closedTabsToday')) $('#closedTabsToday').textContent=hospitalityTabs.filter(t=>t.status==='closed'&&t.closed_at&&day(t.closed_at)===today).length;
   $('#hospitalityTablesGrid').innerHTML=hospitalityTables.length?hospitalityTables.filter(t=>t.active!==false).map(t=>{const tab=open.find(x=>x.table_id===t.id);return `<button class="hospitality-table-card ${tab?'occupied':''}" ${tab?`onclick="openHospitalityOrder('${tab.id}')"`:`onclick="quickOpenHospitalityTable('${t.id}')"`}><b>${esc(t.name)}</b><span>${tab?'OPEN · '+money(hTabTotal(tab.id)):'Available'}</span><small>${t.seats?`${t.seats} seats`:''}</small></button>`}).join(''):'<div class="empty-state">No tables yet. Add tables, or use open bills without a table for bar-counter customers and takeaway.</div>';
   $('#hospitalityTabsList').innerHTML=open.length?open.map(t=>`<div class="item"><div><b>${esc(hTableName(t.table_id)||t.label||t.customer_name||'Open bill')}</b><small>${esc(t.waiter_name||'Staff')} · ${fmt(t.opened_at)} · ${hTabItems(t.id).length} item(s)</small></div><div><b>${money(hTabTotal(t.id))}</b> <button class="btn primary" onclick="openHospitalityOrder('${t.id}')">Open</button></div></div>`).join(''):'No open bills.';
   const tickets=hospitalityItems.filter(i=>i.sent_at&&!i.served_at&&hospitalityTabs.some(t=>t.id===i.tab_id&&t.status==='open'));
@@ -1276,17 +3118,17 @@ $('#recipeBtn')?.addEventListener('click',()=>{if(!can('owner','manager'))return
 $('#hospitalityTableForm')?.addEventListener('submit',async e=>{e.preventDefault();const f=new FormData(e.target);const {error}=await sb.rpc('hospitality_save_table',{p_table_id:null,p_name:String(f.get('name')).trim(),p_seats:Number(f.get('seats')||0)||null,p_active:true});if(error)return alert(error.message);e.target.reset();$('#hospitalityTableModal').close();await refresh();});
 $('#hospitalityTabForm')?.addEventListener('submit',async e=>{e.preventDefault();const f=new FormData(e.target);const {data,error}=await sb.rpc('hospitality_open_tab',{p_table_id:f.get('tableId')||null,p_label:f.get('label')||null,p_customer_name:f.get('customerName')||null});if(error)return alert(error.message);e.target.reset();$('#hospitalityTabModal').close();await refresh();openHospitalityOrder(data);});
 window.quickOpenHospitalityTable=async id=>{const {data,error}=await sb.rpc('hospitality_open_tab',{p_table_id:id,p_label:null,p_customer_name:null});if(error)return alert(error.message);await refresh();openHospitalityOrder(data);};
-window.openHospitalityOrder=id=>{const t=hospitalityTabs.find(x=>x.id===id);if(!t)return;const f=$('#hospitalityOrderForm');f.elements.tabId.value=id;$('#hospitalityOrderHeading').textContent=hTableName(t.table_id)||t.label||t.customer_name||'Open bill';renderHospitalityOrder(id);fillHospitalitySelects();$('#hospitalityOrderModal')?.showModal();};
+window.openHospitalityOrder=id=>{const t=hospitalityTabs.find(x=>x.id===id);if(!t)return;const f=$('#hospitalityOrderForm');f.elements.tabId.value=id;if($('#hospitalityOrderHeading')) $('#hospitalityOrderHeading').textContent=hTableName(t.table_id)||t.label||t.customer_name||'Open bill';renderHospitalityOrder(id);fillHospitalitySelects();$('#hospitalityOrderModal')?.showModal();};
 function renderHospitalityOrder(id){const items=hTabItems(id);$('#hospitalityOrderItems').innerHTML=items.length?items.map(i=>`<div class="hospitality-line"><div><b>${esc(i.product_name)}</b><small>${i.qty} × ${money(i.unit_price)}${i.note?' · '+esc(i.note):''}${i.complimentary?' · COMPLIMENTARY':''}</small></div><div><b>${i.complimentary?'0 RWF':money(i.qty*i.unit_price)}</b><small>${i.served_at?'Served':i.sent_at?'Sent':'Not sent'}</small></div></div>`).join(''):'<div class="notice mini">No items on this bill yet.</div>';$('#hospitalityOrderItems').insertAdjacentHTML('beforeend',`<div class="sale-cart-total grand"><span>Bill total</span><strong>${money(hTabTotal(id))}</strong></div>`);}
 $('#addHospitalityItemBtn')?.addEventListener('click',async()=>{const f=$('#hospitalityOrderForm'),id=f.elements.tabId.value,pid=f.elements.productId.value,qty=Number(f.elements.qty.value);const {error}=await sb.rpc('hospitality_add_item',{p_tab_id:id,p_product_id:pid,p_qty:qty,p_note:f.elements.note.value||null,p_complimentary:!!f.elements.complimentary.checked});if(error)return alert(error.message);f.elements.note.value='';f.elements.complimentary.checked=false;await refresh();renderHospitalityOrder(id);});
 $('#sendHospitalityOrderBtn')?.addEventListener('click',async()=>{const id=$('#hospitalityOrderForm').elements.tabId.value;const {error}=await sb.rpc('hospitality_send_tab',{p_tab_id:id});if(error)return alert(error.message);await refresh();renderHospitalityOrder(id);});
 window.markHospitalityServed=async id=>{const {error}=await sb.rpc('hospitality_mark_served',{p_item_id:id});if(error)return alert(error.message);await refresh();};
 window.printKitchenTicket=id=>{const i=hospitalityItems.find(x=>x.id===id),t=i&&hospitalityTabs.find(x=>x.id===i.tab_id);if(!i)return;const w=window.open('','_blank','width=360,height=520');if(!w)return alert('Allow pop-ups to print kitchen/bar tickets.');w.document.write(`<!doctype html><meta charset="utf-8"><title>Order ticket</title><style>body{font:16px/1.35 monospace;padding:14px;width:72mm}h2{margin:0 0 8px;border-bottom:1px dashed #000;padding-bottom:8px}b{font-size:22px}.line{border-top:1px dashed #000;margin:10px 0}</style><h2>${esc(shop.name)} — ORDER</h2><div>${esc(hTableName(t?.table_id)||t?.label||'Counter / Takeaway')}</div><div class="line"></div><b>${esc(i.product_name)} × ${esc(i.qty)}</b><p>${esc(i.note||'No special note')}</p><div class="line"></div><small>${fmt(i.sent_at||i.created_at)} · ${esc(t?.waiter_name||i.created_by_name||'Staff')}</small>`);w.document.close();w.focus();setTimeout(()=>w.print(),150);};
 
-function addHospitalityPaymentRow(method='Cash',amount=''){const box=$('#hospitalityPaymentRows');const d=document.createElement('div');d.className='form-grid hospitality-payment-row';d.innerHTML=`<label>Method<select name="payMethod"><option ${method==='Cash'?'selected':''}>Cash</option><option>Mobile Money</option><option>Bank</option><option>Credit</option><option>Other</option></select></label><label>Amount<input name="payAmount" type="number" min="0.01" step="0.01" value="${amount}" required></label>`;box.appendChild(d);}
+function addHospitalityPaymentRow(method='Cash',amount=''){const box=$('#hospitalityPaymentRows');const d=document.createElement('div');d.className='form-grid hospitality-payment-row';d.innerHTML=`<label>Method<select name="payMethod"><option ${method==='Cash'?'selected':''}>Cash</option><option>Mobile Money</option><option>Bank</option><option>Credit</option><option>Other</option></select></label><label>Amount<input name="payAmount" type="text" inputmode="decimal" class="money-input" value="${formatMoneyString(amount)}" required></label>`;box.appendChild(d);initMoneyInputs(d);}
 $('#addHospitalityPaymentBtn')?.addEventListener('click',()=>addHospitalityPaymentRow('Mobile Money',''));
 $('#settleHospitalityBtn')?.addEventListener('click',()=>{const id=$('#hospitalityOrderForm').elements.tabId.value,total=hTabTotal(id);$('#hospitalityPaymentForm').elements.tabId.value=id;$('#hospitalityPaymentSummary').innerHTML=`Amount due: <b>${money(total)}</b><br>Use one payment or add rows to split the amount across Cash / MoMo / Bank.`;$('#hospitalityPaymentRows').innerHTML='';addHospitalityPaymentRow('Cash',total);$('#hospitalityPaymentModal')?.showModal();});
-$('#hospitalityPaymentForm')?.addEventListener('submit',async e=>{e.preventDefault();const id=e.target.elements.tabId.value;const rows=[...e.target.querySelectorAll('.hospitality-payment-row')],payments=rows.map(r=>({method:r.querySelector('[name=payMethod]').value,amount:Number(r.querySelector('[name=payAmount]').value)})).filter(x=>x.amount>0);const {data,error}=await sb.rpc('hospitality_close_tab',{p_tab_id:id,p_payments:payments});if(error)return alert(error.message);$('#hospitalityPaymentModal').close();$('#hospitalityOrderModal').close();alert(`Bill closed. Receipt: ${data}`);await refresh();});
+$('#hospitalityPaymentForm')?.addEventListener('submit',async e=>{e.preventDefault();const id=e.target.elements.tabId.value;const rows=[...e.target.querySelectorAll('.hospitality-payment-row')],payments=rows.map(r=>({method:r.querySelector('[name=payMethod]').value,amount:parseMoney(r.querySelector('[name=payAmount]').value)})).filter(x=>x.amount>0);const {data,error}=await sb.rpc('hospitality_close_tab',{p_tab_id:id,p_payments:payments});if(error)return alert(error.message);$('#hospitalityPaymentModal').close();$('#hospitalityOrderModal').close();alert(`Bill closed. Receipt: ${data}`);await refresh();});
 $('#hospitalityWastageForm')?.addEventListener('submit',async e=>{e.preventDefault();const f=new FormData(e.target);const {error}=await sb.rpc('hospitality_record_wastage',{p_product_id:f.get('productId'),p_qty:Number(f.get('qty')),p_reason:f.get('reason')});if(error)return alert(error.message);e.target.reset();$('#hospitalityWastageModal').close();await refresh();});
 
 function recipeRow(ingredient='',qty=''){const d=document.createElement('div');d.className='form-grid recipe-row';d.innerHTML=`<label>Ingredient / stock item<select name="ingredientId">${products.map(p=>`<option value="${p.id}" ${p.id===ingredient?'selected':''}>${esc(p.name)} (${esc(baseUnitLabel(p))})</option>`).join('')}</select></label><label>Qty consumed per menu item<input name="ingredientQty" type="number" min="0.001" step="0.001" value="${qty}" required></label>`;return d;}
@@ -1348,11 +3190,21 @@ async function runOfflineSalesSync(){
     if(!shop||shop.id!==targetShopId||!session?.user?.id||session.user.id!==row.user_id)break;
     try{
       await window.KivuOffline.updateSale(row.client_ref,{status:'syncing',last_error:null});
-      const {error}=await sb.rpc('record_sale_cart_v48',{
+      let {error}=await sb.rpc('record_sale_cart_v48',{
         p_items:row.items,p_payment:row.payment,p_discount:row.discount||0,
         p_customer_id:row.customer_id||null,p_customer_name:row.customer_name||null,
         p_client_ref:row.client_ref
       });
+      if(error&&String(row.payment||'').toLowerCase().includes('split')&&(error.message?.includes('violates check constraint')||error.message?.includes('payment'))){
+        const splitMeta=getSplitPaymentDetails(row.client_ref);
+        const fallback=(splitMeta&&splitMeta.cash>=splitMeta.momo)?'Cash':'Mobile Money';
+        const retry=await sb.rpc('record_sale_cart_v48',{
+          p_items:row.items,p_payment:fallback,p_discount:row.discount||0,
+          p_customer_id:row.customer_id||null,p_customer_name:row.customer_name||null,
+          p_client_ref:row.client_ref
+        });
+        if(!retry.error) error=null;
+      }
       if(error)throw error;
       await window.KivuOffline.removeSale(row.client_ref);
     }catch(err){
@@ -1372,7 +3224,7 @@ if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.ser
 function findProductByBarcode(code){const clean=String(code||'').trim();return products.find(x=>String(x.barcode||'').trim()===clean);}
 function chooseProductFromBarcode(code,{autoAdd=false,formSelector='#saleForm'}={}){const p=findProductByBarcode(code);if(!p){alert('No product matches that barcode. Register the barcode in Inventory first.');return null;}const f=$(formSelector);if(f?.elements?.productId){f.elements.productId.value=p.id;if(formSelector==='#saleForm')refreshSaleUnitOptions();if(f.elements.qty)f.elements.qty.value='1';}if(autoAdd)$('#addSaleItemBtn')?.click();return p;}
 $('#saleBarcodeInput')?.addEventListener('keydown',e=>{if(e.key!=='Enter')return;e.preventDefault();const code=e.currentTarget.value.trim();if(!code)return;chooseProductFromBarcode(code,{autoAdd:true});e.currentTarget.value='';});
-$('#scanSaleBarcodeBtn')?.addEventListener('click',async()=>{const code=await window.KivuCameraScanner?.open('Scan product for sale');if(!code)return;const p=chooseProductFromBarcode(code,{autoAdd:false});if(p){const qty=$('#saleForm')?.elements?.qty;if(qty){qty.value='1';qty.focus();qty.select?.();}}});
+$('#scanSaleBarcodeBtn')?.addEventListener('click',async()=>{const code=await window.KivuCameraScanner?.open('Scan product for sale');if(!code)return;const p=findProductByBarcode(code);if(!p)return alert('No product matches that barcode. Register the barcode in Inventory first.');quickAddProductToCart(p.id);});
 $('#scanProductBarcodeBtn')?.addEventListener('click',async()=>{const code=await window.KivuCameraScanner?.open('Scan barcode for new product');if(code){const input=$('#productBarcodeInput');if(input)input.value=code;}});
 $('#scanEditProductBarcodeBtn')?.addEventListener('click',async()=>{const code=await window.KivuCameraScanner?.open('Scan product barcode');if(code){const input=$('#editProductBarcodeInput');if(input)input.value=code;}});
 $('#scanStockProductBtn')?.addEventListener('click',async()=>{const code=await window.KivuCameraScanner?.open('Scan product to add stock');if(!code)return;const p=findProductByBarcode(code);if(!p)return alert('No product matches that barcode. Register the barcode in Inventory first.');const f=$('#stockForm');f.elements.productId.value=p.id;f.elements.qty.focus();});
@@ -1395,3 +3247,23 @@ $('#requestComplimentaryBtn')?.addEventListener('click',async()=>{if(!can('cashi
 
 renderSettingsV41=function(){if(profile?.role!=='owner'||!shop)return;$('#settingsProvince').value=shop.province||'';$('#settingsDistrict').value=shop.district||'';$('#settingsSector').value=shop.sector||'';$('#settingsCell').value=shop.cell||'';$('#settingsLanguage').value=shop.preferred_language||'en';if($('#settingsTaxRate'))$('#settingsTaxRate').value=Number(shop.tax_rate||0);if($('#settingsTaxLabel'))$('#settingsTaxLabel').value=shop.tax_label||'VAT';if($('#settingsTaxNumber'))$('#settingsTaxNumber').value=shop.tax_number||'';};
 setTimeout(()=>updateConnectivityUI().catch(()=>{}),1000);
+window.addEventListener('keydown', e => {
+  if (e.key === 'F2') {
+    e.preventDefault();
+    if (!session || !profile) return;
+    if (!can('owner', 'manager', 'cashier')) return;
+    if (!ensureSubscriptionAccess()) return;
+    const modal = $('#saleModal');
+    if (modal && !modal.open) {
+      initSaleModal();
+      modal.showModal();
+    } else {
+      $('#saleProductSearch')?.focus();
+    }
+  }
+});
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => initMoneyInputs());
+} else {
+  initMoneyInputs();
+}
