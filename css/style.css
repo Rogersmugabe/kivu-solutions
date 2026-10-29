@@ -5806,3 +5806,229 @@ dialog.supervisor-override-modal::backdrop {
   color: #15803d;
   line-height: 1.45;
 }
+
+/* ==========================================================================
+   ROLE SIMULATOR & PREVIEW BANNER V5.3.5
+   ========================================================================== */
+.role-preview-banner {
+  background: linear-gradient(90deg, #1e1b4b 0%, #312e81 100%);
+  color: #f8fafc;
+  padding: 10px 24px;
+  border-bottom: 2px solid #6366f1;
+  position: sticky;
+  top: 72px;
+  z-index: 99;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.2);
+  animation: slideDownBanner 0.25s ease-out;
+}
+@keyframes slideDownBanner {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.role-preview-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  max-width: 1450px;
+  margin: 0 auto;
+}
+.role-preview-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.role-preview-pill {
+  background: #f59e0b;
+  color: #1e1b4b;
+  font-size: 0.7rem;
+  font-weight: 800;
+  padding: 3px 8px;
+  border-radius: 999px;
+  letter-spacing: 0.05em;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.role-preview-text {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #ffffff;
+}
+.role-preview-text strong {
+  color: #93c5fd;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.role-preview-hint {
+  font-size: 0.78rem;
+  color: #c7d2fe;
+}
+.role-preview-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.role-preview-switch-label {
+  font-size: 0.78rem;
+  color: #cbd5e1;
+  margin: 0;
+  font-weight: 600;
+}
+.preview-role-select {
+  background: #0f172a;
+  color: #f8fafc;
+  border: 1px solid #4338ca;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+}
+.preview-role-select:focus {
+  border-color: #818cf8;
+}
+.btn-exit-preview {
+  background: #dc2626 !important;
+  color: #ffffff !important;
+  border: none !important;
+  font-weight: 700 !important;
+  font-size: 0.8rem !important;
+  padding: 6px 14px !important;
+  border-radius: 8px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  cursor: pointer !important;
+  transition: background 0.15s ease !important;
+}
+.btn-exit-preview:hover {
+  background: #b91c1c !important;
+}
+
+/* Role simulator cards in #page-employees */
+.role-sim-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-top: 10px;
+}
+.btn-role-sim {
+  padding: 14px 14px !important;
+  text-align: left !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 5px !important;
+  height: auto !important;
+  background: #ffffff !important;
+  border: 1px solid var(--line, #e2e8f0) !important;
+  border-radius: 12px !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+}
+.btn-role-sim:hover {
+  background: #f8fafc !important;
+  border-color: #6366f1 !important;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.1) !important;
+}
+.role-sim-btn-title {
+  font-weight: 700;
+  font-size: 0.88rem;
+  color: var(--dark, #0f172a);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.role-sim-btn-title svg {
+  color: #4f46e5;
+  stroke: #4f46e5;
+  flex-shrink: 0;
+}
+.role-sim-btn-desc {
+  color: var(--muted, #64748b);
+  font-size: 0.74rem;
+  line-height: 1.4;
+  font-weight: normal;
+}
+
+/* Quick preview hint inside staff invite modal */
+.role-preview-quick-tip {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  background: #f0fdf4;
+  border: 1px dashed #86efac;
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-top: 12px;
+  font-size: 0.82rem;
+  color: #166534;
+}
+
+/* DB Fix Modal */
+.db-fix-modal-card {
+  padding: 24px;
+}
+.db-fix-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.db-fix-icon-badge {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: #fef2f2;
+  color: #dc2626;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+.db-fix-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  color: var(--dark, #0f172a);
+}
+.db-fix-subtitle {
+  margin: 2px 0 0;
+  font-size: 0.78rem;
+  color: #dc2626;
+  font-family: ui-monospace, monospace;
+}
+.db-fix-body {
+  font-size: 0.84rem;
+  color: var(--muted, #475569);
+  line-height: 1.5;
+  margin: 0 0 12px;
+}
+.db-fix-code-wrap {
+  background: #0f172a;
+  color: #38bdf8;
+  padding: 14px;
+  border-radius: 10px;
+  font-family: ui-monospace, monospace;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  overflow-x: auto;
+  border: 1px solid #1e293b;
+  margin-bottom: 12px;
+}
+.db-fix-code-wrap pre {
+  margin: 0;
+  white-space: pre-wrap;
+}
+.db-fix-tip {
+  font-size: 0.78rem;
+  color: var(--muted, #64748b);
+  line-height: 1.45;
+  margin: 0 0 16px;
+}
+

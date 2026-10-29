@@ -12,7 +12,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
-<link rel="stylesheet" href="css/style.css?v=5.3.4"/>
+<link rel="stylesheet" href="css/style.css?v=5.3.5"/>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 (function(){
@@ -302,6 +302,32 @@
   </div>
   <div class="top-actions"><span id="connectivityBadge" class="pill connectivity online"><span class="pulse-dot"></span>Online</span><button id="offlineQueueBtn" class="btn ghost hidden" type="button">Offline sales <span id="offlineQueueCount">0</span></button><button id="modeSwitchBtn" class="btn secondary hidden" type="button">Platinum Tech Admin</button><select id="languageSelect" class="top-select" aria-label="Language"><option value="en">EN</option><option value="rw">RW</option><option value="fr">FR</option></select><button id="lockTerminalBtn" class="btn ghost lock-terminal-top-btn" type="button" title="Lock Register (Fast PIN Switch)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="top-btn-icon"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg> <span>Lock</span></button><button id="notificationsBtn" class="btn ghost notif-top-btn" type="button" aria-label="Notifications" title="Notifications &amp; Alerts"><svg class="top-btn-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg><span id="notificationCount" class="notif-count-badge">0</span></button><span id="topRoleBadge" class="pill">owner</span><button id="changePinBtn" class="btn ghost hidden" type="button">Change PIN</button><button id="quickSaleBtn" class="btn primary pos-quick-btn pos-action-btn" type="button" title="Open POS counter checkout (F2)">+ New sale <span class="btn-pos-badge">F2</span></button><button id="topLogoutBtn" class="btn ghost" type="button">Sign out</button></div>
 </header>
+<div id="rolePreviewBanner" class="role-preview-banner hidden" role="region" aria-label="Role preview status">
+  <div class="role-preview-content">
+    <div class="role-preview-info">
+      <span class="role-preview-pill">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+        SIMULATION MODE
+      </span>
+      <span class="role-preview-text">Viewing as: <strong id="previewRoleLabel">Cashier</strong></span>
+      <span class="role-preview-hint">Navigation, pages, financials &amp; POS permissions are filtered to this role.</span>
+    </div>
+    <div class="role-preview-actions">
+      <label class="role-preview-switch-label" for="previewRoleSelect">Switch:</label>
+      <select id="previewRoleSelect" class="preview-role-select" onchange="startRoleSimulation(this.value)">
+        <option value="cashier">Cashier</option>
+        <option value="manager">Manager</option>
+        <option value="waiter">Waiter</option>
+        <option value="kitchen">Kitchen / Bar Prep</option>
+        <option value="stock_clerk">Stock Clerk</option>
+      </select>
+      <button type="button" id="exitRolePreviewBtn" class="btn btn-sm btn-exit-preview" onclick="exitRoleSimulation()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        Exit Preview (Back to Owner)
+      </button>
+    </div>
+  </div>
+</div>
 <div id="toastContainer" class="toast-container" aria-live="polite"></div>
 
 <main class="content">
@@ -827,6 +853,57 @@
     <div class="page-kpi-card"><span>Pending Invites</span><strong id="empKpiInvites">0</strong></div>
   </div>
   <div class="notice">Each staff member gets their own login. Permissions are enforced in the database, and sensitive actions are tied to the logged-in user.</div>
+  <section class="panel owner-only" id="roleSimulatorPanel">
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px; margin-bottom:12px;">
+      <div>
+        <p class="eyebrow" style="color:var(--color-brand-600, #2563eb); display:flex; align-items:center; gap:6px;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+          ROLE SIMULATOR &amp; PREVIEW
+        </p>
+        <h2 style="font-size:18px; margin:2px 0 4px;">Test Staff Screens Instantly</h2>
+        <p style="font-size:13px; color:var(--color-text-secondary, #64748b); margin:0;">
+          Preview how Kivu Solutions appears and behaves for any staff role in real-time without creating separate accounts or logging out.
+        </p>
+      </div>
+    </div>
+    <div class="role-sim-cards">
+      <button type="button" class="btn secondary btn-role-sim" onclick="startRoleSimulation('cashier')">
+        <span class="role-sim-btn-title">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+          Cashier View
+        </span>
+        <small class="role-sim-btn-desc">POS counter, blind cash drawer closing &amp; void supervisor approval.</small>
+      </button>
+      <button type="button" class="btn secondary btn-role-sim" onclick="startRoleSimulation('manager')">
+        <span class="role-sim-btn-title">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+          Manager View
+        </span>
+        <small class="role-sim-btn-desc">Financial reports, approvals, staff shifts &amp; shift reconciliations.</small>
+      </button>
+      <button type="button" class="btn secondary btn-role-sim" onclick="startRoleSimulation('waiter')">
+        <span class="role-sim-btn-title">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M8 14s1.5 2 4 2 4-2 4-2"></path><line x1="9" y1="9" x2="9.01" y2="9"></line><line x1="15" y1="9" x2="15.01" y2="9"></line></svg>
+          Waiter View
+        </span>
+        <small class="role-sim-btn-desc">Floor plan tables, dining orders &amp; guest tabs.</small>
+      </button>
+      <button type="button" class="btn secondary btn-role-sim" onclick="startRoleSimulation('kitchen')">
+        <span class="role-sim-btn-title">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 13.87A4 4 0 0 1 7.41 6a5.11 5.11 0 0 1 1.05-1.54 5 5 0 0 1 7.08 0A5.11 5.11 0 0 1 16.59 6 4 4 0 0 1 18 13.87V21H6Z"></path><line x1="6" y1="17" x2="18" y2="17"></line></svg>
+          Kitchen / Bar Prep
+        </span>
+        <small class="role-sim-btn-desc">Kitchen display system (KDS), preparation timers &amp; ticket clearing.</small>
+      </button>
+      <button type="button" class="btn secondary btn-role-sim" onclick="startRoleSimulation('stock_clerk')">
+        <span class="role-sim-btn-title">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+          Stock Clerk View
+        </span>
+        <small class="role-sim-btn-desc">Stock inventory counts, intake receiving &amp; product catalog.</small>
+      </button>
+    </div>
+  </section>
   <section class="panel owner-only"><p class="eyebrow">PENDING INVITES</p><h2>Staff invite codes</h2><div id="staffInvitesList"></div></section>
   <section class="panel"><div class="table-wrap"><table><thead><tr><th>Employee</th><th>Role</th><th>Phone</th><th>Status</th><th>Sales today</th><th>Actions</th></tr></thead><tbody id="employeesBody"></tbody></table></div></section>
   <section class="panel"><p class="eyebrow">AUDIT TRAIL</p><h2>Recent actions</h2><div id="auditList"></div></section>
@@ -1512,7 +1589,36 @@
 
 <dialog id="customerModal" aria-labelledby="customerModalTitle"><form id="customerForm"><h3 id="customerModalTitle">Add customer</h3><label>Name<input name="name" required></label><div class="form-grid"><label>Phone<input name="phone"></label><label>Email<input name="email" type="email"></label></div><div class="modal-actions"><button type="button" class="btn ghost cancel-btn">Cancel</button><button class="btn primary">Save</button></div></form></dialog>
 
-<dialog id="staffInviteModal" aria-labelledby="staffInviteModalTitle"><form id="staffInviteForm"><h3 id="staffInviteModalTitle">Create staff invite</h3><label>Employee name<input name="name" required></label><div class="form-grid"><label>Phone<input name="phone" inputmode="tel" placeholder="0788 123 456" required></label><label>Role<select name="role"><option value="cashier">Cashier</option><option value="manager">Manager</option><option value="stock_clerk">Stock Clerk</option><option value="waiter">Waiter</option><option value="kitchen">Kitchen / Bar Prep</option></select></label></div><div class="notice">Kivu Solutions will create a one-time invite code. The employee activates it using the code, phone number and a 6-digit PIN — no personal email or SMS required.</div><div class="modal-actions"><button type="button" class="btn ghost cancel-btn">Cancel</button><button class="btn primary">Create invite</button></div></form></dialog>
+<dialog id="staffInviteModal" aria-labelledby="staffInviteModalTitle"><form id="staffInviteForm"><h3 id="staffInviteModalTitle">Create staff invite</h3><label>Employee name<input name="name" required></label><div class="form-grid"><label>Phone<input name="phone" inputmode="tel" placeholder="0788 123 456" required></label><label>Role<select name="role" id="staffInviteRoleSelect"><option value="cashier">Cashier</option><option value="manager">Manager</option><option value="stock_clerk">Stock Clerk</option><option value="waiter">Waiter</option><option value="kitchen">Kitchen / Bar Prep</option></select></label></div><div class="notice">Kivu Solutions will create a one-time invite code. The employee activates it using the code, phone number and a 6-digit PIN — no personal email or SMS required.</div><div class="role-preview-quick-tip"><span>Want to see how this role's screen looks first?</span><button type="button" class="btn secondary btn-sm" onclick="$('#staffInviteModal').close(); startRoleSimulation($('#staffInviteRoleSelect')?.value || 'cashier');">👁️ Preview Screen Now</button></div><div class="modal-actions"><button type="button" class="btn ghost cancel-btn">Cancel</button><button class="btn primary">Create invite</button></div></form></dialog>
+
+<dialog id="staffInviteDbFixModal" aria-labelledby="staffInviteDbFixModalTitle">
+  <div class="db-fix-modal-card">
+    <div class="db-fix-header">
+      <div class="db-fix-icon-badge">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+      </div>
+      <div>
+        <h3 id="staffInviteDbFixModalTitle">Database Procedure Notice</h3>
+        <p class="db-fix-subtitle">Notice: function gen_random_bytes(integer) does not exist</p>
+      </div>
+    </div>
+    <p class="db-fix-body">
+      In Supabase, cryptographic functions live in the <code>extensions</code> schema. Your Postgres procedure <code>create_staff_invite</code> needs <code>extensions</code> added to its search path to run.
+    </p>
+    <div class="db-fix-code-wrap">
+      <pre id="dbFixSqlText">CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;
+ALTER FUNCTION public.create_staff_invite(text, text, text) SET search_path = public, extensions;</pre>
+    </div>
+    <p class="db-fix-tip">
+      Paste and run this snippet in your Supabase SQL Editor to enable database staff invites. In the meantime, you can test and preview any employee role right now using the <strong>Role Simulator</strong>!
+    </p>
+    <div class="modal-actions">
+      <button type="button" class="btn ghost cancel-btn" onclick="$('#staffInviteDbFixModal').close()">Close</button>
+      <button type="button" class="btn secondary" id="copyDbFixSqlBtn" onclick="copyDbFixSql()">📋 Copy SQL Script</button>
+      <button type="button" class="btn primary" onclick="$('#staffInviteDbFixModal').close(); startRoleSimulation('cashier')">👁️ Preview Cashier View</button>
+    </div>
+  </div>
+</dialog>
 
 <dialog id="openShiftModal" aria-labelledby="openShiftModalTitle"><form id="openShiftForm"><h3 id="openShiftModalTitle">Open my shift</h3><div class="notice">This shift will be assigned automatically to the logged-in user.</div><label>Opening cash<input name="openingCash" type="text" inputmode="decimal" class="money-input" value="0" required></label><div class="modal-actions"><button type="button" class="btn ghost cancel-btn">Cancel</button><button class="btn primary">Open shift</button></div></form></dialog>
 
@@ -1625,13 +1731,13 @@
 </dialog>
 
 
-<script src="js/config.js?v=5.3.4"></script>
-<script src="js/offline-queue.js?v=5.3.4"></script>
+<script src="js/config.js?v=5.3.5"></script>
+<script src="js/offline-queue.js?v=5.3.5"></script>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="https://unpkg.com/@zxing/browser@0.1.1/umd/zxing-browser.min.js"></script>
-<script src="js/camera-scanner.js?v=5.3.4"></script>
-<script src="js/app.js?v=5.3.4"></script>
-<script src="js/pwa-install.js?v=5.3.4"></script>
+<script src="js/camera-scanner.js?v=5.3.5"></script>
+<script src="js/app.js?v=5.3.5"></script>
+<script src="js/pwa-install.js?v=5.3.5"></script>
 
 <!-- Fast Terminal Lock & Multi-User PIN Switch Screen -->
 <dialog id="terminalLockModal" class="terminal-lock-modal" aria-labelledby="terminalLockTitle">

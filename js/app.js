@@ -495,8 +495,10 @@ const pad2=n=>String(n).padStart(2,'0');
 const localDay=d=>{const x=new Date(d);if(isNaN(x.getTime()))return '';return `${x.getFullYear()}-${pad2(x.getMonth()+1)}-${pad2(x.getDate())}`;};
 const day=localDay;
 const fmt=d=>new Date(d).toLocaleString('en-RW',{dateStyle:'medium',timeStyle:'short'});
+let simulatedRole = null;
+const currentEffectiveRole = () => simulatedRole || profile?.role || 'owner';
 const roleLabel=r=>({owner:'Owner',manager:'Manager',cashier:'Cashier',stock_clerk:'Stock Clerk',waiter:'Waiter',kitchen:'Kitchen / Bar Prep'})[r]||r;
-const can=(...roles)=>roles.includes(profile?.role);
+const can=(...roles)=>roles.includes(currentEffectiveRole());
 const normalizeRwPhone=v=>{let p=String(v||'').replace(/[^0-9+]/g,'');if(p.startsWith('07'))p='+250'+p.slice(1);else if(p.startsWith('250'))p='+'+p;return p;};
 let loginMode='owner', signupMode='owner';
 const staffAuthEmail=phone=>`staff.${normalizeRwPhone(phone).replace(/\D/g,'')}@auth.duka.local`;
@@ -729,7 +731,8 @@ const rolePages={
   kitchen:['hospitality']
 };
 function applyPermissions(){
-  const roleAllowed=rolePages[profile.role]||['dashboard'];
+  const role = currentEffectiveRole();
+  const roleAllowed=rolePages[role]||['dashboard'];
   const allowed=roleAllowed;
 
   // Plan-locked pages remain visible. Role-restricted pages remain hidden for security.
@@ -753,12 +756,12 @@ function applyPermissions(){
     const hasVisible=!!sec.querySelector('.nav:not(.hidden)');
     sec.classList.toggle('hidden',!hasVisible);
   });
-  $$('.owner-only').forEach(x=>x.classList.toggle('hidden',profile.role!=='owner'));
+  $$('.owner-only').forEach(x=>x.classList.toggle('hidden',role!=='owner'));
   $$('.owner-manager-only').forEach(x=>x.classList.toggle('hidden',!can('owner','manager')));
-  const rTxt=roleLabel(profile.role);
+  const rTxt=roleLabel(role) + (simulatedRole ? ' (Preview)' : '');
   if($('#roleBadge')) $('#roleBadge').textContent=rTxt;
   if($('#topRoleBadge')) $('#topRoleBadge').textContent=rTxt;
-  $('#dukaAdminNav')?.classList.toggle('hidden',!isDukaAdmin);
+  $('#dukaAdminNav')?.classList.toggle('hidden',!isDukaAdmin || !!simulatedRole);
 
   $('#quickSaleBtn').classList.toggle('hidden',!can('owner','manager','cashier'));
   $$('[data-open="saleModal"]').forEach(x=>{x.classList.toggle('hidden',!can('owner','manager','cashier'));if(!x.dataset.cartHook){x.dataset.cartHook='1';x.addEventListener('click',()=>{initSaleModal();});}});
@@ -782,12 +785,54 @@ function applyPermissions(){
   $('#dashboardTrendChartCard')?.classList.toggle('hidden',hideFinancial);
   $('#panelPaymentChannels')?.classList.toggle('hidden',hideFinancial);
 
-  if(profile.role==='stock_clerk'||!hasFeature('shifts')) $('#shiftStatusCard')?.classList.add('hidden');
+  if(role==='stock_clerk'||!hasFeature('shifts')) $('#shiftStatusCard')?.classList.add('hidden');
   else $('#shiftStatusCard')?.classList.remove('hidden');
 
   const current=$('.page.active')?.id?.replace('page-','')||'dashboard';
   if(!allowed.includes(current)) showPage(allowed[0]||'dashboard');
 }
+
+/* ROLE SIMULATOR & PREVIEW SYSTEM */
+function startRoleSimulation(role){
+  if(!role || !rolePages[role]) return;
+  simulatedRole = role;
+
+  const banner = $('#rolePreviewBanner');
+  if(banner){
+    banner.classList.remove('hidden');
+    const lbl = $('#previewRoleLabel');
+    if(lbl) lbl.textContent = roleLabel(role);
+    const sel = $('#previewRoleSelect');
+    if(sel) sel.value = role;
+  }
+
+  applyPermissions();
+  if(typeof render === 'function') render();
+
+  const allowed = rolePages[role] || ['dashboard'];
+  const curPage = $('.page.active')?.id?.replace('page-','') || 'dashboard';
+  if(!allowed.includes(curPage)){
+    showPage(allowed[0] || 'dashboard');
+  }
+
+  window.showToast?.(`Simulating ${roleLabel(role)} view. Navigation, pages and POS permissions are filtered.`, 'info', 'Role Preview Active');
+}
+
+function exitRoleSimulation(){
+  simulatedRole = null;
+
+  const banner = $('#rolePreviewBanner');
+  if(banner) banner.classList.add('hidden');
+
+  applyPermissions();
+  if(typeof render === 'function') render();
+
+  window.showToast?.('Returned to Owner view.', 'success', 'Role Preview Stopped');
+}
+
+window.startRoleSimulation = startRoleSimulation;
+window.exitRoleSimulation = exitRoleSimulation;
+window.currentEffectiveRole = currentEffectiveRole;
 
 function syncPaymentMethodUI(method){
   const f=$('#saleForm'); if(!f) return; if(method==='Credit'&&!hasFeature('credit')){ requireFeature('credit','Customer credit is included in Kivu Lite.'); return; }
@@ -845,7 +890,7 @@ const PAGE_TITLES = {
 };
 function showPage(name,bypassSubscription=false){
   if(name==='dukaadmin'&&!isDukaAdmin)return;
-  if(!(rolePages[profile.role]||[]).includes(name)) return;
+  if(!(rolePages[currentEffectiveRole()]||[]).includes(name)) return;
   if(!bypassSubscription&&!subscriptionAllowsAccess()&&!['dashboard','subscription','settings','dukaadmin'].includes(name)){ensureSubscriptionAccess();return;}
   const feature=PAGE_FEATURE[name];
   if(feature&&!hasFeature(feature)){showUpgrade(feature);return;}
@@ -1759,7 +1804,7 @@ $('#saleForm').onsubmit=async e=>{
     const {data:lines,error:se}=await sb.from('sales').select('*').eq('shop_id',shop.id).eq('receipt_no',receiptNo).order('created_at',{ascending:true});
     if(se)return kivuNotify(se.message);
     e.target.reset();resetSaleCart();$('#saleCustomerWrap')?.classList.add('hidden');
-    const isRegisterCashier = profile?.role === 'cashier' || window._continuousRegisterMode;
+    const isRegisterCashier = currentEffectiveRole() === 'cashier' || window._continuousRegisterMode;
     if (!isRegisterCashier) {
       $('#saleModal')?.close();
     }
@@ -1819,18 +1864,107 @@ $('#pettyCashForm')?.addEventListener('submit',async e=>{
 });
 
 /* STAFF INVITES */
+function generateStaffInviteCode(){
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let result = '';
+  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+    const bytes = new Uint8Array(6);
+    crypto.getRandomValues(bytes);
+    for (let i = 0; i < 6; i++) {
+      result += alphabet[bytes[i] % alphabet.length];
+    }
+  } else {
+    for (let i = 0; i < 6; i++) {
+      result += alphabet[Math.floor(Math.random() * alphabet.length)];
+    }
+  }
+  return result;
+}
+
+function copyDbFixSql(){
+  const sql = `-- Kivu Solutions: Fix gen_random_bytes in Supabase\nCREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;\nALTER FUNCTION public.create_staff_invite(text, text, text) SET search_path = public, extensions;`;
+  if(navigator.clipboard?.writeText){
+    navigator.clipboard.writeText(sql).then(()=>{
+      window.showToast?.('SQL fix copied to clipboard! Paste into Supabase SQL Editor.', 'success', 'Copied');
+    }).catch(()=>{
+      kivuNotify(sql);
+    });
+  } else {
+    kivuNotify(sql);
+  }
+}
+window.copyDbFixSql = copyDbFixSql;
+
 $('#staffInviteForm').onsubmit=async e=>{
   e.preventDefault();
   if(profile.role!=='owner')return kivuNotify('Only the owner can invite staff.');
   if(!requireFeature('employees','Staff accounts are included from Kivu Business.'))return;
   const f=new FormData(e.target);
+  const name=(f.get('name')||'').trim();
   const phone=normalizeRwPhone(f.get('phone'));
+  const role=f.get('role');
   if(!/^\+2507\d{8}$/.test(phone))return kivuNotify('Enter a valid Rwanda phone number, for example 0788 123 456.');
-  const {data:code,error}=await sb.rpc('create_staff_invite',{p_employee_name:f.get('name'),p_phone:phone,p_role:f.get('role')});
-  if(error)return kivuNotify(error.message,'error');
+
+  let code=null;
+  let rpcErr=null;
+
+  // 1. Primary Supabase RPC call (preserves baseline RPC verification)
+  try {
+    const {data,error}=await sb.rpc('create_staff_invite',{p_employee_name:name,p_phone:phone,p_role:role});
+    if(!error && data){
+      code = data;
+    } else if(error){
+      rpcErr = error;
+    }
+  } catch(err){
+    rpcErr = err;
+  }
+
+  // 2. Resilient fallback: if RPC fails with gen_random_bytes or missing function, fallback to secure client code & direct insert
+  if(!code && rpcErr){
+    const errMsg = String(rpcErr.message || rpcErr || '');
+    if(errMsg.includes('gen_random_bytes') || errMsg.includes('does not exist') || errMsg.includes('function') || errMsg.includes('42883')){
+      try {
+        const clientCode = generateStaffInviteCode();
+        const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
+        const { data: directData, error: directErr } = await sb.from('staff_invites').insert({
+          shop_id: shop.id,
+          employee_name: name,
+          phone: phone,
+          role: role,
+          code: clientCode,
+          expires_at: expiresAt
+        }).select('code').single();
+
+        if(!directErr){
+          code = directData?.code || clientCode;
+          rpcErr = null;
+        } else {
+          console.warn('Direct insert fallback failed:', directErr);
+        }
+      } catch(fbErr){
+        console.warn('Fallback invite generation failed:', fbErr);
+      }
+    }
+  }
+
+  // 3. If still blocked by gen_random_bytes, open the 1-click SQL fix modal
+  if(!code && rpcErr){
+    const errMsg = String(rpcErr.message || rpcErr);
+    if(errMsg.includes('gen_random_bytes')){
+      const fixModal = $('#staffInviteDbFixModal');
+      if(fixModal){
+        $('#staffInviteModal').close();
+        fixModal.showModal();
+        return;
+      }
+    }
+    return kivuNotify(rpcErr.message || String(rpcErr),'error');
+  }
+
   e.target.reset();$('#staffInviteModal').close();await refresh();
-  kivuNotify(`Staff invite created.\n\nInvite code: ${code}\nPhone: ${phone}\n\nThe employee should choose Join as staff, enter this code and phone number, then create a 6-digit PIN. The invite expires in 14 days.`);
-  window.showToast?.('Staff invite code generated.', 'success', 'Invite Created');
+  kivuNotify(`Staff invite created.\n\nInvite code: ${code}\nPhone: ${phone}\nRole: ${roleLabel(role)}\n\nThe employee should choose Join as staff, enter this code and phone number, then create a 6-digit PIN. The invite expires in 14 days.`);
+  window.showToast?.(`Staff invite code ${code} generated.`, 'success', 'Invite Created');
 };
 
 /* SHIFTS & RECONCILIATION */
@@ -1918,7 +2052,7 @@ function calcShift(s){
 $('#closeShiftBtn').onclick=()=>{
   if(!currentShift)return;
   const c=calcShift(currentShift);
-  const isCashier = profile?.role === 'cashier';
+  const isCashier = currentEffectiveRole() === 'cashier';
   if (isCashier) {
     $('#closeShiftPreview').innerHTML=`
       <div class="blind-count-card">
@@ -2087,7 +2221,7 @@ $('#reportPeriod').onchange=renderReports;
 /* RENDER */
 function render(){
   applyPermissions();
-  if($('#shopLabel')) $('#shopLabel').textContent=shop.name;const rTxt=roleLabel(profile.role);if($('#roleBadge'))$('#roleBadge').textContent=rTxt;if($('#topRoleBadge'))$('#topRoleBadge').textContent=rTxt;const sub=effectiveSubscriptionStatus();if($('#planChip')) $('#planChip').textContent=`${planLabel().toUpperCase()} · ${sub.toUpperCase()}`;
+  if($('#shopLabel')) $('#shopLabel').textContent=shop.name;const rTxt=roleLabel(currentEffectiveRole())+(simulatedRole?' (Preview)':'');if($('#roleBadge'))$('#roleBadge').textContent=rTxt;if($('#topRoleBadge'))$('#topRoleBadge').textContent=rTxt;const sub=effectiveSubscriptionStatus();if($('#planChip')) $('#planChip').textContent=`${planLabel().toUpperCase()} · ${sub.toUpperCase()}`;
   fill();renderDashboard();renderSales();renderInventory();renderSuppliers();renderExpenses();renderCustomers();renderEmployees();renderShifts();renderControls();renderReports();renderPlans();renderSubscriptionStatus();renderSettings();renderNotifications();
 }
 function renderDashboard(){
@@ -3206,7 +3340,7 @@ function renderEmployees(){
   if($('#empKpiActive')) $('#empKpiActive').textContent=employees.filter(e=>e.active!==false).length;
   if($('#empKpiInvites')) $('#empKpiInvites').textContent=pending.length;
 
-  $('#employeesBody').innerHTML=employees.length?employees.map(e=>`<tr><td><b>${esc(e.name)}</b></td><td>${esc(e.role)}</td><td>${esc(e.phone||'—')}</td><td><span class="badge">${e.active?'Active':'Disabled'}</span></td><td>${sales.filter(s=>s.user_id===e.user_id&&day(s.created_at)===t).length}</td><td>${can('owner','manager')?`<button class="btn ${e.active?'danger':'secondary'}" onclick="setEmployeeActive('${e.id}',${!e.active})">${e.active?'Disable':'Reactivate'}</button>`:'—'}</td></tr>`).join(''):`<tr><td colspan="6"><div class="empty-table-state"><span class="empty-icon">${kivuIcon("staff")}</span><p>No staff team members have joined yet.</p>${can('owner')?'<button class="btn primary btn-sm" onclick="$(\'#staffInviteModal\')?.showModal()">+ Invite Staff</button>':''}</div></td></tr>`;
+  $('#employeesBody').innerHTML=employees.length?employees.map(e=>`<tr><td><b>${esc(e.name)}</b></td><td>${esc(roleLabel(e.role))}</td><td>${esc(e.phone||'—')}</td><td><span class="badge">${e.active?'Active':'Disabled'}</span></td><td>${sales.filter(s=>s.user_id===e.user_id&&day(s.created_at)===t).length}</td><td><div style="display:flex; gap:6px; align-items:center;">${profile.role==='owner'?`<button class="btn secondary btn-sm" onclick="startRoleSimulation('${e.role}')" title="Preview interface as this role">👁️ Preview</button>`:''}${can('owner','manager')?`<button class="btn ${e.active?'danger':'secondary'} btn-sm" onclick="setEmployeeActive('${e.id}',${!e.active})">${e.active?'Disable':'Reactivate'}</button>`:'—'}</div></td></tr>`).join(''):`<tr><td colspan="6"><div class="empty-table-state"><span class="empty-icon">${kivuIcon("staff")}</span><p>No staff team members have joined yet.</p>${profile.role==='owner'?'<div style="display:flex; gap:8px; justify-content:center; flex-wrap:wrap; margin-top:8px;"><button class="btn primary btn-sm" onclick="$(\'#staffInviteModal\')?.showModal()">+ Invite Staff</button><button class="btn secondary btn-sm" onclick="startRoleSimulation(\'cashier\')">👁️ Preview Cashier View</button></div>':''}</div></td></tr>`;
   const auditPanel=$('#auditList')?.closest('.panel');
   auditPanel?.classList.toggle('hidden',!hasFeature('audit'));
   if(hasFeature('audit')) $('#auditList').innerHTML=audits.length?audits.slice(0,20).map(a=>`<div class="item"><div><b>${esc(a.user_name||'User')} · ${esc(a.action)}</b><small>${esc(a.entity)} · ${fmt(a.created_at)}</small></div></div>`).join(''):'No audit activity yet.';
@@ -4284,7 +4418,7 @@ async function runOfflineSalesSync(){
 window.addEventListener('online',()=>{updateConnectivityUI();syncOfflineSales().catch(console.warn);});
 window.addEventListener('offline',()=>updateConnectivityUI());
 $('#offlineQueueBtn')?.addEventListener('click',async()=>{const rows=await window.KivuOffline.listSales(shop.id);const errors=rows.filter(x=>x.status==='needs_attention');kivuNotify(rows.length?`${rows.length} offline sale(s) waiting. ${errors.length?errors.length+' need attention because server validation failed. Reconnect and retry after correcting stock/customer data.':'They will sync automatically when online.'}`:'No offline sales waiting.');if(navigator.onLine)syncOfflineSales().catch(console.warn);});
-if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('./sw.js?v=5.3.4',{updateViaCache:'none'}).then(reg=>{reg.update().catch(()=>{});reg.addEventListener('updatefound',()=>{const newWorker=reg.installing;if(!newWorker)return;newWorker.addEventListener('statechange',()=>{if(newWorker.state==='installed'&&navigator.serviceWorker.controller){newWorker.postMessage({type:'SKIP_WAITING'});}});});}).catch(e=>console.warn('Service worker:',e.message));let refreshing=false;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(refreshing)return;refreshing=true;window.location.reload();});});}
+if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('./sw.js?v=5.3.5',{updateViaCache:'none'}).then(reg=>{reg.update().catch(()=>{});reg.addEventListener('updatefound',()=>{const newWorker=reg.installing;if(!newWorker)return;newWorker.addEventListener('statechange',()=>{if(newWorker.state==='installed'&&navigator.serviceWorker.controller){newWorker.postMessage({type:'SKIP_WAITING'});}});});}).catch(e=>console.warn('Service worker:',e.message));let refreshing=false;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(refreshing)return;refreshing=true;window.location.reload();});});}
 
 function findProductByBarcode(code){const clean=String(code||'').trim();return products.find(x=>String(x.barcode||'').trim()===clean);}
 function chooseProductFromBarcode(code,{autoAdd=false,formSelector='#saleForm'}={}){const p=findProductByBarcode(code);if(!p){kivuNotify('No product matches that barcode. Register the barcode in Inventory first.');return null;}const f=$(formSelector);if(f?.elements?.productId){f.elements.productId.value=p.id;if(formSelector==='#saleForm')refreshSaleUnitOptions();if(f.elements.qty)f.elements.qty.value='1';}if(autoAdd)$('#addSaleItemBtn')?.click();return p;}
