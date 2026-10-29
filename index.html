@@ -645,6 +645,36 @@
       </div>
     </div>
     
+    <!-- Multi-dimension Filter Bar & Controls -->
+    <div class="sales-filter-controls-bar" style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 16px; border-bottom: 1px solid var(--k-border, #e2e8f0); background: var(--k-surface-2, #f8fafc);">
+      <select id="salesFilterStatus" class="select-sm" style="padding: 6px 10px; border-radius: 8px; border: 1px solid var(--k-border, #e2e8f0); font-size: 0.82rem;" aria-label="Filter transactions by status">
+        <option value="all">All statuses</option>
+        <option value="completed">Completed only</option>
+        <option value="voided">Voided only</option>
+      </select>
+      <select id="salesFilterPayment" class="select-sm" style="padding: 6px 10px; border-radius: 8px; border: 1px solid var(--k-border, #e2e8f0); font-size: 0.82rem;" aria-label="Filter transactions by payment channel">
+        <option value="all">All payment methods</option>
+        <option value="Cash">Cash</option>
+        <option value="Mobile Money">Mobile Money (MoMo)</option>
+        <option value="Bank">Bank</option>
+        <option value="Credit">Credit (Amadeni)</option>
+        <option value="Split">Split payment</option>
+      </select>
+      <div class="sales-date-range-box" style="display: inline-flex; align-items: center; gap: 6px;">
+        <span style="font-size: 0.76rem; font-weight: 600; color: var(--k-text-3, #64748b);">From:</span>
+        <input id="salesDateFrom" type="date" class="input-sm" style="padding: 4px 8px; border-radius: 6px; border: 1px solid var(--k-border, #e2e8f0); font-size: 0.8rem;" aria-label="Sales start date" />
+        <span style="font-size: 0.76rem; font-weight: 600; color: var(--k-text-3, #64748b);">To:</span>
+        <input id="salesDateTo" type="date" class="input-sm" style="padding: 4px 8px; border-radius: 6px; border: 1px solid var(--k-border, #e2e8f0); font-size: 0.8rem;" aria-label="Sales end date" />
+      </div>
+      <select id="salesSortSelect" class="select-sm" style="padding: 6px 10px; border-radius: 8px; border: 1px solid var(--k-border, #e2e8f0); font-size: 0.82rem;" aria-label="Sort transactions">
+        <option value="date-desc">Newest first</option>
+        <option value="date-asc">Oldest first</option>
+        <option value="total-desc">Amount (Highest first)</option>
+        <option value="total-asc">Amount (Lowest first)</option>
+      </select>
+      <button id="clearAllSalesFiltersBtn" type="button" class="btn ghost btn-sm" onclick="clearAllSalesFilters()" style="margin-left: auto; font-size: 0.78rem;">Reset filters</button>
+    </div>
+    
     <div class="table-wrap sales-table-wrap">
       <table class="sales-table">
         <thead>
@@ -662,6 +692,9 @@
         <tbody id="salesBody"></tbody>
       </table>
     </div>
+
+    <!-- Pager Container -->
+    <div id="salesPager" class="sales-pager" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-top: 1px solid var(--k-border, #e2e8f0); font-size: 0.84rem;"></div>
   </section>
 </section>
 
@@ -856,6 +889,7 @@
     </div>
   </div>
   <label class="period">Period<select id="reportPeriod"><option value="7">Last 7 days</option><option value="30" selected>Last 30 days</option><option value="90">Last 90 days</option></select></label>
+  <div id="reportCapNotice" class="notice mini hidden" style="margin: 10px 0;"></div>
   <div class="stats four">
     <article><span>Sales Volume</span><strong id="reportSales">0 RWF</strong></article>
     <article><span>Operating Expenses</span><strong id="reportExpenses">0 RWF</strong></article>
@@ -1421,7 +1455,21 @@
         <button class="btn primary" type="submit">Save settings</button>
       </div>
     </form>
-  <section class="panel owner-only"><p class="eyebrow">DEVICES & SESSIONS</p><h2>Signed-in devices</h2><div id="ownerDevicesList"></div></section><section class="panel"><p class="eyebrow">LEGAL & TRUST</p><h2>Policies</h2><p><a href="legal/privacy.html" target="_blank" rel="noopener">Privacy notice</a> · <a href="legal/terms.html" target="_blank" rel="noopener">Terms of service</a></p><small>These launch drafts should be reviewed by your legal adviser before wider rollout.</small></section>
+  <section class="panel owner-only"><p class="eyebrow">DEVICES & SESSIONS</p><h2>Signed-in devices</h2><div id="ownerDevicesList"></div></section>
+  <section class="panel owner-only">
+    <p class="eyebrow">LOCAL DATA BACKUP & RESTORE</p>
+    <h2>Device Storage Backup (Amadeni Repayments & Petty Cash)</h2>
+    <p class="notice mini" style="margin-top: 8px;">
+      Customer debt repayments, petty cash payouts, and held carts are stored securely on this browser/device.
+      Export a local backup regularly so you can transfer or restore this data on another device or after clearing your browser cache.
+    </p>
+    <div style="display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap;">
+      <button id="exportLocalDataBtn" type="button" class="btn secondary">⬇️ Export Local Data Backup (JSON)</button>
+      <button id="importLocalDataBtn" type="button" class="btn secondary">⬆️ Restore Local Data from Backup</button>
+      <input type="file" id="importLocalDataFile" accept=".json,application/json" hidden />
+    </div>
+  </section>
+  <section class="panel"><p class="eyebrow">LEGAL & TRUST</p><h2>Policies</h2><p><a href="legal/privacy.html" target="_blank" rel="noopener">Privacy notice</a> · <a href="legal/terms.html" target="_blank" rel="noopener">Terms of service</a></p><small>These launch drafts should be reviewed by your legal adviser before wider rollout.</small></section>
 </section>
 </main>
 </div>
@@ -1535,7 +1583,7 @@
 
 <dialog id="creditRepaymentModal" aria-labelledby="creditRepaymentModalTitle"><form id="creditRepaymentForm"><h3 id="creditRepaymentModalTitle">Customer Debt Repayment</h3><input name="creditId" type="hidden"><input name="customerId" type="hidden"><div id="creditRepaySummary" class="notice"></div><div class="form-grid"><label>Repayment Amount (RWF)<input name="amount" type="text" inputmode="decimal" class="money-input" required></label><label>Payment Method<select name="paymentMethod"><option value="Cash">Cash (To Shift Drawer)</option><option value="Mobile Money">Mobile Money (MoMo)</option><option value="Bank">Bank</option></select></label></div><label>Note / Reference<input name="note" placeholder="Optional note or reference"></label><div class="notice mini">Cash debt repayments are automatically added to the active cashier's shift expected cash drawer.</div><div class="modal-actions"><button type="button" class="btn ghost cancel-btn">Cancel</button><button class="btn primary">Record Repayment</button></div></form></dialog>
 
-<dialog id="customerLedgerModal" class="ledger-modal" aria-labelledby="ledgerCustomerName"><div class="ledger-card"><div class="page-head"><div><p class="eyebrow">AMADENI LEDGER</p><h2 id="ledgerCustomerName">Customer Statement</h2><small id="ledgerCustomerPhone"></small></div><div class="ledger-balance-box"><span>Current Balance</span><strong id="ledgerCustomerBalance">0 RWF</strong></div></div><div class="table-wrap"><table class="ledger-table"><thead><tr><th>Date</th><th>Type</th><th>Reference / Note</th><th>Debit (+)</th><th>Credit (-)</th><th>Balance</th></tr></thead><tbody id="ledgerTableBody"></tbody></table></div><div class="modal-actions"><button id="whatsappReminderBtn" type="button" class="btn secondary">💬 WhatsApp Reminder</button><button id="printLedgerBtn" type="button" class="btn secondary">🖨️ Print Statement</button><button type="button" class="btn ghost cancel-btn">Close</button></div></div></dialog>
+<dialog id="customerLedgerModal" class="ledger-modal" aria-labelledby="ledgerCustomerName"><div class="ledger-card"><div class="page-head"><div><p class="eyebrow">AMADENI LEDGER</p><h2 id="ledgerCustomerName">Customer Statement</h2><small id="ledgerCustomerPhone"></small></div><div class="ledger-balance-box"><span>Current Balance</span><strong id="ledgerCustomerBalance">0 RWF</strong></div></div><div class="notice mini" style="margin: 8px 0 12px;">ℹ️ <b>Device Storage Notice:</b> Individual debt repayments recorded on this register are stored on this device. Use Settings → Device Storage Backup to export or transfer local records.</div><div class="table-wrap"><table class="ledger-table"><thead><tr><th>Date</th><th>Type</th><th>Reference / Note</th><th>Debit (+)</th><th>Credit (-)</th><th>Balance</th></tr></thead><tbody id="ledgerTableBody"></tbody></table></div><div class="modal-actions"><button id="whatsappReminderBtn" type="button" class="btn secondary">💬 WhatsApp Reminder</button><button id="printLedgerBtn" type="button" class="btn secondary">🖨️ Print Statement</button><button type="button" class="btn ghost cancel-btn">Close</button></div></div></dialog>
 
 <dialog id="pettyCashModal" aria-labelledby="pettyCashModalTitle"><form id="pettyCashForm"><h3 id="pettyCashModalTitle">Cash Drawer Petty Cash Payout</h3><div class="notice mini">Record small cash payouts (under 5,000 RWF) directly from the register drawer during an open shift. This is subtracted from shift expected physical cash.</div><div class="form-grid"><label>Amount (RWF)<input name="amount" type="text" inputmode="decimal" class="money-input" placeholder="Under 5,000 RWF" required></label><label>Category<select name="category"><option value="Supplies">Supplies</option><option value="Transport">Transport / Fare</option><option value="Food">Staff Welfare / Tea</option><option value="Repairs">Repairs</option><option value="Other">Other</option></select></label></div><label>Description / Reason<input name="description" placeholder="What was this cash taken for?" required></label><label>Paid to (Recipient)<input name="paidTo" placeholder="Recipient name (optional)"></label><div class="modal-actions"><button type="button" class="btn ghost cancel-btn">Cancel</button><button class="btn danger">Payout from Drawer</button></div></form></dialog>
 

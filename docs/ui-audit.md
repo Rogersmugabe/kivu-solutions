@@ -1,8 +1,8 @@
 # Kivu Solutions UI Audit Report
 
-Generated: 2026-10-29T16:47:39.024Z
-Total Controls & Surfaces Audited: 280
-Bound: 280 | Unbound: 0
+Generated: 2026-10-29T16:57:09.450Z
+Total Controls & Surfaces Audited: 283
+Bound: 283 | Unbound: 0
 
 | Kind | ID | Label / Context | Handler Evidence | Status |
 |---|---|---|---|---|
@@ -58,6 +58,7 @@ Bound: 280 | Unbound: 0
 | button | `(no id)` | Today | onclick="setSalesDateFilter(" | ✅ |
 | button | `(no id)` | Yesterday | onclick="setSalesDateFilter(" | ✅ |
 | button | `(no id)` | Last 7 Days | onclick="setSalesDateFilter(" | ✅ |
+| button | `clearAllSalesFiltersBtn` | Reset filters | onclick="clearAllSalesFilters()" | ✅ |
 | button | `recipeBtn` | Recipes | referenced by #recipeBtn in JS | ✅ |
 | button | `newTableBtn` | + Table | referenced by #newTableBtn in JS | ✅ |
 | button | `newTabBtn` | + Open bill | referenced by #newTabBtn in JS | ✅ |
@@ -103,6 +104,8 @@ Bound: 280 | Unbound: 0
 | button | `(no id)` | Request Kivu Pro | [data-plan="pro"] | ✅ |
 | button | `(no id)` | Request One-Time | [data-plan="one_time"] | ✅ |
 | button | `(no id)` | Save settings | submit button for form #settingsForm | ✅ |
+| button | `exportLocalDataBtn` | ⬇️ Export Local Data Backup (JSON) | referenced by #exportLocalDataBtn in JS | ✅ |
+| button | `importLocalDataBtn` | ⬆️ Restore Local Data from Backup | referenced by #importLocalDataBtn in JS | ✅ |
 | button | `(no id)` | Cancel | cancel-btn dialog closer; inside form #supplierForm handled in JS | ✅ |
 | button | `(no id)` | Save supplier | inside form #supplierForm handled in JS | ✅ |
 | button | `(no id)` | ⌂Home | [data-mobile-page="dashboard"] | ✅ |

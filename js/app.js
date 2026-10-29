@@ -1650,6 +1650,19 @@ $('#saleForm').onsubmit=async e=>{
     currentSaleTendered={tendered,change:Math.max(0,tendered-cashTarget)};
   }
 
+  // Safety Stock Pre-Check: verify live availability before sending RPC
+  for(const it of saleCart){
+    const prod=products.find(p=>p.id===it.product_id);
+    if(prod){
+      const isB=it.unit_mode==='bulk';
+      const requestedUnits=Number(it.entered_qty||0)*(isB?unitsPerBulk(prod):1);
+      const avail=Number(prod.qty||0);
+      if(requestedUnits>avail){
+        return kivuNotify(`Insufficient stock for "${prod.name}". Available: ${avail} ${baseUnitLabel(prod)}, requested: ${requestedUnits}.`,'warning');
+      }
+    }
+  }
+
   const submitBtn=$('#completeSaleBtn');
   const origBtnText=submitBtn?submitBtn.textContent:'Complete sale';
   try {
@@ -2090,6 +2103,16 @@ function renderDashboard(){
         </div>
       `);
     }
+    if(sales.length>=1000){
+      alertItems.unshift(`
+        <div class="alert-ribbon-item alert-ribbon-info" style="border-left: 4px solid var(--k-accent, #2563eb);">
+          <div class="alert-ribbon-content">
+            <span class="alert-ribbon-icon">ℹ️</span>
+            <span><b>High Volume Window:</b> Analytics and comparisons are computed over the latest 1,000 sales transactions loaded.</span>
+          </div>
+        </div>
+      `);
+    }
     alertsBox.innerHTML=alertItems.join('');
   }
 
@@ -2469,6 +2492,9 @@ window.openQuickAddStock=function(productId){
   if(sel&&productId)sel.value=productId;
   modal.showModal();
 };
+let salesCurrentPage = 1;
+const SALES_PAGE_SIZE = 25;
+
 function renderSales(){
   const pillsBox=$('#salesCategoryPills');
   if(pillsBox){
@@ -2501,7 +2527,7 @@ function renderSales(){
     );
   }
 
-  // Active date filter (All Time, Today, Yesterday, Last 7 Days)
+  // Quick Date Filter Buttons (All Time, Today, Yesterday, Last 7 Days)
   if(window.salesDateFilter && window.salesDateFilter !== 'all'){
     const now = new Date();
     const todayStr = day(now);
@@ -2517,11 +2543,74 @@ function renderSales(){
     }
   }
 
-  if($('#salesCountPill')){
-    $('#salesCountPill').textContent = list.length + (list.length===1 ? ' sale' : ' sales');
+  // Filter by status (completed vs voided)
+  const statusFilter = $('#salesFilterStatus')?.value || 'all';
+  if(statusFilter === 'completed'){
+    list = list.filter(s => s.status !== 'voided');
+  } else if(statusFilter === 'voided'){
+    list = list.filter(s => s.status === 'voided');
   }
 
-  $('#salesBody').innerHTML=list.length?list.map(s=>{
+  // Filter by payment method
+  const payFilter = $('#salesFilterPayment')?.value || 'all';
+  if(payFilter !== 'all'){
+    list = list.filter(s => (s.payment||'').toLowerCase().includes(payFilter.toLowerCase()));
+  }
+
+  // Filter by custom date range
+  const dateFrom = $('#salesDateFrom')?.value;
+  const dateTo = $('#salesDateTo')?.value;
+  if(dateFrom){
+    list = list.filter(s => day(s.created_at) >= dateFrom);
+  }
+  if(dateTo){
+    list = list.filter(s => day(s.created_at) <= dateTo);
+  }
+
+  // Sorting
+  const sortOption = $('#salesSortSelect')?.value || 'date-desc';
+  list = [...list].sort((a,b) => {
+    if(sortOption === 'date-asc') return new Date(a.created_at) - new Date(b.created_at);
+    if(sortOption === 'total-desc') return Number(b.total||0) - Number(a.total||0);
+    if(sortOption === 'total-asc') return Number(a.total||0) - Number(b.total||0);
+    return new Date(b.created_at) - new Date(a.created_at);
+  });
+
+  const totalFilteredCount = list.length;
+  const totalPages = Math.ceil(totalFilteredCount / SALES_PAGE_SIZE) || 1;
+  salesCurrentPage = Math.min(salesCurrentPage, totalPages);
+  const startIdx = (salesCurrentPage - 1) * SALES_PAGE_SIZE;
+  const pageItems = list.slice(startIdx, startIdx + SALES_PAGE_SIZE);
+
+  if($('#salesCountPill')){
+    $('#salesCountPill').textContent = `${totalFilteredCount} sale${totalFilteredCount===1?'':'s'}`;
+  }
+
+  // Pager controls
+  const pagerEl = $('#salesPager');
+  if(pagerEl){
+    if(totalFilteredCount <= SALES_PAGE_SIZE){
+      pagerEl.innerHTML = `<span style="color:var(--k-text-3,#64748b);">Showing ${totalFilteredCount} transaction${totalFilteredCount===1?'':'s'}</span>`;
+    } else {
+      const fromNum = startIdx + 1;
+      const toNum = Math.min(startIdx + SALES_PAGE_SIZE, totalFilteredCount);
+      pagerEl.innerHTML = `
+        <span style="color:var(--k-text-3,#64748b);">Showing <b>${fromNum}-${toNum}</b> of <b>${totalFilteredCount}</b></span>
+        <div style="display:inline-flex; align-items:center; gap:8px;">
+          <button type="button" class="btn ghost btn-sm" onclick="setSalesPage(${salesCurrentPage - 1})" ${salesCurrentPage <= 1 ? 'disabled style="opacity:0.5;pointer-events:none;"' : ''}>← Prev</button>
+          <span>Page <b>${salesCurrentPage}</b> of <b>${totalPages}</b></span>
+          <button type="button" class="btn ghost btn-sm" onclick="setSalesPage(${salesCurrentPage + 1})" ${salesCurrentPage >= totalPages ? 'disabled style="opacity:0.5;pointer-events:none;"' : ''}>Next →</button>
+        </div>
+      `;
+    }
+  }
+
+  if(!pageItems.length){
+    $('#salesBody').innerHTML = `<tr><td colspan="8"><div class="empty-table-state"><span class="empty-icon">🔍</span><p>No sales match your search and filter criteria.</p><button type="button" class="btn secondary btn-sm" onclick="clearAllSalesFilters()">Clear all filters</button></div></td></tr>`;
+    return;
+  }
+
+  $('#salesBody').innerHTML=pageItems.map(s=>{
     const voided=s.status==='voided';
     const action=[];
     if(hasFeature('receipts')) action.push(`<button class="btn secondary btn-sm" onclick="viewReceipt('${s.id}')">🧾 Receipt</button>`);
@@ -2559,25 +2648,41 @@ function renderSales(){
           ${s.customer ? `<span class="cust-named">👤 ${esc(s.customer)}</span>` : `<span class="cust-walkin">Walk-in</span>`}
         </div>
       </td>
-      <td><strong class="sale-total-text">${money(s.total)}</strong></td>
-      <td class="action-cell text-right">${action.join(' ')||'—'}</td>
+      <td>
+        <div class="cell-amount">
+          <strong class="total-amt">${money(s.total)}</strong>
+          ${Number(s.discount)>0 ? `<small class="discount-tag">-${money(s.discount)}</small>` : ''}
+        </div>
+      </td>
+      <td class="text-right">
+        <div class="cell-actions">
+          ${action.join(' ')}
+        </div>
+      </td>
     </tr>`;
-  }).join(''):`<tr><td colspan="8"><div class="empty-table-state"><span class="empty-icon">🧾</span><p>${sales.length?'No matching transactions found for this filter.':'No transactions recorded yet.'}</p></div></td></tr>`;
-
-  const t=day(new Date()),today=sales.filter(x=>day(x.created_at)===t&&x.status!=='voided');
-  let todayCash=0,todayMomo=0,todayBank=0,todayCredit=0;
-  today.forEach(x=>{
-    const b=getSalePaymentBreakdown(x);
-    todayCash+=b.cash; todayMomo+=b.momo; todayBank+=b.bank; todayCredit+=b.credit;
-  });
-  if($('#salesCashToday'))$('#salesCashToday').textContent=money(todayCash);
-  if($('#salesMomoToday'))$('#salesMomoToday').textContent=money(todayMomo);
-  if($('#salesBankToday'))$('#salesBankToday').textContent=money(todayBank);
-  if($('#salesCreditToday'))$('#salesCreditToday').textContent=money(todayCredit);
+  }).join('');
 }
 
-window.filterSalesCategory=function(cat){
-  selectedSalesCategory=cat;
+window.clearAllSalesFilters = function(){
+  window.salesDateFilter = 'all';
+  document.querySelectorAll('.sales-filter-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.filter === 'all');
+  });
+  if($('#salesSearchInput')) $('#salesSearchInput').value = '';
+  salesSearchQuery = '';
+  $('#clearSalesSearchBtn')?.classList.add('hidden');
+  selectedSalesCategory = 'All';
+  if($('#salesFilterStatus')) $('#salesFilterStatus').value = 'all';
+  if($('#salesFilterPayment')) $('#salesFilterPayment').value = 'all';
+  if($('#salesDateFrom')) $('#salesDateFrom').value = '';
+  if($('#salesDateTo')) $('#salesDateTo').value = '';
+  if($('#salesSortSelect')) $('#salesSortSelect').value = 'date-desc';
+  salesCurrentPage = 1;
+  renderSales();
+};
+
+window.setSalesPage = function(page){
+  salesCurrentPage = Math.max(1, page);
   renderSales();
 };
 
@@ -2688,7 +2793,11 @@ function renderInventory(){
     const days=exp?Math.ceil((exp-new Date())/86400000):null;
     const expText=!exp?'—':days<0?`Expired ${Math.abs(days)}d ago`:days===0?'Expires today':`${p.expiry_date} (${days}d)`;
     const bulkHtml=Number(p.bulk_price)>0?`<br><small class="text-muted">Bulk: ${money(p.bulk_price)} / ${esc(bulkUnitLabel(p))}</small>`:'';
-    const isLow=Number(p.qty)<=Number(p.low_stock);
+    const qNum=Number(p.qty||0);
+    const isOut=qNum<=0;
+    const isLow=!isOut&&qNum<=Number(p.low_stock||0);
+    const badgeClass=isOut?'danger-badge':(isLow?'danger-badge':'badge-success');
+    const badgeText=isOut?'Out of stock':(isLow?'Low stock':'In stock');
     return `<tr>
       <td><b>${esc(p.name)}</b>${p.barcode?`<br><small class="barcode-tag">${esc(p.barcode)}</small>`:''}</td>
       <td>${p.category?`<span class="category-tag">${esc(p.category)}</span>`:'<span class="text-muted">—</span>'}</td>
@@ -2698,7 +2807,7 @@ function renderInventory(){
       <td>${can('owner','manager')?money(Number(p.price)-Number(p.cost)):'Hidden'}</td>
       <td>${p.preferred_supplier_id?esc(supplierName(p.preferred_supplier_id)):'—'}</td>
       <td>${esc(expText)}</td>
-      <td><span class="badge ${isLow?'danger-badge':'badge-success'}">${isLow?'Low stock':'OK'}</span></td>
+      <td><span class="badge ${badgeClass}">${badgeText}</span></td>
       <td>${can('owner','manager')?`<button class="btn secondary" onclick="openEditProduct('${p.id}')">Edit</button> <button class="btn secondary" onclick="openStockAdjustFor('${p.id}')">Adjust</button>`:'—'}</td>
     </tr>`;
   }).join(''):`<tr><td colspan="10"><div class="empty-table-state"><span class="empty-icon">📦</span><p>${products.length?'No matching products found for this filter.':'No products in catalog yet.'}</p>${products.length?'':'<button class="btn primary btn-sm" onclick="$(\'#productModal\')?.showModal()">+ Add Product</button>'}</div></td></tr>`;
@@ -3090,6 +3199,15 @@ function renderControls(){
 
 function renderReports(){
   if(!can('owner','manager'))return;
+  const reportCap=$('#reportCapNotice');
+  if(reportCap){
+    if(sales.length>=1000){
+      reportCap.classList.remove('hidden');
+      reportCap.textContent='ℹ️ Data Window: Summary metrics and period aggregations are based on the latest 1,000 sales records loaded on this device.';
+    } else {
+      reportCap.classList.add('hidden');
+    }
+  }
   const days=+$('#reportPeriod').value,cut=new Date();cut.setDate(cut.getDate()-days);
   const ss=sales.filter(x=>new Date(x.created_at)>=cut&&x.status!=='voided');
   const ee=expenses.filter(x=>new Date(x.created_at)>=cut&&x.approval_status!=='rejected');
@@ -4064,3 +4182,90 @@ if (document.readyState === 'loading') {
 }
 // Instant Pre-Hydration: populate the entire website with cached data immediately in 0ms!
 hydrateFromCache();
+
+
+/* SETTINGS LOCAL BACKUP & RESTORE (R14) */
+$('#exportLocalDataBtn')?.addEventListener('click', () => {
+  if(!shop?.id) return;
+  const prefix = 'kivu_';
+  const data = {
+    app: 'Kivu Solutions',
+    version: '5.3.0',
+    exported_at: new Date().toISOString(),
+    shop_id: shop.id,
+    shop_name: shop.name,
+    keys: {}
+  };
+  for(let i=0; i<localStorage.length; i++){
+    const k = localStorage.key(i);
+    if(k && k.startsWith(prefix) && (k.includes(shop.id) || k.includes('held_carts') || k.includes('split') || k.includes('tendered'))){
+      try {
+        data.keys[k] = JSON.parse(localStorage.getItem(k));
+      } catch(_e) {
+        data.keys[k] = localStorage.getItem(k);
+      }
+    }
+  }
+  const filename = `kivu-local-backup-${shop.name.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${day(new Date())}.json`;
+  downloadText(filename, JSON.stringify(data, null, 2), 'application/json');
+  kivuNotify('Local storage backup file exported successfully.', 'success');
+});
+
+$('#importLocalDataBtn')?.addEventListener('click', () => {
+  $('#importLocalDataFile')?.click();
+});
+
+$('#importLocalDataFile')?.addEventListener('change', async (e) => {
+  const file = e.target.files?.[0];
+  if(!file) return;
+  try {
+    const text = await file.text();
+    const data = JSON.parse(text);
+    if(!data || !data.shop_id || !data.keys){
+      return kivuNotify('Invalid backup file: missing shop or keys data.', 'error');
+    }
+    if(data.shop_id !== shop?.id){
+      const match = await kivuConfirm(`This backup belongs to shop "${data.shop_name || data.shop_id}", but your active shop is "${shop.name}". Are you sure you want to restore it anyway?`, { title: 'Shop Mismatch', danger: true });
+      if(!match){
+        e.target.value = '';
+        return;
+      }
+    } else {
+      const confirmed = await kivuConfirm(`Restore ${Object.keys(data.keys).length} local data records from backup exported on ${data.exported_at ? fmt(data.exported_at) : 'backup'}? Existing local records will be merged.`, { title: 'Confirm Local Data Restore', confirmText: 'Restore Data' });
+      if(!confirmed){
+        e.target.value = '';
+        return;
+      }
+    }
+    let count = 0;
+    for(const [k, v] of Object.entries(data.keys)){
+      try {
+        localStorage.setItem(k, typeof v === 'object' && v !== null ? JSON.stringify(v) : String(v));
+        count++;
+      } catch(_e){}
+    }
+    e.target.value = '';
+    kivuNotify(`Successfully restored ${count} local records from backup.`, 'success');
+    render();
+  } catch(err){
+    kivuNotify(`Failed to restore backup: ${err.message}`, 'error');
+  }
+});
+
+let isSettingsFormDirty = false;
+$('#settingsForm')?.addEventListener('input', () => { isSettingsFormDirty = true; });
+$('#settingsForm')?.addEventListener('change', () => { isSettingsFormDirty = true; });
+$('#settingsForm')?.addEventListener('submit', () => { isSettingsFormDirty = false; });
+window.addEventListener('beforeunload', (e) => {
+  if (isSettingsFormDirty) {
+    e.preventDefault();
+    e.returnValue = 'You have unsaved changes in business settings. Are you sure you want to leave?';
+  }
+});
+
+// Sales Filter Row Listeners
+$('#salesFilterStatus')?.addEventListener('change', () => { salesCurrentPage = 1; renderSales(); });
+$('#salesFilterPayment')?.addEventListener('change', () => { salesCurrentPage = 1; renderSales(); });
+$('#salesDateFrom')?.addEventListener('change', () => { salesCurrentPage = 1; renderSales(); });
+$('#salesDateTo')?.addEventListener('change', () => { salesCurrentPage = 1; renderSales(); });
+$('#salesSortSelect')?.addEventListener('change', () => { salesCurrentPage = 1; renderSales(); });

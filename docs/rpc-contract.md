@@ -1,6 +1,6 @@
 # Kivu Solutions — Supabase RPC Contract
 
-Generated: 2026-10-29T16:47:39.033Z
+Generated: 2026-10-29T16:57:09.461Z
 Total Distinct RPCs: 55
 
 | # | RPC Name | Call Count in app.js | Expected Parameter Keys |
