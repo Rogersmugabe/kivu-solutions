@@ -600,12 +600,8 @@ dialog{border-radius:16px;box-shadow:0 28px 90px rgba(15,23,42,.28)}dialog::back
 .barcode-field,.barcode-select-row{display:flex;gap:8px;align-items:stretch}.barcode-field input,.barcode-select-row select{min-width:0;flex:1}.barcode-scan-btn{white-space:nowrap;padding-inline:12px}.barcode-camera-modal{width:min(94vw,520px);border:0;border-radius:18px;padding:0;overflow:hidden}.barcode-camera-card{padding:18px}.barcode-camera-frame{position:relative;background:#020617;border-radius:14px;overflow:hidden;aspect-ratio:4/3}.barcode-camera-frame video,.barcode-camera-reader,.barcode-camera-reader>div{width:100%;height:100%;object-fit:cover;display:block}.barcode-camera-reader video{width:100%!important;height:100%!important;object-fit:cover!important}.barcode-camera-reader canvas{display:none!important}.barcode-camera-reader #qr-shaded-region{border-width:0!important}.barcode-camera-guide{position:absolute;left:10%;right:10%;top:34%;height:32%;border:3px solid rgba(255,255,255,.9);border-radius:12px;box-shadow:0 0 0 999px rgba(2,6,23,.24)}
 @media(max-width:640px){.barcode-field,.barcode-select-row{flex-direction:column}.barcode-scan-btn{width:100%}}
 
-/* Optional PWA installation assistance; existing business UI is unchanged. */
-.pwa-install-bar{position:fixed;z-index:9999;bottom:12px;left:12px;right:12px;max-width:610px;margin:auto;display:flex;align-items:center;gap:10px;justify-content:space-between;padding:12px 14px;border-radius:12px;background:#0f172a;color:#fff;box-shadow:0 8px 25px rgba(0,0,0,.25);font-size:14px}
-.pwa-install-bar.hidden{display:none!important}
-.pwa-install-bar .btn{flex:0 0 auto;margin:0}
-.pwa-install-bar .btn.ghost{color:#fff}
-@media(max-width:460px){.pwa-install-bar{flex-wrap:wrap}.pwa-install-bar span{flex-basis:100%}}
+/* PWA install bar completely hidden per user request to remove hanging overlay */
+.pwa-install-bar{display:none!important}
 
 /* ==========================================================
    V5.0 MODERN AUTH & LOGIN EXPERIENCE

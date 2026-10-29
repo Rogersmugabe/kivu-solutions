@@ -1,6 +1,6 @@
 # Kivu Solutions UI Audit Report
 
-Generated: 2026-10-29T16:57:09.450Z
+Generated: 2026-10-29T17:09:31.038Z
 Total Controls & Surfaces Audited: 283
 Bound: 283 | Unbound: 0
 

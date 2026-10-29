@@ -10,7 +10,7 @@
   const onIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   const dismissed = () => sessionStorage.getItem('kivu-install-dismissed') === 'yes';
   const hide = () => bar.classList.add('hidden');
-  const show = () => { if (!isStandalone() && !dismissed()) bar.classList.remove('hidden'); };
+  const show = () => {};
   dismiss.addEventListener('click', () => { sessionStorage.setItem('kivu-install-dismissed','yes'); hide(); });
   if (isStandalone()) return;
   window.addEventListener('beforeinstallprompt', event => {
