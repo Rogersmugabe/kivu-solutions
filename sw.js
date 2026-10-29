@@ -1,8 +1,16 @@
-const CACHE='kivu-v4-9-5-shell';
+const CACHE='kivu-v5-0-0-shell';
 const SHELL=[
-  './','./index.html','./css/style.css','./js/config.js','./js/offline-queue.js',
-  './js/camera-scanner.js','./js/app.js','./manifest.webmanifest',
-  './icons/kivu-192.png','./icons/kivu-512.png','./js/pwa-install.js'
+  './',
+  './index.html',
+  './css/style.css?v=5.0.0',
+  './js/config.js?v=5.0.0',
+  './js/offline-queue.js?v=5.0.0',
+  './js/camera-scanner.js?v=5.0.0',
+  './js/app.js?v=5.0.0',
+  './js/pwa-install.js?v=5.0.0',
+  './manifest.webmanifest',
+  './icons/kivu-192.png',
+  './icons/kivu-512.png'
 ];
 
 // Camera decoder dependencies used by Kivu V4.8.4.
@@ -26,6 +34,12 @@ async function cacheScannerAssets(cache){
     }
   }));
 }
+
+self.addEventListener('message',event=>{
+  if(event.data && event.data.type==='SKIP_WAITING'){
+    self.skipWaiting();
+  }
+});
 
 self.addEventListener('install',event=>{
   event.waitUntil((async()=>{
@@ -78,12 +92,24 @@ self.addEventListener('fetch',event=>{
 
   // Network-first for all local assets and HTML navigation. If offline, falls back to cache.
   event.respondWith(
-    fetch(req).then(r=>{
-      if(r && r.ok){
-        const copy=r.clone();
-        caches.open(CACHE).then(c=>c.put(req,copy));
+    (async()=>{
+      try{
+        const fetchOpts=(req.mode==='navigate')?{}:{cache:'no-cache'};
+        const res=await fetch(req,fetchOpts);
+        if(res && res.ok){
+          const cache=await caches.open(CACHE);
+          cache.put(req,res.clone());
+        }
+        return res;
+      }catch(err){
+        const match=await caches.match(req);
+        if(match)return match;
+        if(req.mode==='navigate'){
+          const fallback=await caches.match('./index.html') || await caches.match('./');
+          if(fallback)return fallback;
+        }
+        throw err;
       }
-      return r;
-    }).catch(()=>caches.match(req))
+    })()
   );
 });
