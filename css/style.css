@@ -1201,10 +1201,10 @@ td b, strong {
   font-variant-numeric: tabular-nums;
 }
 
-.text-danger { color: #dc2626 !important; }
-.text-success { color: #059669 !important; }
-.text-warning { color: #d97706 !important; }
-.text-muted { color: #64748b !important; }
+.text-danger { color: #dc2626; }
+.text-success { color: #059669; }
+.text-warning { color: #d97706; }
+.text-muted { color: #64748b; }
 
 /* Panels & Inset Sections */
 .panel {
@@ -2690,29 +2690,29 @@ dialog::backdrop {
 
 /* Current Plan State */
 #page-subscription .pricing article.sub-card.current {
-  border: 2.5px solid #10b981 !important;
-  outline: none !important;
-  box-shadow: 0 12px 30px rgba(16, 185, 129, 0.12) !important;
+  border: 2.5px solid #10b981;
+  outline: none;
+  box-shadow: 0 12px 30px rgba(16, 185, 129, 0.12);
 }
 #page-subscription .pricing article.sub-card.current::before {
-  content: "\2713  YOUR ACTIVE PLAN" !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  gap: 6px !important;
-  width: calc(100% + 44px) !important;
-  margin: -26px -22px 16px -22px !important;
-  background: #10b981 !important;
-  color: #ffffff !important;
-  font-size: 0.72rem !important;
-  font-weight: 800 !important;
-  letter-spacing: 0.06em !important;
-  text-align: center !important;
-  padding: 8px 14px !important;
-  border-top-left-radius: 22px !important;
-  border-top-right-radius: 22px !important;
-  position: static !important;
-  box-sizing: border-box !important;
+  content: "\2713  YOUR ACTIVE PLAN";
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: calc(100% + 44px);
+  margin: -26px -22px 16px -22px;
+  background: #10b981;
+  color: #ffffff;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-align: center;
+  padding: 8px 14px;
+  border-top-left-radius: 22px;
+  border-top-right-radius: 22px;
+  position: static;
+  box-sizing: border-box;
 }
 
 /* Popular Card (Kivu Business) */
@@ -3592,19 +3592,19 @@ dialog::backdrop {
   letter-spacing: -0.01em;
 }
 .btn-sm {
-  padding: 6px 12px !important;
-  font-size: 0.78rem !important;
-  border-radius: 8px !important;
-  font-weight: 700 !important;
+  padding: 6px 12px;
+  font-size: 0.78rem;
+  border-radius: 8px;
+  font-weight: 700;
 }
 .ghost-danger {
-  background: #ffffff !important;
-  color: #dc2626 !important;
-  border: 1px solid #fecaca !important;
+  background: #ffffff;
+  color: #dc2626;
+  border: 1px solid #fecaca;
 }
 .ghost-danger:hover {
-  background: #fef2f2 !important;
-  border-color: #f87171 !important;
+  background: #fef2f2;
+  border-color: #f87171;
 }
 .danger-badge {
   background: #fef2f2;
@@ -3852,10 +3852,10 @@ dialog.pos-modal form {
   position: absolute;
   right: 6px;
   height: 32px;
-  padding: 0 10px !important;
-  font-size: 0.74rem !important;
-  border-radius: 8px !important;
-  font-weight: 700 !important;
+  padding: 0 10px;
+  font-size: 0.74rem;
+  border-radius: 8px;
+  font-weight: 700;
 }
 
 /* Category Pills in POS */
@@ -4275,23 +4275,23 @@ dialog.pos-modal form {
 
 /* Complete Sale Big Button */
 #completeSaleBtn {
-  background: #16a34a !important;
-  color: #ffffff !important;
-  font-size: 1rem !important;
-  font-weight: 800 !important;
-  padding: 13px 24px !important;
-  border-radius: 12px !important;
-  box-shadow: 0 4px 14px rgba(22, 163, 74, 0.3) !important;
-  transition: all 0.15s ease !important;
-  width: 100% !important;
-  text-align: center !important;
-  justify-content: center !important;
-  display: flex !important;
+  background: #16a34a;
+  color: #ffffff;
+  font-size: 1rem;
+  font-weight: 800;
+  padding: 13px 24px;
+  border-radius: 12px;
+  box-shadow: 0 4px 14px rgba(22, 163, 74, 0.3);
+  transition: all 0.15s ease;
+  width: 100%;
+  text-align: center;
+  justify-content: center;
+  display: flex;
 }
 #completeSaleBtn:hover {
-  background: #15803d !important;
-  transform: translateY(-1px) !important;
-  box-shadow: 0 6px 18px rgba(22, 163, 74, 0.4) !important;
+  background: #15803d;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(22, 163, 74, 0.4);
 }
 
 /* Mobile Breakpoints for POS Modal */
@@ -4455,23 +4455,23 @@ body {
 
 /* Quick Sale Button in Topbar */
 .pos-quick-btn {
-  display: inline-flex !important;
-  align-items: center !important;
-  gap: 6px !important;
-  background: linear-gradient(135deg, #16a34a 0%, #15803d 100%) !important;
-  color: #ffffff !important;
-  font-weight: 800 !important;
-  padding: 0 14px !important;
-  height: 38px !important;
-  border-radius: 10px !important;
-  border: 1px solid rgba(255, 255, 255, 0.15) !important;
-  box-shadow: 0 2px 8px rgba(22, 163, 74, 0.3) !important;
-  transition: all 0.15s ease !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
+  color: #ffffff;
+  font-weight: 800;
+  padding: 0 14px;
+  height: 38px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 2px 8px rgba(22, 163, 74, 0.3);
+  transition: all 0.15s ease;
 }
 .pos-quick-btn:hover {
-  background: linear-gradient(135deg, #15803d 0%, #166534 100%) !important;
-  transform: translateY(-1px) !important;
-  box-shadow: 0 4px 12px rgba(22, 163, 74, 0.4) !important;
+  background: linear-gradient(135deg, #15803d 0%, #166534 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(22, 163, 74, 0.4);
 }
 
 /* ==========================================================
@@ -5127,23 +5127,23 @@ body {
 /* WhatsApp Reminder Button */
 .btn-wa-reminder,
 .whatsapp-btn {
-  display: inline-flex !important;
-  align-items: center !important;
-  gap: 5px !important;
-  background: #25d366 !important;
-  color: #ffffff !important;
-  border: none !important;
-  padding: 5px 10px !important;
-  font-size: 0.75rem !important;
-  font-weight: 800 !important;
-  border-radius: var(--radius-sm) !important;
-  cursor: pointer !important;
-  transition: all 0.15s ease !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: #25d366;
+  color: #ffffff;
+  border: none;
+  padding: 5px 10px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.15s ease;
 }
 .btn-wa-reminder:hover,
 .whatsapp-btn:hover {
-  background: #20ba5a !important;
-  transform: translateY(-1px) !important;
+  background: #20ba5a;
+  transform: translateY(-1px);
 }
 
 /* Reports Performance Breakdown Visual */

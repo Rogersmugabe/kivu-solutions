@@ -36,4 +36,17 @@
 
 ---
 
-## Phase 3: Accessibility & Design Tokens (In Progress)
+## Phase 3: Accessibility & Design Tokens (Observed)
+
+| Test ID | Description | Command / Execution | Status | Observed Output |
+|---|---|---|---|---|
+| **T20** | Reduced motion support | `css/style.css` media query | ✅ PASS | `@media (prefers-reduced-motion: reduce)` resets duration & transitions |
+| **T21** | Focus visible states | `css/style.css` | ✅ PASS | `:where(button,[role=button],a,input,select,textarea,summary):focus-visible` ring |
+| **T22** | Dialog labelling | DOM audit | ✅ PASS | 38 dialogs labelled via `aria-labelledby` pointing to their titles |
+| **T23** | Icon buttons accessibility | DOM audit | ✅ PASS | All icon buttons have descriptive `aria-label` attributes |
+| **T24** | Active navigation a11y | `showPage()` in `app.js` | ✅ PASS | Sets `aria-current="page"` on desktop and mobile active nav items |
+| **T25** | `!important` reduction | CSS audit | ✅ PASS | Reduced from 156 down to 74 (52.6% reduction, <= 76 criterion met) |
+
+---
+
+## Phase 4: Page-by-Page Audit & Polish (In Progress)

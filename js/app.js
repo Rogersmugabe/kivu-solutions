@@ -805,7 +805,8 @@ function showPage(name,bypassSubscription=false){
   if(!bypassSubscription&&!subscriptionAllowsAccess()&&!['dashboard','subscription','settings','dukaadmin'].includes(name)){ensureSubscriptionAccess();return;}
   const feature=PAGE_FEATURE[name];
   if(feature&&!hasFeature(feature)){showUpgrade(feature);return;}
-  $$('.nav').forEach(b=>b.classList.toggle('active',b.dataset.page===name));
+  $$('.nav').forEach(b=>{const act=b.dataset.page===name;b.classList.toggle('active',act);if(act)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');});
+  $$('.mobile-nav[data-mobile-page]').forEach(b=>{const act=b.dataset.mobilePage===name;b.classList.toggle('active',act);if(act)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');});
   $$('.page').forEach(p=>p.classList.remove('active'));
   $(`#page-${name}`).classList.add('active');
   if($('#pageTitle')) $('#pageTitle').textContent=PAGE_TITLES[name]||(name[0].toUpperCase()+name.slice(1));
