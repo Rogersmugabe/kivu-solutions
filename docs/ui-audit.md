@@ -1,6 +1,6 @@
 # Kivu Solutions UI Audit Report
 
-Generated: 2026-10-29T17:09:31.038Z
+Generated: 2026-10-29T17:46:17.347Z
 Total Controls & Surfaces Audited: 283
 Bound: 283 | Unbound: 0
 
@@ -40,7 +40,7 @@ Bound: 283 | Unbound: 0
 | button | `quickSaleBtn` | + New sale F2 | referenced by #quickSaleBtn in JS | ✅ |
 | button | `topLogoutBtn` | Sign out | referenced by #topLogoutBtn in JS | ✅ |
 | button | `(no id)` | 🔄 Refresh | onclick="refresh()" | ✅ |
-| button | `(no id)` | ＋ + New POS Sale F2 Fast counter checkou | [data-open="saleModal"] | ✅ |
+| button | `(no id)` | ＋ New POS Sale F2 Fast counter checkout | [data-open="saleModal"] | ✅ |
 | button | `(no id)` | 📦 Add Stock Replenish units | [data-open="stockModal"] | ✅ |
 | button | `(no id)` | 💸 Add Expense Log cash outflow | [data-open="expenseModal"] | ✅ |
 | button | `(no id)` | 📝 Add Credit "Amadeni" debtor record | [data-open="creditModal"] | ✅ |
@@ -53,7 +53,7 @@ Bound: 283 | Unbound: 0
 | button | `editPlatformStatusBtn` | [icon] | referenced by #editPlatformStatusBtn in JS | ✅ |
 | button | `clearSalesSearchBtn` | ✕ | referenced by #clearSalesSearchBtn in JS | ✅ |
 | button | `(no id)` | Export CSV | onclick="exportSalesCsv()" | ✅ |
-| button | `(no id)` | + New POS Sale F2 | [data-open="saleModal"] | ✅ |
+| button | `(no id)` | New POS Sale F2 | [data-open="saleModal"] | ✅ |
 | button | `(no id)` | All Time | onclick="setSalesDateFilter(" | ✅ |
 | button | `(no id)` | Today | onclick="setSalesDateFilter(" | ✅ |
 | button | `(no id)` | Yesterday | onclick="setSalesDateFilter(" | ✅ |

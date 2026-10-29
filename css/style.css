@@ -5298,3 +5298,251 @@ body {
   border-top: 0;
 }
 
+
+
+/* ==========================================================
+   MODERN ICON & NOTIFICATIONS DESIGN SYSTEM ENHANCEMENTS
+   ========================================================== */
+.btn-refresh {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #334155;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  padding: 6px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+.btn-refresh:hover {
+  background: #f8fafc;
+  border-color: #94a3b8;
+  color: #0f172a;
+}
+.btn-refresh .refresh-icon {
+  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  flex-shrink: 0;
+}
+.btn-refresh:hover .refresh-icon,
+.btn-refresh.spinning .refresh-icon {
+  transform: rotate(180deg);
+}
+
+.notif-top-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 12px;
+}
+.notif-top-btn .top-btn-icon {
+  flex-shrink: 0;
+}
+.notif-count-badge {
+  background: #2563eb;
+  color: #ffffff;
+  font-size: 0.72rem;
+  font-weight: 800;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0 4px;
+  line-height: 1;
+}
+.notif-count-badge:is([data-count="0"]) {
+  opacity: 0.7;
+  background: #94a3b8;
+}
+
+.kpi-icon-wrap svg {
+  width: 18px;
+  height: 18px;
+  stroke: currentColor;
+}
+
+.quick-action-icon svg {
+  width: 20px;
+  height: 20px;
+  stroke: currentColor;
+}
+.quick-action-primary .quick-action-icon {
+  background: rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+}
+
+.channel-icon svg {
+  width: 18px;
+  height: 18px;
+  stroke: currentColor;
+}
+
+.alert-ribbon-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  color: currentColor;
+}
+.alert-ribbon-icon svg {
+  width: 18px;
+  height: 18px;
+  stroke: currentColor;
+}
+
+.empty-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 10px;
+  color: #94a3b8;
+}
+.empty-icon svg {
+  width: 36px;
+  height: 36px;
+  stroke: #94a3b8;
+}
+
+.search-icon-svg {
+  width: 16px;
+  height: 16px;
+  stroke: #94a3b8;
+  margin-right: 6px;
+  flex-shrink: 0;
+}
+
+.filter-icon-svg, .btn-icon-svg {
+  width: 14px;
+  height: 14px;
+  stroke: currentColor;
+  flex-shrink: 0;
+  vertical-align: -2px;
+}
+
+/* Notification Drawer Tabs & Card Enhancement */
+.notif-tabs-bar {
+  display: flex;
+  gap: 8px;
+  padding: 10px 22px;
+  background: #ffffff;
+  border-bottom: 1px solid #f1f5f9;
+}
+.notif-tab {
+  border: 1px solid transparent;
+  background: transparent;
+  padding: 5px 12px;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.notif-tab:hover {
+  color: #0f172a;
+  background: #f8fafc;
+}
+.notif-tab.active {
+  background: #eff6ff;
+  color: #2563eb;
+  border-color: #bfdbfe;
+}
+.notif-tab-count {
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  color: #475569;
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+.notif-tab.active .notif-tab-count {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.notif-mark-read-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.notif-mark-read-btn svg {
+  stroke: currentColor;
+}
+
+.notif-card {
+  display: flex;
+  gap: 14px;
+  padding: 14px 16px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  position: relative;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.notif-card:hover {
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.06);
+  border-color: #cbd5e1;
+}
+.notif-card.unread {
+  border-left: 4px solid #2563eb;
+  background: #fbfcfe;
+}
+.notif-card.read {
+  opacity: 0.82;
+  background: #ffffff;
+}
+
+.notif-type-icon svg {
+  width: 18px;
+  height: 18px;
+  stroke: currentColor;
+}
+
+.notif-card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 10px;
+}
+.notif-mark-single-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: none;
+  background: transparent;
+  color: #64748b;
+  font-size: 0.74rem;
+  font-weight: 700;
+  padding: 4px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.notif-mark-single-btn:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+.notif-mark-single-btn svg {
+  width: 13px;
+  height: 13px;
+  stroke: currentColor;
+}
+
+.btn-wa-reminder svg, .overdue-tag svg {
+  width: 13px;
+  height: 13px;
+  stroke: currentColor;
+  vertical-align: -2px;
+}

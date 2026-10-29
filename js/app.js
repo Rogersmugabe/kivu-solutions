@@ -113,6 +113,46 @@ const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const money=n=>new Intl.NumberFormat('en-RW',{maximumFractionDigits:0}).format(Math.round(Number(n)||0))+' RWF';
 const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
 
+/* GLOBAL VECTOR SVG ICON REGISTRY */
+const KIVU_ICONS = {
+  bell: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>',
+  refresh: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"></path></svg>',
+  sales: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"></rect><circle cx="12" cy="12" r="2"></circle><path d="M6 12h.01M18 12h.01"></path></svg>',
+  cash: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"></rect><circle cx="12" cy="12" r="2"></circle><path d="M6 12h.01M18 12h.01"></path></svg>',
+  expenses: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"></polyline><polyline points="17 18 23 18 23 12"></polyline></svg>',
+  profit: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>',
+  credit: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>',
+  lowstock: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>',
+  warning: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>',
+  stock: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>',
+  package: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>',
+  billing: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>',
+  card: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>',
+  momo: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>',
+  bank: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="21" x2="21" y2="21"></line><line x1="3" y1="10" x2="21" y2="10"></line><polyline points="5 6 12 3 19 6"></polyline><line x1="4" y1="10" x2="4" y2="21"></line><line x1="20" y1="10" x2="20" y2="21"></line><line x1="8" y1="14" x2="8" y2="17"></line><line x1="12" y1="14" x2="12" y2="17"></line><line x1="16" y1="14" x2="16" y2="17"></line></svg>',
+  shift: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 16l3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1z"></path><path d="M2 16l3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1z"></path><path d="M7 21h10"></path><path d="M12 3v18"></path><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"></path></svg>',
+  scale: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 16l3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1z"></path><path d="M2 16l3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1z"></path><path d="M7 21h10"></path><path d="M12 3v18"></path><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"></path></svg>',
+  printer: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>',
+  whatsapp: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>',
+  statement: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>',
+  check: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>',
+  supplier: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>',
+  staff: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>',
+  control: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>',
+  system: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>',
+  info: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>',
+  sparkle: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>',
+  plus: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>',
+  receipt: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"></path><line x1="8" y1="7" x2="16" y2="7"></line><line x1="8" y1="11" x2="16" y2="11"></line><line x1="8" y1="15" x2="12" y2="15"></line></svg>',
+  search: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>',
+  building: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2" ry="2"></rect><line x1="9" y1="22" x2="9" y2="18"></line><line x1="15" y1="22" x2="15" y2="18"></line><line x1="9" y1="6" x2="9.01" y2="6"></line><line x1="15" y1="6" x2="15.01" y2="6"></line><line x1="9" y1="10" x2="9.01" y2="10"></line><line x1="15" y1="10" x2="15.01" y2="10"></line><line x1="9" y1="14" x2="9.01" y2="14"></line><line x1="15" y1="14" x2="15.01" y2="14"></line></svg>'
+};
+function kivuIcon(name, fallbackSvg = '') {
+  return KIVU_ICONS[name] || fallbackSvg || KIVU_ICONS.info;
+}
+window.kivuIcon = kivuIcon;
+
+
 /* UNIVERSAL TOAST NOTIFICATION SYSTEM */
 function showToast(msg, type='info', title='', duration=3500){
   const container = $('#toastContainer') || document.body;
@@ -918,7 +958,16 @@ async function load(){
   }
 }
 
-async function refresh(){await load();render()}
+async function refresh(){
+  const btn = $('#dashboardRefreshBtn') || $('.btn-refresh');
+  if (btn) btn.classList.add('spinning');
+  try {
+    await load();
+    render();
+  } finally {
+    if (btn) setTimeout(() => btn.classList.remove('spinning'), 400);
+  }
+}
 async function audit(action,entity,details={}){
   const {error}=await sb.from('audit_logs').insert({shop_id:shop.id,user_id:session.user.id,user_name:profile.full_name||session.user.email,action,entity,details});
   if(error)console.warn('Audit log:',error.message);
@@ -2063,7 +2112,7 @@ function renderDashboard(){
       alertItems.push(`
         <div class="alert-ribbon-item alert-ribbon-info">
           <div class="alert-ribbon-content">
-            <span class="alert-ribbon-icon">✨</span>
+            <span class="alert-ribbon-icon">${kivuIcon("sparkle")}</span>
             <span><b>Welcome to Kivu Solutions!</b> Set up your catalog or import opening inventory to start fast counter checkout.</span>
           </div>
           <button type="button" class="alert-ribbon-btn" onclick="showPage('inventory');$('#productModal')?.showModal();">+ Add product →</button>
@@ -2074,7 +2123,7 @@ function renderDashboard(){
       alertItems.push(`
         <div class="alert-ribbon-item alert-ribbon-warning">
           <div class="alert-ribbon-content">
-            <span class="alert-ribbon-icon">⚠️</span>
+            <span class="alert-ribbon-icon">${kivuIcon("warning")}</span>
             <span><b>${low.length} product(s)</b> are running low or out of stock. Replenish inventory to prevent lost revenue.</span>
           </div>
           <button type="button" class="alert-ribbon-btn" onclick="showPage('inventory');filterInventoryStatus('low')">Review stock →</button>
@@ -2085,7 +2134,7 @@ function renderDashboard(){
       alertItems.push(`
         <div class="alert-ribbon-item alert-ribbon-info">
           <div class="alert-ribbon-content">
-            <span class="alert-ribbon-icon">📝</span>
+            <span class="alert-ribbon-icon">${kivuIcon("statement")}</span>
             <span><b>${money(cr)}</b> in outstanding customer credit ("Amadeni") across <b>${activeDebtorsCount} debtor(s)</b>.</span>
           </div>
           <button type="button" class="alert-ribbon-btn" onclick="showPage('customers')">Debtors ledger →</button>
@@ -2096,7 +2145,7 @@ function renderDashboard(){
       alertItems.push(`
         <div class="alert-ribbon-item alert-ribbon-info">
           <div class="alert-ribbon-content">
-            <span class="alert-ribbon-icon">⚖️</span>
+            <span class="alert-ribbon-icon">${kivuIcon("scale")}</span>
             <span><b>No Open Register Shift:</b> Open a shift to track cash drawer balance, log float, and reconcile closing cash.</span>
           </div>
           <button type="button" class="alert-ribbon-btn" onclick="showPage('shifts');$('#openShiftModal')?.showModal();">Open shift →</button>
@@ -2107,7 +2156,7 @@ function renderDashboard(){
       alertItems.unshift(`
         <div class="alert-ribbon-item alert-ribbon-info" style="border-left: 4px solid var(--k-accent, #2563eb);">
           <div class="alert-ribbon-content">
-            <span class="alert-ribbon-icon">ℹ️</span>
+            <span class="alert-ribbon-icon">${kivuIcon("info")}</span>
             <span><b>High Volume Window:</b> Analytics and comparisons are computed over the latest 1,000 sales transactions loaded.</span>
           </div>
         </div>
@@ -2170,10 +2219,10 @@ function renderDashboard(){
   const channelsList=$('#paymentChannelsList');
   if(channelsList){
     const channels=[
-      {name:'Cash',icon:'💵',amount:todayCash,count:cashReceipts.size,pct:pctCash,colorClass:'cash'},
-      {name:'MTN Mobile Money',icon:'📱',amount:todayMomo,count:momoReceipts.size,pct:pctMomo,colorClass:'momo'},
-      {name:'Bank Transfer',icon:'🏦',amount:todayBank,count:bankReceipts.size,pct:pctBank,colorClass:'bank'},
-      {name:'Customer Credit',icon:'📝',amount:todayCredit,count:creditReceipts.size,pct:pctCredit,colorClass:'credit'}
+      {name:'Cash',icon:kivuIcon('cash'),amount:todayCash,count:cashReceipts.size,pct:pctCash,colorClass:'cash'},
+      {name:'MTN Mobile Money',icon:kivuIcon('momo'),amount:todayMomo,count:momoReceipts.size,pct:pctMomo,colorClass:'momo'},
+      {name:'Bank Transfer',icon:kivuIcon('bank'),amount:todayBank,count:bankReceipts.size,pct:pctBank,colorClass:'bank'},
+      {name:'Customer Credit',icon:kivuIcon('credit'),amount:todayCredit,count:creditReceipts.size,pct:pctCredit,colorClass:'credit'}
     ];
     channelsList.innerHTML=channels.map(ch=>`
       <div class="channel-row">
@@ -2229,13 +2278,13 @@ function renderDashboard(){
         </div>
         <div class="drawer-footer-actions">
           <button type="button" class="btn secondary btn-sm" onclick="showPage('shifts')">
-            <span>⚖️</span> Shifts & Reconciliation
+            ${kivuIcon("scale")} <span>Shifts &amp; Reconciliation</span>
           </button>
           <button type="button" class="btn secondary btn-sm" onclick="openDrawerPettyCash()">
-            <span>💸</span> Petty Cash Payout
+            ${kivuIcon("expenses")} <span>Petty Cash Payout</span>
           </button>
           <button type="button" class="btn ghost btn-sm" onclick="openShiftZReport('${activeShift.id}')">
-            <span>🖨️</span> Z-Report
+            ${kivuIcon("printer")} <span>Z-Report</span>
           </button>
         </div>
       `;
@@ -2254,7 +2303,7 @@ function renderDashboard(){
         </div>
         <div class="drawer-footer-actions">
           <button type="button" class="btn primary btn-sm" onclick="showPage('shifts');$('#openShiftModal')?.showModal();">
-            <span>➕</span> Open Shift
+            ${kivuIcon("plus")} <span>Open Shift</span>
           </button>
           <button type="button" class="btn ghost btn-sm" onclick="showPage('shifts')">
             Shift Records →
@@ -2284,7 +2333,7 @@ function renderDashboard(){
     if(topProducts.length===0){
       fastMoversList.innerHTML=`
         <div class="overview-empty-state">
-          <span class="empty-icon">📈</span>
+          <span class="empty-icon">${kivuIcon("profit")}</span>
           <p>No sales recorded yet. Top moving products and velocity rankings will appear here as you sell.</p>
         </div>
       `;
@@ -2363,7 +2412,7 @@ function renderDashboard(){
     if(topDebtors.length===0){
       creditWatchlist.innerHTML=`
         <div class="overview-empty-state">
-          <span class="empty-icon">🤝</span>
+          <span class="empty-icon">${kivuIcon("credit")}</span>
           <p>No outstanding customer debts! All credit balances are paid up.</p>
         </div>
       `;
@@ -2379,7 +2428,7 @@ function renderDashboard(){
             <div class="debtor-main">
               <div class="debtor-title-row">
                 <strong class="debtor-name">${esc(d.name)}</strong>
-                ${isOverdue?'<span class="overdue-tag">⚠️ Overdue</span>':''}
+                ${isOverdue?`<span class="overdue-tag">${kivuIcon('warning')} Overdue</span>`:''}
               </div>
               <div class="debtor-sub">
                 <span>${d.phone?esc(d.phone):'No phone recorded'}</span>
@@ -2392,10 +2441,10 @@ function renderDashboard(){
               <strong class="debt-amount">${money(d.totalDebt)}</strong>
               <div class="debtor-btns">
                 <button type="button" class="btn-wa-reminder" onclick="${waCall}" title="Send WhatsApp debt reminder">
-                  💬 WhatsApp
+                  ${kivuIcon("whatsapp")} WhatsApp
                 </button>
                 <button type="button" class="btn ghost btn-xs" onclick="${ledgerCall}" title="Open customer ledger">
-                  📋 Statement
+                  ${kivuIcon("statement")} Statement
                 </button>
               </div>
             </div>
@@ -2413,7 +2462,7 @@ function renderDashboard(){
     if(criticalProducts.length===0){
       stockAlertsList.innerHTML=`
         <div class="overview-empty-state">
-          <span class="empty-icon">✅</span>
+          <span class="empty-icon">${kivuIcon("check")}</span>
           <p>Stock levels are healthy! All products have inventory above their low-stock reorder thresholds.</p>
         </div>
       `;
@@ -2606,14 +2655,14 @@ function renderSales(){
   }
 
   if(!pageItems.length){
-    $('#salesBody').innerHTML = `<tr><td colspan="8"><div class="empty-table-state"><span class="empty-icon">🔍</span><p>No sales match your search and filter criteria.</p><button type="button" class="btn secondary btn-sm" onclick="clearAllSalesFilters()">Clear all filters</button></div></td></tr>`;
+    $('#salesBody').innerHTML = `<tr><td colspan="8"><div class="empty-table-state"><span class="empty-icon">${kivuIcon("search")}</span><p>No sales match your search and filter criteria.</p><button type="button" class="btn secondary btn-sm" onclick="clearAllSalesFilters()">Clear all filters</button></div></td></tr>`;
     return;
   }
 
   $('#salesBody').innerHTML=pageItems.map(s=>{
     const voided=s.status==='voided';
     const action=[];
-    if(hasFeature('receipts')) action.push(`<button class="btn secondary btn-sm" onclick="viewReceipt('${s.id}')">🧾 Receipt</button>`);
+    if(hasFeature('receipts')) action.push(`<button class="btn secondary btn-sm" onclick="viewReceipt('${s.id}')">${kivuIcon("receipt")} Receipt</button>`);
     if(!voided&&can('owner','manager','cashier')) action.push(`<button class="btn ${can('owner','manager')?'ghost-danger':'secondary'} btn-sm" onclick="openVoidSale('${s.id}')">${can('owner','manager')?'Void':'Request void'}</button>`);
     if(voided) action.push('<span class="badge danger-badge">VOIDED</span>');
 
@@ -2645,7 +2694,7 @@ function renderSales(){
       <td><span class="pay-chip ${payClass}"><span class="chip-dot"></span>${esc(s.payment||'Cash')}</span></td>
       <td>
         <div class="cell-customer">
-          ${s.customer ? `<span class="cust-named">👤 ${esc(s.customer)}</span>` : `<span class="cust-walkin">Walk-in</span>`}
+          ${s.customer ? `<span class="cust-named">${kivuIcon("staff")} ${esc(s.customer)}</span>` : `<span class="cust-walkin">Walk-in</span>`}
         </div>
       </td>
       <td>
@@ -2810,7 +2859,7 @@ function renderInventory(){
       <td><span class="badge ${badgeClass}">${badgeText}</span></td>
       <td>${can('owner','manager')?`<button class="btn secondary" onclick="openEditProduct('${p.id}')">Edit</button> <button class="btn secondary" onclick="openStockAdjustFor('${p.id}')">Adjust</button>`:'—'}</td>
     </tr>`;
-  }).join(''):`<tr><td colspan="10"><div class="empty-table-state"><span class="empty-icon">📦</span><p>${products.length?'No matching products found for this filter.':'No products in catalog yet.'}</p>${products.length?'':'<button class="btn primary btn-sm" onclick="$(\'#productModal\')?.showModal()">+ Add Product</button>'}</div></td></tr>`;
+  }).join(''):`<tr><td colspan="10"><div class="empty-table-state"><span class="empty-icon">${kivuIcon("package")}</span><p>${products.length?'No matching products found for this filter.':'No products in catalog yet.'}</p>${products.length?'':'<button class="btn primary btn-sm" onclick="$(\'#productModal\')?.showModal()">+ Add Product</button>'}</div></td></tr>`;
 }
 
 window.filterInventoryStatus=function(status){
@@ -2870,7 +2919,7 @@ function renderSuppliers(){
       <td><b>${money(bal)}</b></td>
       <td>${x.active!==false&&bal>0?`<button class="btn secondary" onclick="openSupplierPayment('${x.id}')">Pay debt</button> `:''}<button class="btn secondary" onclick="openEditSupplier('${x.id}')">Edit</button> ${x.active!==false?`<button class="btn danger" onclick="removeSupplier('${x.id}')">Delete</button>`:''}</td>
     </tr>`;
-  }).join(''):`<tr><td colspan="6"><div class="empty-table-state"><span class="empty-icon">🏢</span><p>${suppliers.length?'No matching suppliers found.':'No suppliers registered yet.'}</p>${suppliers.length?'':'<button class="btn primary btn-sm" onclick="$(\'#supplierModal\')?.showModal()">+ Add Supplier</button>'}</div></td></tr>`;
+  }).join(''):`<tr><td colspan="6"><div class="empty-table-state"><span class="empty-icon">${kivuIcon("building")}</span><p>${suppliers.length?'No matching suppliers found.':'No suppliers registered yet.'}</p>${suppliers.length?'':'<button class="btn primary btn-sm" onclick="$(\'#supplierModal\')?.showModal()">+ Add Supplier</button>'}</div></td></tr>`;
 
   $('#supplierPurchasesBody').innerHTML=supPurchasesList.length?supPurchasesList.map(x=>`<tr>
     <td>${fmt(x.created_at)}</td>
@@ -2881,7 +2930,7 @@ function renderSuppliers(){
     <td><b>${money(x.balance_due)}</b></td>
     <td><span class="badge">${esc(x.status)}</span></td>
     <td>${x.due_date?new Date(x.due_date+'T00:00:00').toLocaleDateString('en-RW'):'—'}</td>
-  </tr>`).join(''):`<tr><td colspan="8"><div class="empty-table-state"><span class="empty-icon">📦</span><p>${supplierPurchases.length?'No matching purchases found.':'No supplier purchases recorded yet.'}</p>${supplierPurchases.length?'':'<button class="btn primary btn-sm" onclick="$(\'#purchaseModal\')?.showModal()">+ Record Purchase</button>'}</div></td></tr>`;
+  </tr>`).join(''):`<tr><td colspan="8"><div class="empty-table-state"><span class="empty-icon">${kivuIcon("package")}</span><p>${supplierPurchases.length?'No matching purchases found.':'No supplier purchases recorded yet.'}</p>${supplierPurchases.length?'':'<button class="btn primary btn-sm" onclick="$(\'#purchaseModal\')?.showModal()">+ Record Purchase</button>'}</div></td></tr>`;
 
   $('#supplierPaymentsBody').innerHTML=supplierPayments.length?supplierPayments.map(x=>`<tr>
     <td>${fmt(x.created_at)}</td>
@@ -2889,7 +2938,7 @@ function renderSuppliers(){
     <td>${esc(x.payment_method||'—')}</td>
     <td>${esc(x.note||'—')}</td>
     <td><b>${money(x.amount)}</b></td>
-  </tr>`).join(''):`<tr><td colspan="5"><div class="empty-table-state"><span class="empty-icon">💳</span><p>No supplier debt payments recorded yet.</p></div></td></tr>`;
+  </tr>`).join(''):`<tr><td colspan="5"><div class="empty-table-state"><span class="empty-icon">${kivuIcon("card")}</span><p>No supplier debt payments recorded yet.</p></div></td></tr>`;
 }
 
 $('#supplierSearchInput')?.addEventListener('input',e=>{
@@ -2959,7 +3008,7 @@ function renderExpenses(){
     );
   }
 
-  body.innerHTML=list.length?list.map(x=>`<tr><td>${fmt(x.created_at)}</td><td>${esc(x.category||'Other')}</td><td>${esc(x.description)}</td><td>${esc(x.employee_name||'Owner')}</td><td><b>${money(x.amount)}</b></td></tr>`).join(''):`<tr><td colspan="5"><div class="empty-table-state"><span class="empty-icon">💸</span><p>${expenses.length?'No matching expenses found for this filter.':'No expenses recorded yet.'}</p>${can('owner','manager')?'<button class="btn primary btn-sm" onclick="$(\'#expenseModal\')?.showModal()">+ Record Expense</button>':''}</div></td></tr>`;
+  body.innerHTML=list.length?list.map(x=>`<tr><td>${fmt(x.created_at)}</td><td>${esc(x.category||'Other')}</td><td>${esc(x.description)}</td><td>${esc(x.employee_name||'Owner')}</td><td><b>${money(x.amount)}</b></td></tr>`).join(''):`<tr><td colspan="5"><div class="empty-table-state"><span class="empty-icon">${kivuIcon("expenses")}</span><p>${expenses.length?'No matching expenses found for this filter.':'No expenses recorded yet.'}</p>${can('owner','manager')?'<button class="btn primary btn-sm" onclick="$(\'#expenseModal\')?.showModal()">+ Record Expense</button>':''}</div></td></tr>`;
   if($('#expenseApprovalHint')) $('#expenseApprovalHint').textContent='Expenses can be recorded by the owner or a manager only.';
 }
 
@@ -3012,13 +3061,13 @@ function renderCustomers(){
       <td>${esc(c.email||'—')}</td>
       <td><b class="${bal>0?'text-danger':''}">${money(bal)}</b></td>
       <td class="action-cell">
-        <button class="btn secondary" onclick="openCustomerLedger('${c.id}')" title="View Statement">📋 Statement</button>
+        <button class="btn secondary" onclick="openCustomerLedger('${c.id}')" title="View Statement">${kivuIcon("statement")} <span>Statement</span></button>
         ${bal>0?`<button class="btn secondary" onclick="openCustomerDebtRepay('${c.id}')">Repay</button> `:''}
-        ${bal>0?`<button class="btn ghost whatsapp-btn" onclick="sendWhatsappDebtReminder('${c.id}')" title="WhatsApp Reminder">💬 WA</button> `:''}
+        ${bal>0?`<button class="btn ghost whatsapp-btn" onclick="sendWhatsappDebtReminder('${c.id}')" title="WhatsApp Reminder">${kivuIcon("whatsapp")} WA</button> `:''}
         ${can('owner','manager')?`<button class="btn secondary" onclick="openEditCustomer('${c.id}')">Edit</button> ${c.active!==false?`<button class="btn danger" onclick="removeCustomer('${c.id}')">Delete</button>`:''}`:''}
       </td>
     </tr>`;
-  }).join(''):`<tr><td colspan="5"><div class="empty-table-state"><span class="empty-icon">👥</span><p>${customers.length?'No matching customers found for this filter.':'No customers in directory yet.'}</p>${can('owner','manager','cashier')?'<button class="btn primary btn-sm" onclick="$(\'#customerModal\')?.showModal()">+ Add Customer</button>':''}</div></td></tr>`;
+  }).join(''):`<tr><td colspan="5"><div class="empty-table-state"><span class="empty-icon">${kivuIcon("staff")}</span><p>${customers.length?'No matching customers found for this filter.':'No customers in directory yet.'}</p>${can('owner','manager','cashier')?'<button class="btn primary btn-sm" onclick="$(\'#customerModal\')?.showModal()">+ Add Customer</button>':''}</div></td></tr>`;
   const open=credits.filter(x=>!x.paid);
   $('#creditList').innerHTML=open.length?open.map(c=>`
     <div class="item">
@@ -3030,7 +3079,7 @@ function renderCustomers(){
         <b>${money(c.amount)}</b>
         <button class="btn secondary" onclick="openRepayCredit('${c.id}')">Repay</button>
         <button class="btn ghost" onclick="openCustomerLedgerByName('${esc(c.customer)}')">Statement</button>
-        <button class="btn ghost whatsapp-btn" onclick="sendWhatsappReminderForCredit('${c.id}')">💬 WA</button>
+        <button class="btn ghost whatsapp-btn" onclick="sendWhatsappReminderForCredit('${c.id}')">${kivuIcon("whatsapp")} <span>WA</span></button>
       </div>
     </div>
   `).join(''):'No outstanding credit.';
@@ -3122,7 +3171,7 @@ function renderEmployees(){
   if($('#empKpiActive')) $('#empKpiActive').textContent=employees.filter(e=>e.active!==false).length;
   if($('#empKpiInvites')) $('#empKpiInvites').textContent=pending.length;
 
-  $('#employeesBody').innerHTML=employees.length?employees.map(e=>`<tr><td><b>${esc(e.name)}</b></td><td>${esc(e.role)}</td><td>${esc(e.phone||'—')}</td><td><span class="badge">${e.active?'Active':'Disabled'}</span></td><td>${sales.filter(s=>s.user_id===e.user_id&&day(s.created_at)===t).length}</td><td>${can('owner','manager')?`<button class="btn ${e.active?'danger':'secondary'}" onclick="setEmployeeActive('${e.id}',${!e.active})">${e.active?'Disable':'Reactivate'}</button>`:'—'}</td></tr>`).join(''):`<tr><td colspan="6"><div class="empty-table-state"><span class="empty-icon">👥</span><p>No staff team members have joined yet.</p>${can('owner')?'<button class="btn primary btn-sm" onclick="$(\'#staffInviteModal\')?.showModal()">+ Invite Staff</button>':''}</div></td></tr>`;
+  $('#employeesBody').innerHTML=employees.length?employees.map(e=>`<tr><td><b>${esc(e.name)}</b></td><td>${esc(e.role)}</td><td>${esc(e.phone||'—')}</td><td><span class="badge">${e.active?'Active':'Disabled'}</span></td><td>${sales.filter(s=>s.user_id===e.user_id&&day(s.created_at)===t).length}</td><td>${can('owner','manager')?`<button class="btn ${e.active?'danger':'secondary'}" onclick="setEmployeeActive('${e.id}',${!e.active})">${e.active?'Disable':'Reactivate'}</button>`:'—'}</td></tr>`).join(''):`<tr><td colspan="6"><div class="empty-table-state"><span class="empty-icon">${kivuIcon("staff")}</span><p>No staff team members have joined yet.</p>${can('owner')?'<button class="btn primary btn-sm" onclick="$(\'#staffInviteModal\')?.showModal()">+ Invite Staff</button>':''}</div></td></tr>`;
   const auditPanel=$('#auditList')?.closest('.panel');
   auditPanel?.classList.toggle('hidden',!hasFeature('audit'));
   if(hasFeature('audit')) $('#auditList').innerHTML=audits.length?audits.slice(0,20).map(a=>`<div class="item"><div><b>${esc(a.user_name||'User')} · ${esc(a.action)}</b><small>${esc(a.entity)} · ${fmt(a.created_at)}</small></div></div>`).join(''):'No audit activity yet.';
@@ -3174,9 +3223,9 @@ function renderShifts(){
       <td>${s.actual_cash==null?'—':money(s.actual_cash)}</td>
       <td>${diff==null?'—':money(diff)}</td>
       <td><span class="badge ${s.status==='closed'?'badge-neutral':'badge-success'}">${esc(s.status)}</span></td>
-      <td><button class="btn secondary" onclick="openShiftZReport('${s.id}')">🖨️ Z-Report</button></td>
+      <td><button class="btn secondary" onclick="openShiftZReport('${s.id}')">${kivuIcon("printer")} Z-Report</button></td>
     </tr>`;
-  }).join(''):`<tr><td colspan="8"><div class="empty-table-state"><span class="empty-icon">⚖️</span><p>No register shifts recorded yet.</p><button class="btn primary btn-sm" onclick="$(\'#openShiftModal\')?.showModal()">+ Open Shift</button></div></td></tr>`;
+  }).join(''):`<tr><td colspan="8"><div class="empty-table-state"><span class="empty-icon">${kivuIcon("scale")}</span><p>No register shifts recorded yet.</p><button class="btn primary btn-sm" onclick="$(\'#openShiftModal\')?.showModal()">+ Open Shift</button></div></td></tr>`;
 }
 function renderControls(){
   if(!$('#approvalsList'))return;
@@ -3252,10 +3301,10 @@ function renderReports(){
   const channelsList=$('#reportChannelsList');
   if(channelsList){
     const channels=[
-      {name:'Cash',icon:'💵',amount:periodCash,count:cashTx.size,pct:pctCash,colorClass:'cash'},
-      {name:'MTN Mobile Money',icon:'📱',amount:periodMomo,count:momoTx.size,pct:pctMomo,colorClass:'momo'},
-      {name:'Bank Transfer',icon:'🏦',amount:periodBank,count:bankTx.size,pct:pctBank,colorClass:'bank'},
-      {name:'Customer Credit',icon:'📝',amount:periodCredit,count:creditTx.size,pct:pctCredit,colorClass:'credit'}
+      {name:'Cash',icon:kivuIcon('cash'),amount:periodCash,count:cashTx.size,pct:pctCash,colorClass:'cash'},
+      {name:'MTN Mobile Money',icon:kivuIcon('momo'),amount:periodMomo,count:momoTx.size,pct:pctMomo,colorClass:'momo'},
+      {name:'Bank Transfer',icon:kivuIcon('bank'),amount:periodBank,count:bankTx.size,pct:pctBank,colorClass:'bank'},
+      {name:'Customer Credit',icon:kivuIcon('credit'),amount:periodCredit,count:creditTx.size,pct:pctCredit,colorClass:'credit'}
     ];
     channelsList.innerHTML=channels.map(ch=>`
       <div class="channel-row">
@@ -3445,6 +3494,9 @@ setTimeout(()=>checkAppStatus().catch(()=>{}),1800);
 
 // Notifications Center: persistent state, live business alerts, and modern card rendering.
 let dismissedAlertsKey = 'kivu_dismissed_alerts_';
+const NOTIF_READ_STORAGE_KEY = 'kivu_read_notifs_v3_';
+let activeNotifFilterTab = 'all';
+
 function getDismissedAlerts() {
   if (!shop?.id) return {};
   try { return JSON.parse(localStorage.getItem(dismissedAlertsKey + shop.id) || '{}'); } catch(_e) { return {}; }
@@ -3456,6 +3508,43 @@ function dismissAllAlerts(alertIds) {
   (alertIds || []).forEach(id => { map[id] = now; });
   localStorage.setItem(dismissedAlertsKey + shop.id, JSON.stringify(map));
 }
+
+function getReadNotificationsMap() {
+  const sid = shop?.id || 'default';
+  try { return JSON.parse(localStorage.getItem(NOTIF_READ_STORAGE_KEY + sid) || '{}'); } catch(_e) { return {}; }
+}
+function saveReadNotificationsMap(map) {
+  const sid = shop?.id || 'default';
+  try { localStorage.setItem(NOTIF_READ_STORAGE_KEY + sid, JSON.stringify(map || {})); } catch(_e) {}
+}
+
+window.filterNotificationsTab = function(tab) {
+  activeNotifFilterTab = tab;
+  $$('.notif-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  renderNotifications();
+};
+
+window.markSingleNotificationRead = async function(notifId, event) {
+  if (event) { event.stopPropagation(); }
+  const readMap = getReadNotificationsMap();
+  const now = Date.now();
+  const nowIso = new Date().toISOString();
+  readMap[notifId] = now;
+
+  const stored = (shopNotifications || []).find(n => n.id === notifId || ('stored_' + n.id) === notifId);
+  if (stored) {
+    stored.read_at = nowIso;
+    readMap[stored.id] = now;
+    readMap['stored_' + stored.id] = now;
+    if (sb) {
+      try { await sb.from('shop_notifications').update({ read_at: nowIso }).eq('id', stored.id); } catch(_e) {}
+    }
+  }
+
+  dismissAllAlerts([notifId]);
+  saveReadNotificationsMap(readMap);
+  renderNotifications();
+};
 
 async function loadNotifications() {
   if (!shop) return;
@@ -3470,16 +3559,18 @@ async function loadNotifications() {
 
 function renderNotifications() {
   const dismissedMap = getDismissedAlerts();
+  const readMap = getReadNotificationsMap();
   const listEl = $('#notificationsList');
   const countBadge = $('#notificationCount');
   const modalBadge = $('#notifUnreadBadge');
+  const totalPill = $('#notifTotalCountPill');
+  const unreadPill = $('#notifUnreadCountPill');
 
   const allNotifs = [];
 
   // 1. Stored notifications from backend
   (shopNotifications || []).forEach(n => {
     let type = 'system';
-    let icon = 'ℹ️';
     let typeClass = 'notif-type-system';
     let typeLabel = 'System';
     let actionText = '';
@@ -3490,45 +3581,44 @@ function renderNotifications() {
 
     if (t.includes('subscription') || t.includes('plan') || t.includes('billing') || m.includes('subscription')) {
       type = 'billing';
-      icon = '💳';
       typeClass = 'notif-type-billing';
       typeLabel = 'Subscription';
       actionText = 'Review Plan →';
       actionPage = 'subscription';
     } else if (t.includes('stock') || t.includes('inventory') || m.includes('stock')) {
       type = 'stock';
-      icon = '⚠️';
       typeClass = 'notif-type-stock';
       typeLabel = 'Stock Alert';
       actionText = 'View Inventory →';
       actionPage = 'inventory';
     } else if (t.includes('credit') || t.includes('debt') || m.includes('credit')) {
       type = 'credit';
-      icon = '💰';
       typeClass = 'notif-type-credit';
       typeLabel = 'Customer Debt';
       actionText = 'View Debtors →';
       actionPage = 'customers';
     } else if (t.includes('invite') || t.includes('staff') || t.includes('employee')) {
       type = 'staff';
-      icon = '👥';
       typeClass = 'notif-type-staff';
       typeLabel = 'Team & Staff';
       actionText = 'Manage Staff →';
       actionPage = 'employees';
     }
 
+    const notifKey = 'stored_' + (n.id || n.title || Math.random());
+    const isRead = Boolean(n.read_at) || Boolean(readMap[n.id]) || Boolean(readMap[notifKey]) || Boolean(dismissedMap[notifKey]);
+
     allNotifs.push({
-      id: 'stored_' + (n.id || Math.random()),
+      id: notifKey,
+      rawId: n.id,
       isStored: true,
       raw: n,
       title: n.title,
       message: n.message,
       time: n.created_at ? fmt(n.created_at) : 'Recent',
       timestamp: n.created_at ? new Date(n.created_at).getTime() : 0,
-      read: Boolean(n.read_at),
+      read: isRead,
       type,
-      icon,
       typeClass,
       typeLabel,
       actionText,
@@ -3540,6 +3630,7 @@ function renderNotifications() {
   const subStatus = effectiveSubscriptionStatus();
   if (subStatus === 'grace' || subStatus === 'expired' || subStatus === 'trial') {
     const subAlertId = 'live_sub_' + subStatus;
+    const isRead = Boolean(readMap[subAlertId]) || Boolean(dismissedMap[subAlertId]);
     allNotifs.push({
       id: subAlertId,
       isStored: false,
@@ -3551,9 +3642,8 @@ function renderNotifications() {
         : 'Your subscription has expired. Operational access is locked until renewed.',
       time: 'Realtime Alert',
       timestamp: Date.now() + 10000,
-      read: Boolean(dismissedMap[subAlertId]),
+      read: isRead,
       type: 'billing',
-      icon: '💳',
       typeClass: 'notif-type-billing',
       typeLabel: 'Subscription & Billing',
       actionText: 'Review Plan →',
@@ -3565,18 +3655,18 @@ function renderNotifications() {
   if (lowProducts.length > 0) {
     const outCount = lowProducts.filter(p => Number(p.qty || 0) <= 0).length;
     const stockAlertId = 'live_stock_' + lowProducts.length + '_' + outCount;
+    const isRead = Boolean(readMap[stockAlertId]) || Boolean(readMap['live_stock']) || Boolean(dismissedMap[stockAlertId]);
     allNotifs.push({
       id: stockAlertId,
       isStored: false,
       title: `${lowProducts.length} product(s) low or out of stock`,
       message: outCount > 0 
         ? `${outCount} item(s) are completely out of stock (${lowProducts.slice(0, 3).map(p=>p.name).join(', ')}...). Restock now.`
-        : `${lowProducts.length} item(s) are at or below reorder threshold (${lowProducts.slice(0, 3).map(p=>p.name).join(', ')}...).`,
+        : `${lowProducts.length} item(s) are at or below reorder threshold (${lowProducts.slice(0, 3).map(p=>p.name).join(', ')}...). `,
       time: 'Active Alert',
       timestamp: Date.now() + 9000,
-      read: Boolean(dismissedMap[stockAlertId]),
+      read: isRead,
       type: 'stock',
-      icon: '⚠️',
       typeClass: 'notif-type-stock',
       typeLabel: 'Stock & Inventory',
       actionText: 'Check Stock →',
@@ -3589,6 +3679,7 @@ function renderNotifications() {
   const totalUnpaidCredit = credits.filter(x => !x.paid).reduce((a, x) => a + Number(x.amount || 0), 0);
   if (overdueCredit.length > 0 || totalUnpaidCredit > 0) {
     const creditAlertId = 'live_credit_' + overdueCredit.length + '_' + Math.round(totalUnpaidCredit);
+    const isRead = Boolean(readMap[creditAlertId]) || Boolean(readMap['live_credit']) || Boolean(dismissedMap[creditAlertId]);
     allNotifs.push({
       id: creditAlertId,
       isStored: false,
@@ -3598,9 +3689,8 @@ function renderNotifications() {
         : `Total customer debt outstanding: ${money(totalUnpaidCredit)}. Keep debt under control.`,
       time: 'Customer Ledger',
       timestamp: Date.now() + 8000,
-      read: Boolean(dismissedMap[creditAlertId]),
+      read: isRead,
       type: 'credit',
-      icon: '💰',
       typeClass: 'notif-type-credit',
       typeLabel: 'Customer Debt',
       actionText: 'View Debtors →',
@@ -3613,6 +3703,7 @@ function renderNotifications() {
     if (overdueSuppliers.length > 0) {
       const supTotal = overdueSuppliers.reduce((a, x) => a + Number(x.balance_due || 0), 0);
       const supplierAlertId = 'live_sup_' + overdueSuppliers.length + '_' + Math.round(supTotal);
+      const isRead = Boolean(readMap[supplierAlertId]) || Boolean(readMap['live_sup']) || Boolean(dismissedMap[supplierAlertId]);
       allNotifs.push({
         id: supplierAlertId,
         isStored: false,
@@ -3620,9 +3711,8 @@ function renderNotifications() {
         message: `Total ${money(supTotal)} is overdue to suppliers. Review supplier balances.`,
         time: 'Supplier Accounts',
         timestamp: Date.now() + 7000,
-        read: Boolean(dismissedMap[supplierAlertId]),
+        read: isRead,
         type: 'supplier',
-        icon: '🚚',
         typeClass: 'notif-type-supplier',
         typeLabel: 'Supplier Balances',
         actionText: 'View Suppliers →',
@@ -3635,6 +3725,7 @@ function renderNotifications() {
     if (pendingApprovals.length > 0 || unreviewedShifts.length > 0) {
       const totalRequests = pendingApprovals.length + unreviewedShifts.length;
       const controlAlertId = 'live_controls_' + pendingApprovals.length + '_' + unreviewedShifts.length;
+      const isRead = Boolean(readMap[controlAlertId]) || Boolean(readMap['live_controls']) || Boolean(dismissedMap[controlAlertId]);
       allNotifs.push({
         id: controlAlertId,
         isStored: false,
@@ -3642,9 +3733,8 @@ function renderNotifications() {
         message: `${pendingApprovals.length} void/adjustment request(s) and ${unreviewedShifts.length} closed shift variance(s) waiting for review.`,
         time: 'Anti-Theft Controls',
         timestamp: Date.now() + 6000,
-        read: Boolean(dismissedMap[controlAlertId]),
+        read: isRead,
         type: 'control',
-        icon: '🛡️',
         typeClass: 'notif-type-control',
         typeLabel: 'Anti-Theft Controls',
         actionText: 'Review Approvals →',
@@ -3655,6 +3745,7 @@ function renderNotifications() {
     const pendingInvites = staffInvites.filter(i => !i.used_at && new Date(i.expires_at) > new Date());
     if (pendingInvites.length > 0) {
       const inviteAlertId = 'live_invites_' + pendingInvites.length;
+      const isRead = Boolean(readMap[inviteAlertId]) || Boolean(readMap['live_invites']) || Boolean(dismissedMap[inviteAlertId]);
       allNotifs.push({
         id: inviteAlertId,
         isStored: false,
@@ -3662,9 +3753,8 @@ function renderNotifications() {
         message: `Staff invite code(s) waiting to be activated by your team.`,
         time: 'Staff Management',
         timestamp: Date.now() + 5000,
-        read: Boolean(dismissedMap[inviteAlertId]),
+        read: isRead,
         type: 'staff',
-        icon: '👥',
         typeClass: 'notif-type-staff',
         typeLabel: 'Staff & Team',
         actionText: 'Manage Staff →',
@@ -3682,8 +3772,13 @@ function renderNotifications() {
 
   const unreadCount = allNotifs.filter(n => !n.read).length;
 
-  if (countBadge) countBadge.textContent = unreadCount;
+  if (countBadge) {
+    countBadge.textContent = unreadCount;
+    countBadge.dataset.count = unreadCount;
+  }
   if (modalBadge) modalBadge.textContent = `${unreadCount} unread`;
+  if (totalPill) totalPill.textContent = allNotifs.length;
+  if (unreadPill) unreadPill.textContent = unreadCount;
 
   const markBtn = $('#markAllReadBtn');
   if (markBtn) {
@@ -3693,21 +3788,25 @@ function renderNotifications() {
 
   if (!listEl) return;
 
-  if (allNotifs.length === 0) {
+  const displayNotifs = activeNotifFilterTab === 'unread' 
+    ? allNotifs.filter(n => !n.read) 
+    : allNotifs;
+
+  if (displayNotifs.length === 0) {
     listEl.innerHTML = `
       <div class="notif-empty-state">
-        <div class="notif-empty-icon">🔔</div>
-        <h4>All caught up!</h4>
-        <p>No new notifications, cashier alerts, or business reminders right now.</p>
+        <div class="notif-empty-icon">${kivuIcon('check')}</div>
+        <h4>${activeNotifFilterTab === 'unread' ? 'All unread cleared!' : 'All caught up!'}</h4>
+        <p>${activeNotifFilterTab === 'unread' ? 'You have no unread notifications right now.' : 'No new notifications, cashier alerts, or business reminders.'}</p>
       </div>
     `;
     return;
   }
 
-  listEl.innerHTML = allNotifs.map(n => `
+  listEl.innerHTML = displayNotifs.map(n => `
     <div class="notif-card ${n.read ? 'read' : 'unread'}" data-notif-id="${n.id}">
       <div class="notif-badge-col">
-        <span class="notif-type-icon ${n.typeClass}">${n.icon}</span>
+        <span class="notif-type-icon ${n.typeClass}">${kivuIcon(n.type, kivuIcon('info'))}</span>
       </div>
       <div class="notif-content-col">
         <div class="notif-top-row">
@@ -3716,13 +3815,18 @@ function renderNotifications() {
         </div>
         <div class="notif-title">${esc(n.title)}</div>
         <div class="notif-message">${esc(n.message)}</div>
-        ${n.actionText ? `
-          <div class="notif-actions">
+        <div class="notif-card-foot">
+          ${n.actionText ? `
             <button type="button" class="notif-action-link" onclick="$('#notificationsModal')?.close();showPage('${n.actionPage}')">
               ${n.actionText}
             </button>
-          </div>
-        ` : ''}
+          ` : '<span></span>'}
+          ${!n.read ? `
+            <button type="button" class="notif-mark-single-btn" onclick="markSingleNotificationRead('${n.id}', event)" title="Mark as read">
+              ${kivuIcon('check')} <span>Mark read</span>
+            </button>
+          ` : ''}
+        </div>
       </div>
       ${!n.read ? '<span class="notif-unread-dot" title="Unread notification"></span>' : ''}
     </div>
@@ -3730,16 +3834,29 @@ function renderNotifications() {
 }
 
 window.markAllNotificationsRead = async function() {
+  const readMap = getReadNotificationsMap();
+  const now = Date.now();
+  const nowIso = new Date().toISOString();
+
   dismissAllAlerts(window._currentDynamicAlertIds || []);
+  (window._currentDynamicAlertIds || []).forEach(id => { readMap[id] = now; });
+
+  (shopNotifications || []).forEach(n => {
+    n.read_at = nowIso;
+    readMap[n.id] = now;
+    readMap['stored_' + n.id] = now;
+  });
+
+  saveReadNotificationsMap(readMap);
+
   if (shop?.id && sb) {
     try {
-      await sb.from('shop_notifications').update({ read_at: new Date().toISOString() }).eq('shop_id', shop.id).is('read_at', null);
+      await sb.from('shop_notifications').update({ read_at: nowIso }).eq('shop_id', shop.id).is('read_at', null);
     } catch (_e) {}
   }
-  (shopNotifications || []).forEach(n => {
-    if (!n.read_at) n.read_at = new Date().toISOString();
-  });
+
   renderNotifications();
+  window.showToast?.('All notifications marked as read', 'info', 'Notifications');
 };
 
 window.renderNotifications = renderNotifications;
@@ -4132,7 +4249,7 @@ async function runOfflineSalesSync(){
 window.addEventListener('online',()=>{updateConnectivityUI();syncOfflineSales().catch(console.warn);});
 window.addEventListener('offline',()=>updateConnectivityUI());
 $('#offlineQueueBtn')?.addEventListener('click',async()=>{const rows=await window.KivuOffline.listSales(shop.id);const errors=rows.filter(x=>x.status==='needs_attention');kivuNotify(rows.length?`${rows.length} offline sale(s) waiting. ${errors.length?errors.length+' need attention because server validation failed. Reconnect and retry after correcting stock/customer data.':'They will sync automatically when online.'}`:'No offline sales waiting.');if(navigator.onLine)syncOfflineSales().catch(console.warn);});
-if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('./sw.js?v=5.3.2',{updateViaCache:'none'}).then(reg=>{reg.update().catch(()=>{});reg.addEventListener('updatefound',()=>{const newWorker=reg.installing;if(!newWorker)return;newWorker.addEventListener('statechange',()=>{if(newWorker.state==='installed'&&navigator.serviceWorker.controller){newWorker.postMessage({type:'SKIP_WAITING'});}});});}).catch(e=>console.warn('Service worker:',e.message));let refreshing=false;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(refreshing)return;refreshing=true;window.location.reload();});});}
+if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('./sw.js?v=5.3.3',{updateViaCache:'none'}).then(reg=>{reg.update().catch(()=>{});reg.addEventListener('updatefound',()=>{const newWorker=reg.installing;if(!newWorker)return;newWorker.addEventListener('statechange',()=>{if(newWorker.state==='installed'&&navigator.serviceWorker.controller){newWorker.postMessage({type:'SKIP_WAITING'});}});});}).catch(e=>console.warn('Service worker:',e.message));let refreshing=false;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(refreshing)return;refreshing=true;window.location.reload();});});}
 
 function findProductByBarcode(code){const clean=String(code||'').trim();return products.find(x=>String(x.barcode||'').trim()===clean);}
 function chooseProductFromBarcode(code,{autoAdd=false,formSelector='#saleForm'}={}){const p=findProductByBarcode(code);if(!p){kivuNotify('No product matches that barcode. Register the barcode in Inventory first.');return null;}const f=$(formSelector);if(f?.elements?.productId){f.elements.productId.value=p.id;if(formSelector==='#saleForm')refreshSaleUnitOptions();if(f.elements.qty)f.elements.qty.value='1';}if(autoAdd)$('#addSaleItemBtn')?.click();return p;}
