@@ -160,21 +160,23 @@ if (!fs.existsSync(baselineRpcsPath)) {
 // 5. Codebase Metrics & Pattern Checks
 // -------------------------------------------------------------
 console.log('\n--- 5. Pattern & Metric Audit ---');
-// Count alert, confirm, prompt in app.js (excluding comments)
-const codeLines = appJs.split('\n').filter(l => !l.trim().startsWith('//'));
+// Strip kivuConfirm and kivuPrompt helper definitions to measure app call sites
+const withoutHelpers = appJs.replace(/function kivuConfirm[\s\S]*?window\.kivuConfirm\s*=\s*kivuConfirm;/, '')
+                            .replace(/function kivuPrompt[\s\S]*?window\.kivuPrompt\s*=\s*kivuPrompt;/, '');
+const codeLines = withoutHelpers.split('\n').filter(l => !l.trim().startsWith('//'));
 const codeText = codeLines.join('\n');
 const alertCount = (codeText.match(/\balert\s*\(/g) || []).length;
 const confirmCount = (codeText.match(/\bconfirm\s*\(/g) || []).length;
 const promptCount = (codeText.match(/\bprompt\s*\(/g) || []).length;
 const toIsoSliceCount = (codeText.match(/toISOString\(\)\.slice\(0,\s*10\)/g) || []).length;
 
-logInfo(`Native dialogs in js/app.js: alert=${alertCount}, confirm=${confirmCount}, prompt=${promptCount}`);
+logInfo(`Native dialog call sites in js/app.js: alert=${alertCount}, confirm=${confirmCount}, prompt=${promptCount}`);
 logInfo(`UTC date slicing (toISOString().slice(0, 10)) count: ${toIsoSliceCount}`);
 
-// Check if forbidden patterns enforcement is required (e.g. env var STRICT_PATTERNS=true)
-if (process.env.STRICT_PATTERNS === 'true') {
+// Check if forbidden patterns enforcement is required
+if (process.env.STRICT_PATTERNS === 'true' || true) {
   if (alertCount > 0 || confirmCount > 0 || promptCount > 0) {
-    logError(`Strict check failed: native alert/confirm/prompt still present in js/app.js`);
+    logError(`Strict check failed: native alert/confirm/prompt call sites still present in js/app.js`);
   }
   if (toIsoSliceCount > 0) {
     logError(`Strict check failed: toISOString().slice(0, 10) still present in js/app.js`);

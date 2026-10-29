@@ -1,5 +1,14 @@
 const cfg=window.KIVU_CONFIG||window.DUKA_CONFIG||{};
-if(!cfg.SUPABASE_URL || !/^https?:\/\//.test(cfg.SUPABASE_URL)) alert('Check js/config.js: SUPABASE_URL must start with https://');
+if(!cfg.SUPABASE_URL || !/^https?:\/\//.test(cfg.SUPABASE_URL)) {
+  console.error('Check js/config.js: SUPABASE_URL must start with https://');
+  window.addEventListener('DOMContentLoaded', () => {
+    const b = document.createElement('div');
+    b.className = 'notice danger';
+    b.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;text-align:center;padding:12px;font-weight:bold;';
+    b.textContent = 'Configuration Error: SUPABASE_URL must start with https:// in js/config.js';
+    document.body?.prepend(b);
+  });
+}
 const sb=window.supabase.createClient(cfg.SUPABASE_URL,cfg.SUPABASE_ANON_KEY);
 
 let session=null,profile=null,shop=null;
@@ -129,6 +138,182 @@ function showToast(msg, type='info', title='', duration=3500){
   if(duration > 0) setTimeout(dismiss, duration);
 }
 window.showToast = showToast;
+
+function kivuNotify(msg, type='info', title='', duration=3500){
+  let t = type;
+  if(t === 'info' && msg){
+    const s = String(msg).toLowerCase();
+    if(s.includes('error') || s.includes('failed') || s.includes('could not') || s.includes('violate')) t = 'error';
+    else if(s.includes('saved') || s.includes('success') || s.includes('restored') || s.includes('created') || s.includes('opened') || s.includes('recorded') || s.includes('imported') || s.includes('approved')) t = 'success';
+    else if(s.includes('enter') || s.includes('valid') || s.includes('required') || s.includes('permission') || s.includes('cannot') || s.includes('warning') || s.includes('empty') || s.includes('not found') || s.includes('must be')) t = 'warning';
+  }
+  const dur = t === 'error' ? 6000 : duration;
+  showToast(msg, t, title, dur);
+  const region = document.getElementById('toastRegion');
+  if(region) region.textContent = `${t.toUpperCase()}: ${msg}`;
+}
+window.kivuNotify = kivuNotify;
+
+let kivuLastActiveElement = null;
+
+function kivuConfirm(msg, { title='Confirm Action', confirmText='Confirm', cancelText='Cancel', danger=false } = {}){
+  return new Promise(resolve => {
+    kivuLastActiveElement = document.activeElement;
+    const dialog = document.getElementById('confirmDialog');
+    if(!dialog){
+      return resolve(window.confirm(msg));
+    }
+    const titleEl = document.getElementById('confirmTitle');
+    const msgEl = document.getElementById('confirmMessage');
+    const okBtn = document.getElementById('confirmOkBtn');
+    const cancelBtn = document.getElementById('confirmCancelBtn');
+
+    if(titleEl) titleEl.textContent = title;
+    if(msgEl) msgEl.textContent = msg;
+    if(okBtn){
+      okBtn.textContent = confirmText;
+      okBtn.className = danger ? 'btn danger' : 'btn primary';
+    }
+    if(cancelBtn) cancelBtn.textContent = cancelText;
+
+    let settled = false;
+    const cleanup = () => {
+      dialog.removeEventListener('close', onClose);
+      if(kivuLastActiveElement && typeof kivuLastActiveElement.focus === 'function'){
+        try{ kivuLastActiveElement.focus(); }catch(_e){}
+      }
+    };
+
+    const onClose = () => {
+      if(!settled){
+        settled = true;
+        cleanup();
+        resolve(false);
+      }
+    };
+
+    okBtn.onclick = () => {
+      if(!settled){
+        settled = true;
+        cleanup();
+        dialog.close();
+        resolve(true);
+      }
+    };
+
+    cancelBtn.onclick = () => {
+      if(!settled){
+        settled = true;
+        cleanup();
+        dialog.close();
+        resolve(false);
+      }
+    };
+
+    dialog.addEventListener('close', onClose, { once: true });
+    dialog.showModal();
+    if(danger && cancelBtn){
+      cancelBtn.focus();
+    } else if(okBtn){
+      okBtn.focus();
+    }
+  });
+}
+window.kivuConfirm = kivuConfirm;
+
+function kivuPrompt(msg, { title='Please enter', defaultValue='', multiline=false, required=false, inputType='text', minLength=0 } = {}){
+  return new Promise(resolve => {
+    kivuLastActiveElement = document.activeElement;
+    const dialog = document.getElementById('promptDialog');
+    if(!dialog){
+      return resolve(window.prompt(msg, defaultValue));
+    }
+    const titleEl = document.getElementById('promptTitle');
+    const msgEl = document.getElementById('promptMessage');
+    const inputEl = document.getElementById('promptInput');
+    const textareaEl = document.getElementById('promptTextarea');
+    const okBtn = document.getElementById('promptOkBtn');
+    const cancelBtn = document.getElementById('promptCancelBtn');
+    const form = document.getElementById('promptForm');
+
+    if(titleEl) titleEl.textContent = title;
+    if(msgEl) msgEl.textContent = msg;
+
+    const activeInput = multiline ? textareaEl : inputEl;
+    if(multiline){
+      inputEl?.classList.add('hidden');
+      textareaEl?.classList.remove('hidden');
+      if(textareaEl) textareaEl.value = defaultValue || '';
+    } else {
+      textareaEl?.classList.add('hidden');
+      inputEl?.classList.remove('hidden');
+      if(inputEl){
+        inputEl.type = inputType || 'text';
+        inputEl.value = defaultValue || '';
+      }
+    }
+
+    let settled = false;
+    const cleanup = () => {
+      dialog.removeEventListener('close', onClose);
+      if(kivuLastActiveElement && typeof kivuLastActiveElement.focus === 'function'){
+        try{ kivuLastActiveElement.focus(); }catch(_e){}
+      }
+    };
+
+    const onClose = () => {
+      if(!settled){
+        settled = true;
+        cleanup();
+        resolve(null);
+      }
+    };
+
+    const submitVal = () => {
+      const val = activeInput?.value ?? '';
+      if(required && !val.trim()){
+        kivuNotify('This field is required.', 'warning');
+        activeInput?.focus();
+        return;
+      }
+      if(minLength && val.length < minLength){
+        kivuNotify(`Must be at least ${minLength} characters.`, 'warning');
+        activeInput?.focus();
+        return;
+      }
+      settled = true;
+      cleanup();
+      dialog.close();
+      resolve(val);
+    };
+
+    if(form){
+      form.onsubmit = (e) => {
+        e.preventDefault();
+        submitVal();
+      };
+    }
+    if(okBtn) okBtn.onclick = (e) => {
+      e.preventDefault();
+      submitVal();
+    };
+
+    if(cancelBtn) cancelBtn.onclick = () => {
+      if(!settled){
+        settled = true;
+        cleanup();
+        dialog.close();
+        resolve(null);
+      }
+    };
+
+    dialog.addEventListener('close', onClose, { once: true });
+    dialog.showModal();
+    activeInput?.focus();
+    activeInput?.select?.();
+  });
+}
+window.kivuPrompt = kivuPrompt;
 
 /* GLOBAL KEYBOARD ACCESSIBILITY & SHORTCUTS (F2, ESC, CTRL+ENTER) */
 window.addEventListener('keydown', e => {
@@ -324,7 +509,7 @@ function showUpgrade(feature,customMessage){
   if(message) message.textContent=customMessage||`This feature is not included in your ${planLabel()} plan. Upgrade to ${pendingUpgradePlan} to use it.`;
   if(button) button.textContent=`View ${pendingUpgradePlan} plan`;
   const dialog=$('#upgradeModal');
-  if(dialog?.showModal) dialog.showModal(); else alert(message?.textContent||customMessage||'Upgrade your plan to use this feature.');
+  if(dialog?.showModal) dialog.showModal(); else kivuNotify(message?.textContent||customMessage||'Upgrade your plan to use this feature.');
 }
 const requireFeature=(feature,message)=>{
   if(hasFeature(feature)) return true;
@@ -419,8 +604,8 @@ $('#forgotPasswordBtn')?.addEventListener('click',async()=>{
 
 sb.auth.onAuthStateChange(async(event,s)=>{
   if(event==='PASSWORD_RECOVERY'){
-    const password=prompt('Enter a new Kivu Solutions password (at least 6 characters):');
-    if(password&&password.length>=6){const {error}=await sb.auth.updateUser({password});alert(error?error.message:'Password changed successfully. You can continue using Kivu Solutions.');}
+    const password=await kivuPrompt('Enter a new Kivu Solutions password (at least 6 characters):',{title:'New Password',inputType:'password',required:true,minLength:6});
+    if(password&&password.length>=6){const {error}=await sb.auth.updateUser({password});kivuNotify(error?error.message:'Password changed successfully. You can continue using Kivu Solutions.');}
   }
 });
 
@@ -462,7 +647,7 @@ async function enter(){
     $('#appShell').classList.remove('hidden');
   }catch(err){
     console.error(err);
-    console.error(err); alert(err.message||'Could not load Kivu Solutions.');
+    console.error(err); kivuNotify(err.message||'Could not load Kivu Solutions.');
     await sb.auth.signOut();
   }
 }
@@ -594,7 +779,7 @@ $('#quickSaleBtn').onclick=()=>{if(!ensureSubscriptionAccess())return;initSaleMo
 function ensureSubscriptionAccess(){
   if(subscriptionAllowsAccess()) return true;
   const status=effectiveSubscriptionStatus();
-  alert(`Your Kivu Solutions subscription is ${status}. Please open Subscription and renew a plan to continue using business features.`);
+  kivuNotify(`Your Kivu Solutions subscription is ${status}. Please open Subscription and renew a plan to continue using business features.`);
   showPage('subscription',true);
   return false;
 }
@@ -765,7 +950,7 @@ function refreshSaleUnitOptions(){
 $('#stockAdjustBtn')?.addEventListener('click',()=>{
   if(!ensureSubscriptionAccess())return;
   if(!requireFeature('controls','Controlled stock adjustments are included in Kivu Control.'))return;
-  if(!can('owner','manager','stock_clerk'))return alert('You do not have permission to adjust stock.');
+  if(!can('owner','manager','stock_clerk'))return kivuNotify('You do not have permission to adjust stock.');
   $('#stockAdjustModal')?.showModal();
 });
 
@@ -781,15 +966,15 @@ window.openVoidSale=id=>{
 window.reviewApproval=async(id,decision)=>{
   if(!can('owner','manager'))return;
   const {error}=await sb.rpc('review_control_request',{p_request_id:id,p_decision:decision});
-  if(error)return alert(error.message);
+  if(error)return kivuNotify(error.message,'error');
   await refresh();
 };
 
 $('#voidSaleForm').onsubmit=async e=>{
   e.preventDefault();const f=new FormData(e.target);
   const {data,error}=await sb.rpc('request_or_void_sale',{p_sale_id:f.get('saleId'),p_reason:(f.get('reason')||'').trim()});
-  if(error)return alert(error.message);
-  alert(data==='voided'?'Sale voided and stock restored.':'Void request sent for approval.');
+  if(error)return kivuNotify(error.message,'error');
+  kivuNotify(data==='voided'?'Sale voided and stock restored.':'Void request sent for approval.');
   e.target.reset();$('#voidSaleModal').close();await refresh();
   window.showToast?.(data==='voided'?'Sale voided & inventory restored.':'Void request queued for approval.', data==='voided'?'warning':'info', 'Void Status');
 };
@@ -797,8 +982,8 @@ $('#voidSaleForm').onsubmit=async e=>{
 $('#stockAdjustForm').onsubmit=async e=>{
   e.preventDefault();const f=new FormData(e.target);
   const {data,error}=await sb.rpc('request_or_adjust_stock',{p_product_id:f.get('productId'),p_qty_delta:+f.get('qtyDelta'),p_reason:(f.get('reasonType')||'Other')+': '+(f.get('note')||'').trim()});
-  if(error)return alert(error.message);
-  alert(data==='applied'?'Stock adjusted and logged.':'Stock adjustment sent for approval.');
+  if(error)return kivuNotify(error.message,'error');
+  kivuNotify(data==='applied'?'Stock adjusted and logged.':'Stock adjustment sent for approval.');
   e.target.reset();$('#stockAdjustModal').close();await refresh();
   window.showToast?.(data==='applied'?'Stock adjustment logged.':'Stock adjustment queued for approval.', data==='applied'?'success':'info', 'Stock Adjustment');
 };
@@ -806,7 +991,7 @@ $('#stockAdjustForm').onsubmit=async e=>{
 /* PRODUCTS + STOCK */
 $('#productForm').onsubmit=async e=>{
   e.preventDefault();
-  if(!can('owner','manager'))return alert('You do not have permission to create products.');
+  if(!can('owner','manager'))return kivuNotify('You do not have permission to create products.');
   const f=new FormData(e.target);
   const bulkPrice=parseMoney(f.get('bulkPrice'))||null;
   const category=(f.get('category')||'').trim()||null;
@@ -830,7 +1015,7 @@ $('#productForm').onsubmit=async e=>{
     const retry=await sb.from('products').insert(p).select('id');
     data=retry.data; error=retry.error;
   }
-  if(error)return alert(error.message);
+  if(error)return kivuNotify(error.message,'error');
   const newId=data?.[0]?.id;
   if(newId && (bulkPrice || category)){
     saveProductMetaSingle(shop.id, newId, { bulk_price: bulkPrice, category });
@@ -842,13 +1027,13 @@ $('#stockForm').onsubmit=async e=>{
   e.preventDefault();
   const f=new FormData(e.target),productId=f.get('productId');
   const {error}=await sb.rpc('receive_stock',{p_product_id:productId,p_qty:+f.get('qty'),p_total_cost:parseMoney(f.get('totalCost'))});
-  if(error)return alert(error.message);
+  if(error)return kivuNotify(error.message,'error');
   e.target.reset();$('#stockModal').close();await refresh();window.showToast?.('Stock inventory replenished.', 'success', 'Stock Received');
 };
 
 window.openEditProduct=function(id){
-  if(!can('owner','manager'))return alert('Only an owner or manager can edit products.');
-  const p=products.find(x=>x.id===id);if(!p)return alert('Product not found.');
+  if(!can('owner','manager'))return kivuNotify('Only an owner or manager can edit products.');
+  const p=products.find(x=>x.id===id);if(!p)return kivuNotify('Product not found.');
   const form=$('#editProductForm');
   form.elements.productId.value=p.id;
   form.elements.name.value=p.name||'';
@@ -873,7 +1058,7 @@ window.openEditProduct=function(id){
 
 $('#editProductForm').onsubmit=async e=>{
   e.preventDefault();
-  if(!can('owner','manager'))return alert('Only an owner or manager can edit products.');
+  if(!can('owner','manager'))return kivuNotify('Only an owner or manager can edit products.');
   if(!ensureSubscriptionAccess())return;
   const f=new FormData(e.target);
   const bulkPrice=parseMoney(f.get('bulkPrice'))||null;
@@ -888,9 +1073,9 @@ $('#editProductForm').onsubmit=async e=>{
     p_base_unit:(f.get('baseUnit')||'Piece').trim(),p_bulk_unit:(f.get('bulkUnit')||'Carton').trim(),p_units_per_bulk:+f.get('unitsPerBulk')||1,
     p_expiry_date:f.get('expiryDate')||null,p_expiry_reminder_days:+f.get('expiryReminderDays')||14
   });
-  if(error)return alert(error.message);
+  if(error)return kivuNotify(error.message,'error');
   const barcodeResult=await sb.rpc('update_product_barcode',{p_product_id:prodId,p_barcode:(f.get('barcode')||'').trim()||null});
-  if(barcodeResult.error)return alert(barcodeResult.error.message);
+  if(barcodeResult.error)return kivuNotify(barcodeResult.error.message);
   $('#editProductModal').close();
   await refresh();
 };
@@ -904,7 +1089,7 @@ function addPurchaseItemRow(){
   row.innerHTML=`<label>Product<div class="barcode-select-row"><select name="purchaseProductId" required></select><button type="button" class="btn secondary barcode-scan-btn scan-purchase-product">📷 Scan</button></div></label><label>Qty bought<input name="purchaseQty" type="number" min="0.001" step="0.001" value="1" required></label><label>Buy as<select name="purchaseUnitMode"><option value="base">Base unit</option><option value="bulk">Bulk unit</option></select></label><label>Cost per selected unit<input name="purchaseUnitCost" type="text" inputmode="decimal" class="money-input" placeholder="0" required></label><label>Expiry date <small>(optional)</small><input name="purchaseExpiryDate" type="date"></label><label>Line total<div class="inline-total"><strong class="purchase-line-total">0 RWF</strong><button type="button" class="btn ghost remove-purchase-item">Remove</button></div></label>`;
   wrap.appendChild(row);
   row.querySelector('.remove-purchase-item').onclick=()=>{if(wrap.children.length>1)row.remove();updatePurchaseTotal();};
-  row.querySelector('.scan-purchase-product')?.addEventListener('click',async()=>{const code=await window.KivuCameraScanner?.open('Scan product to receive');if(!code)return;const p=findProductByBarcode(code);if(!p)return alert('No product matches that barcode. Register the barcode in Inventory first.');const sel=row.querySelector('[name="purchaseProductId"]');sel.value=p.id;sel.dispatchEvent(new Event('change',{bubbles:true}));row.querySelector('[name="purchaseQty"]')?.focus();});
+  row.querySelector('.scan-purchase-product')?.addEventListener('click',async()=>{const code=await window.KivuCameraScanner?.open('Scan product to receive');if(!code)return;const p=findProductByBarcode(code);if(!p)return kivuNotify('No product matches that barcode. Register the barcode in Inventory first.');const sel=row.querySelector('[name="purchaseProductId"]');sel.value=p.id;sel.dispatchEvent(new Event('change',{bubbles:true}));row.querySelector('[name="purchaseQty"]')?.focus();});
   row.querySelectorAll('input,select').forEach(x=>x.addEventListener('input',updatePurchaseTotal));
   row.querySelector('[name="purchaseProductId"]').addEventListener('change',()=>{refreshPurchaseItemOptions();updatePurchaseTotal();});
   refreshPurchaseItemOptions();updatePurchaseTotal();initMoneyInputs(row);
@@ -926,24 +1111,24 @@ function toggleInlineSupplier(){
 $('#purchaseForm select[name="supplierId"]')?.addEventListener('change',toggleInlineSupplier);
 
 $('#supplierForm').onsubmit=async e=>{
-  e.preventDefault();if(!can('owner','manager'))return alert('Only an owner or manager can manage suppliers.');if(!ensureSubscriptionAccess())return;
+  e.preventDefault();if(!can('owner','manager'))return kivuNotify('Only an owner or manager can manage suppliers.');if(!ensureSubscriptionAccess())return;
   const f=new FormData(e.target);
   const {error}=await sb.from('suppliers').insert({shop_id:shop.id,name:(f.get('name')||'').trim(),phone:(f.get('phone')||'').trim()||null,address:(f.get('address')||'').trim()||null,notes:(f.get('notes')||'').trim()||null});
-  if(error)return alert(error.message);await audit('created supplier','supplier',{name:f.get('name')});e.target.reset();$('#supplierModal').close();await refresh();window.showToast?.('Supplier record saved.', 'success', 'Supplier Added');
+  if(error)return kivuNotify(error.message,'error');await audit('created supplier','supplier',{name:f.get('name')});e.target.reset();$('#supplierModal').close();await refresh();window.showToast?.('Supplier record saved.', 'success', 'Supplier Added');
 };
 $('#purchaseForm').onsubmit=async e=>{
-  e.preventDefault();if(!can('owner','manager'))return alert('Only an owner or manager can record supplier purchases.');if(!ensureSubscriptionAccess())return;
+  e.preventDefault();if(!can('owner','manager'))return kivuNotify('Only an owner or manager can record supplier purchases.');if(!ensureSubscriptionAccess())return;
   const f=new FormData(e.target),items=purchaseItemsFromForm(),total=updatePurchaseTotal(),paid=parseMoney(f.get('amountPaid'));
-  if(!items.length||items.some(x=>!x.product_id||x.entered_qty<=0||x.entered_unit_cost<0))return alert('Check every purchase item.');if(total<=0)return alert('Purchase total must be greater than zero.');if(paid<0||paid>total)return alert('Amount paid cannot be greater than the purchase total.');
+  if(!items.length||items.some(x=>!x.product_id||x.entered_qty<=0||x.entered_unit_cost<0))return kivuNotify('Check every purchase item.');if(total<=0)return kivuNotify('Purchase total must be greater than zero.');if(paid<0||paid>total)return kivuNotify('Amount paid cannot be greater than the purchase total.');
   let supplierId=f.get('supplierId');
   if(supplierId==='__new__'){
-    const name=(f.get('newSupplierName')||'').trim();if(!name)return alert('Enter the new supplier name.');
+    const name=(f.get('newSupplierName')||'').trim();if(!name)return kivuNotify('Enter the new supplier name.');
     const ins=await sb.from('suppliers').insert({shop_id:shop.id,name,phone:(f.get('newSupplierPhone')||'').trim()||null,address:(f.get('newSupplierAddress')||'').trim()||null}).select('id').single();
-    if(ins.error)return alert(ins.error.message);supplierId=ins.data.id;
+    if(ins.error)return kivuNotify(ins.error.message);supplierId=ins.data.id;
   }
-  if(!supplierId)return alert('Choose a supplier or add a new supplier.');
+  if(!supplierId)return kivuNotify('Choose a supplier or add a new supplier.');
   const {data,error}=await sb.rpc('record_supplier_purchase_v44',{p_supplier_id:supplierId,p_items:items,p_amount_paid:paid,p_payment_method:f.get('paymentMethod'),p_invoice_no:(f.get('invoiceNo')||'').trim()||null,p_due_date:f.get('dueDate')||null,p_note:(f.get('note')||'').trim()||null});
-  if(error)return alert(error.message);e.target.reset();$('#inlineSupplierFields')?.classList.add('hidden');$('#purchaseItems').innerHTML='';addPurchaseItemRow();$('#purchaseModal').close();await refresh();alert(`Purchase saved. Inventory increased automatically${data?.new_stock_total!==undefined?` by ${data.new_stock_total} base unit(s)`:''}.`);window.showToast?.('Supplier purchase recorded & stock updated.', 'success', 'Stock Received');
+  if(error)return kivuNotify(error.message,'error');e.target.reset();$('#inlineSupplierFields')?.classList.add('hidden');$('#purchaseItems').innerHTML='';addPurchaseItemRow();$('#purchaseModal').close();await refresh();kivuNotify(`Purchase saved. Inventory increased automatically${data?.new_stock_total!==undefined?` by ${data.new_stock_total} base unit(s)`:''}.`);window.showToast?.('Supplier purchase recorded & stock updated.', 'success', 'Stock Received');
 };
 window.openSupplierPayment=id=>{
   const supplier=suppliers.find(x=>x.id===id),balance=supplierBalance(id);if(!supplier||balance<=0)return;const form=$('#supplierPaymentForm');form.reset();form.elements.supplierId.value=id;form.elements.amount.value=formatMoneyString(balance);form.elements.amount.max=String(balance);initMoneyInputs(form);$('#supplierPaymentSummary').innerHTML=`<b>${esc(supplier.name)}</b><br>Outstanding debt: <b>${money(balance)}</b>`;$('#supplierPaymentModal').showModal();
@@ -951,7 +1136,7 @@ window.openSupplierPayment=id=>{
 $('#supplierPaymentForm').onsubmit=async e=>{
   e.preventDefault();if(!can('owner','manager'))return;const f=new FormData(e.target),amount=parseMoney(f.get('amount'));
   const {error}=await sb.rpc('record_supplier_payment',{p_supplier_id:f.get('supplierId'),p_amount:amount,p_payment_method:f.get('paymentMethod'),p_note:(f.get('note')||'').trim()||null});
-  if(error)return alert(error.message);e.target.reset();$('#supplierPaymentModal').close();await refresh();window.showToast?.('Supplier debt payment recorded.', 'success', 'Payment Saved');
+  if(error)return kivuNotify(error.message,'error');e.target.reset();$('#supplierPaymentModal').close();await refresh();window.showToast?.('Supplier debt payment recorded.', 'success', 'Payment Saved');
 };
 
 /* CUSTOMERS + CREDIT */
@@ -960,7 +1145,7 @@ $('#customerForm').onsubmit=async e=>{
   if(!requireFeature('customers','Customers are included in Kivu Lite.'))return;
   const f=new FormData(e.target);
   const {error}=await sb.from('customers').insert({shop_id:shop.id,name:f.get('name'),phone:f.get('phone')||null,email:f.get('email')||null});
-  if(error)return alert(error.message);
+  if(error)return kivuNotify(error.message,'error');
   await audit('created customer','customer',{name:f.get('name')});e.target.reset();$('#customerModal').close();await refresh();window.showToast?.('Customer added to directory.', 'success', 'Customer Saved');
 };
 
@@ -968,9 +1153,9 @@ $('#creditForm').onsubmit=async e=>{
   e.preventDefault();
   if(!requireFeature('credit','Customer credit is included in Kivu Lite.'))return;
   const f=new FormData(e.target),cid=f.get('customerId')||null,name=customerName(cid)||(f.get('customer')||'').trim();
-  if(!name)return alert('Select or enter a customer.');
+  if(!name)return kivuNotify('Select or enter a customer.');
   const creditAmt=parseMoney(f.get('amount')); const {error}=await sb.from('credits').insert({shop_id:shop.id,customer_id:cid,customer:name,amount:creditAmt,due_date:f.get('dueDate')||null,note:f.get('note')||null,paid:false});
-  if(error)return alert(error.message);
+  if(error)return kivuNotify(error.message,'error');
   await audit('added credit','credit',{customer:name,amount:creditAmt});e.target.reset();$('#creditModal').close();await refresh();window.showToast?.('Customer debt recorded.', 'info', 'Credit Recorded');
 };
 /* CUSTOMER AMADENI & CREDIT REPAYMENTS */
@@ -980,7 +1165,7 @@ window.markPaid=id=>{
 
 window.openRepayCredit=function(creditId){
   const cr=credits.find(x=>x.id===creditId);
-  if(!cr)return alert('Credit record not found.');
+  if(!cr)return kivuNotify('Credit record not found.');
   const f=$('#creditRepaymentForm');
   f.elements.creditId.value=cr.id;
   f.elements.customerId.value=cr.customer_id||'';
@@ -993,7 +1178,7 @@ window.openRepayCredit=function(creditId){
 window.openCustomerDebtRepay=function(customerId){
   const c=customers.find(x=>x.id===customerId);
   const openCrs=credits.filter(x=>!x.paid&&(x.customer_id===customerId||(c&&x.customer&&x.customer.toLowerCase()===c.name.toLowerCase())));
-  if(!openCrs.length)return alert(c?`${c.name} has no open debt.`:'No open debt found.');
+  if(!openCrs.length)return kivuNotify(c?`${c.name} has no open debt.`:'No open debt found.');
   const totalDebt=openCrs.reduce((a,x)=>a+Number(x.amount||0),0);
   const f=$('#creditRepaymentForm');
   f.elements.creditId.value=openCrs.length===1?openCrs[0].id:'__all__';
@@ -1008,7 +1193,7 @@ $('#creditRepaymentForm')?.addEventListener('submit',async e=>{
   e.preventDefault();
   const f=new FormData(e.target),creditId=f.get('creditId'),customerId=f.get('customerId');
   const repayAmount=parseMoney(f.get('amount'));
-  if(!repayAmount||repayAmount<=0)return alert('Enter a valid repayment amount.');
+  if(!repayAmount||repayAmount<=0)return kivuNotify('Enter a valid repayment amount.');
   const method=f.get('paymentMethod')||'Cash';
   const note=(f.get('note')||'').trim();
   const now=new Date().toISOString();
@@ -1019,11 +1204,11 @@ $('#creditRepaymentForm')?.addEventListener('submit',async e=>{
     openCrs=credits.filter(x=>!x.paid&&(x.customer_id===customerId||(c&&x.customer&&x.customer.toLowerCase()===c.name.toLowerCase()))).sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));
   } else {
     const cr=credits.find(x=>x.id===creditId);
-    if(!cr)return alert('Credit record not found.');
+    if(!cr)return kivuNotify('Credit record not found.');
     openCrs=[cr];
   }
   const totalDebt=openCrs.reduce((a,x)=>a+Number(x.amount||0),0);
-  if(repayAmount>totalDebt)return alert(`Repayment cannot exceed outstanding balance of ${money(totalDebt)}.`);
+  if(repayAmount>totalDebt)return kivuNotify(`Repayment cannot exceed outstanding balance of ${money(totalDebt)}.`);
 
   let remainingRepay=repayAmount;
   for(const cr of openCrs){
@@ -1034,7 +1219,7 @@ $('#creditRepaymentForm')?.addEventListener('submit',async e=>{
     const isFull=thisRepay>=curBal;
     const patch=isFull?{paid:true,paid_at:now}:{amount:curBal-thisRepay,note:(cr.note?cr.note+' | ':'')+`Repaid ${money(thisRepay)} via ${method} on ${day(now)}`};
     const {error}=await sb.from('credits').update(patch).eq('id',cr.id);
-    if(error)return alert(error.message);
+    if(error)return kivuNotify(error.message,'error');
 
     saveCreditRepayment({
       id:crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random()),
@@ -1046,7 +1231,7 @@ $('#creditRepaymentForm')?.addEventListener('submit',async e=>{
   }
 
   e.target.reset();$('#creditRepaymentModal').close();await refresh();
-  alert(`Repayment of ${money(repayAmount)} recorded successfully.${method==='Cash'&&currentShift?' Cash drawer balance updated.':''}`);
+  kivuNotify(`Repayment of ${money(repayAmount)} recorded successfully.${method==='Cash'&&currentShift?' Cash drawer balance updated.':''}`);
 });
 
 /* CUSTOMER AMADENI LEDGER & WHATSAPP REMINDERS */
@@ -1081,11 +1266,11 @@ function renderCustomerLedgerModal(c){
 window.openCustomerLedger=id=>{const c=customers.find(x=>x.id===id); if(c)renderCustomerLedgerModal(c);};
 window.openCustomerLedgerByName=name=>{const c=customers.find(x=>x.name.toLowerCase()===String(name).toLowerCase())||{id:null,name,phone:''}; renderCustomerLedgerModal(c);};
 
-function sendWhatsappDebtReminderForCustomer(customer,balance){
-  if(!balance||balance<=0)return alert(`${customer.name} has no outstanding debt.`);
+async function sendWhatsappDebtReminderForCustomer(customer,balance){
+  if(!balance||balance<=0)return kivuNotify(`${customer.name} has no outstanding debt.`);
   let phone=customer.phone?normalizeRwPhone(customer.phone).replace(/\D/g,''):'';
   if(!phone){
-    const promptPhone=prompt(`Enter WhatsApp phone number for ${customer.name}:`,'0788...');
+    const promptPhone=await kivuPrompt(`Enter WhatsApp phone number for ${customer.name}:`,{title:'WhatsApp Number',defaultValue:'0788...'});
     if(!promptPhone)return;
     phone=normalizeRwPhone(promptPhone).replace(/\D/g,'');
     if(customer.id&&phone){
@@ -1095,7 +1280,7 @@ function sendWhatsappDebtReminderForCustomer(customer,balance){
   const msg=`Muraho ${customer.name},\nTubibukije ko mufite umwenda wa ${money(balance)} muri ${shop.name}.\nMurakoze cyane!\n\nDear ${customer.name},\nThis is a polite reminder of your outstanding balance of ${money(balance)} at ${shop.name}.\nThank you!`;
   window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`,'_blank');
 }
-window.sendWhatsappDebtReminder=id=>{const c=customers.find(x=>x.id===id); if(!c)return; const debt=credits.filter(x=>!x.paid&&(x.customer_id===c.id||(x.customer&&x.customer.toLowerCase()===c.name.toLowerCase()))).reduce((a,x)=>a+Number(x.amount||0),0); sendWhatsappDebtReminderForCustomer(c,debt);};
+window.sendWhatsappDebtReminder=async id=>{const c=customers.find(x=>x.id===id); if(!c)return; const debt=credits.filter(x=>!x.paid&&(x.customer_id===c.id||(x.customer&&x.customer.toLowerCase()===c.name.toLowerCase()))).reduce((a,x)=>a+Number(x.amount||0),0); sendWhatsappDebtReminderForCustomer(c,debt);};
 window.sendWhatsappDebtReminderByName=name=>{const clean=String(name||'').trim(); const c=customers.find(x=>x.name.toLowerCase()===clean.toLowerCase())||{id:null,name:clean,phone:''}; const debt=credits.filter(x=>!x.paid&&((c.id&&x.customer_id===c.id)||(x.customer&&x.customer.toLowerCase()===clean.toLowerCase()))).reduce((a,x)=>a+Number(x.amount||0),0); sendWhatsappDebtReminderForCustomer(c,debt);};
 window.sendWhatsappReminderForCredit=id=>{const cr=credits.find(x=>x.id===id); if(!cr)return; const c=customers.find(x=>x.id===cr.customer_id||(x.name&&x.name.toLowerCase()===cr.customer.toLowerCase()))||{name:cr.customer,phone:''}; sendWhatsappDebtReminderForCustomer(c,Number(cr.amount||0));};
 
@@ -1149,7 +1334,7 @@ window.updateSaleCartQty=function(i,delta){
   const ratio=item.unit_mode==='bulk'?unitsPerBulk(p):1;
   const otherLinesBase=saleCart.filter((x,idx)=>idx!==i&&x.product_id===item.product_id).reduce((a,x)=>a+Number(x.entered_qty)*(x.unit_mode==='bulk'?unitsPerBulk(p):1),0);
   if((newQty*ratio)+otherLinesBase > Number(p.qty||0)){
-    return alert(`Not enough stock. Maximum available: ${p.qty} ${baseUnitLabel(p)}.`);
+    return kivuNotify(`Not enough stock. Maximum available: ${p.qty} ${baseUnitLabel(p)}.`);
   }
   item.entered_qty=newQty;
   renderSaleCart(); renderSaleQuickResults();
@@ -1167,7 +1352,7 @@ window.setSaleCartQty=function(i,val){
   const ratio=item.unit_mode==='bulk'?unitsPerBulk(p):1;
   const otherLinesBase=saleCart.filter((x,idx)=>idx!==i&&x.product_id===item.product_id).reduce((a,x)=>a+Number(x.entered_qty)*(x.unit_mode==='bulk'?unitsPerBulk(p):1),0);
   if((newQty*ratio)+otherLinesBase > Number(p.qty||0)){
-    alert(`Not enough stock. Maximum available: ${p.qty} ${baseUnitLabel(p)}.`);
+    kivuNotify(`Not enough stock. Maximum available: ${p.qty} ${baseUnitLabel(p)}.`);
     renderSaleCart();
     return;
   }
@@ -1199,7 +1384,7 @@ window.toggleCartItemUnit=function(i){
   const newRatio=newMode==='bulk'?ratio:1;
   const otherLinesBase=saleCart.filter((x,idx)=>idx!==i&&x.product_id===item.product_id).reduce((a,x)=>a+Number(x.entered_qty)*(x.unit_mode==='bulk'?ratio:1),0);
   if((newQty*newRatio)+otherLinesBase>Number(p.qty||0)){
-    return alert(`Not enough stock. Available: ${p.qty} ${baseUnitLabel(p)}.`);
+    return kivuNotify(`Not enough stock. Available: ${p.qty} ${baseUnitLabel(p)}.`);
   }
   item.entered_qty=newQty;
   item.unit_mode=newMode;
@@ -1243,9 +1428,9 @@ function renderSaleQuickResults(){
 
 window.quickAddProductToCart=function(productId){
   const p=products.find(x=>x.id===productId); if(!p)return;
-  if(Number(p.qty)<=0)return alert(`${p.name} is out of stock.`);
+  if(Number(p.qty)<=0)return kivuNotify(`${p.name} is out of stock.`);
   const alreadyBase=saleCart.filter(x=>x.product_id===productId).reduce((a,x)=>a+Number(x.entered_qty)*(x.unit_mode==='bulk'?unitsPerBulk(p):1),0);
-  if(alreadyBase+1>Number(p.qty))return alert(`Not enough stock. Available: ${p.qty} ${baseUnitLabel(p)}.`);
+  if(alreadyBase+1>Number(p.qty))return kivuNotify(`Not enough stock. Available: ${p.qty} ${baseUnitLabel(p)}.`);
   const existing=saleCart.find(x=>x.product_id===productId&&x.unit_mode==='base');
   if(existing) existing.entered_qty+=1;
   else saleCart.push({product_id:productId,entered_qty:1,unit_mode:'base'});
@@ -1369,18 +1554,18 @@ $('#saleForm input[name="discount"]')?.addEventListener('input',renderSaleCart);
 
 $('#addSaleItemBtn')?.addEventListener('click',()=>{
   const f=$('#saleForm'),pid=f.elements.productId.value,qty=Number(f.elements.qty.value),mode=f.elements.saleUnit.value||'base',p=products.find(x=>x.id===pid);
-  if(!p)return alert('Select a product.'); if(!qty||qty<=0)return alert('Enter a quantity greater than zero.');
+  if(!p)return kivuNotify('Select a product.'); if(!qty||qty<=0)return kivuNotify('Enter a quantity greater than zero.');
   const ratio=mode==='bulk'?unitsPerBulk(p):1,baseQty=qty*ratio;
   const already=saleCart.filter(x=>x.product_id===pid).reduce((a,x)=>a+Number(x.entered_qty)*(x.unit_mode==='bulk'?unitsPerBulk(p):1),0);
-  if(baseQty+already>Number(p.qty||0))return alert(`Not enough stock. Available: ${p.qty} ${p.base_unit||'unit(s)'}.`);
+  if(baseQty+already>Number(p.qty||0))return kivuNotify(`Not enough stock. Available: ${p.qty} ${p.base_unit||'unit(s)'}.`);
   const same=saleCart.find(x=>x.product_id===pid&&x.unit_mode===mode); if(same)same.entered_qty+=qty; else saleCart.push({product_id:pid,entered_qty:qty,unit_mode:mode});
   f.elements.qty.value='1';renderSaleCart();
 });
 
 /* PARK / HOLD CART */
-$('#parkCartBtn')?.addEventListener('click',()=>{
-  if(!saleCart.length)return alert('Cart is empty. Add products before holding.');
-  const notePrompt=prompt('Enter a note or customer name for this held cart (e.g. "Customer getting cash"):','Customer waiting');
+$('#parkCartBtn')?.addEventListener('click',async()=>{
+  if(!saleCart.length)return showToast('Cart is empty. Add products before holding.','warning');
+  const notePrompt=await kivuPrompt('Enter a note or customer name for this held cart (e.g. "Customer getting cash"):',{title:'Hold Cart',defaultValue:'Customer waiting'});
   if(notePrompt===null) return;
   const note=notePrompt.trim()||'Held cart';
   const f=$('#saleForm');
@@ -1394,7 +1579,7 @@ $('#parkCartBtn')?.addEventListener('click',()=>{
   const list=getHeldCarts(); list.unshift(held); saveHeldCarts(list);
   resetSaleCart(); if(f) f.reset();
   initSaleModal();
-  alert('Cart held safely. You can now serve the next customer.');
+  kivuNotify('Cart held safely. You can now serve the next customer.');
   window.showToast?.('Cart held safely. Ready for next transaction.', 'info', 'Cart Parked');
 });
 $('#viewParkedCartsBtn')?.addEventListener('click',()=>{renderParkedCartsModal();$('#parkedCartsModal').showModal();});
@@ -1405,11 +1590,11 @@ function renderParkedCartsModal(){
     <div class="parked-cart-item"><div><b>${esc(c.note)}</b><small>${fmt(c.savedAt)} · ${c.items.length} item(s)</small><strong>${money(c.total)}</strong></div><div class="parked-cart-actions"><button type="button" class="btn primary" onclick="resumeParkedCart('${c.id}')">Resume</button><button type="button" class="btn danger" onclick="discardParkedCart('${c.id}')">Discard</button></div></div>
   `).join(''):'<div class="notice mini">No held carts currently.</div>';
 }
-window.resumeParkedCart=function(id){
-  const list=getHeldCarts(),c=list.find(x=>x.id===id); if(!c)return alert('Held cart not found.');
-  if(saleCart.length>0&&!confirm('Active cart has items. Replace active cart with held cart?'))return;
+window.resumeParkedCart=async function(id){
+  const list=getHeldCarts(),c=list.find(x=>x.id===id); if(!c)return kivuNotify('Held cart not found.');
+  if(saleCart.length>0&&!(await kivuConfirm('Active cart has items. Replace active cart with held cart?',{danger:true})))return;
   const validItems=c.items.filter(it=>products.some(p=>p.id===it.product_id));
-  if(!validItems.length) return alert('Cannot resume cart: products in this held cart no longer exist in inventory.');
+  if(!validItems.length) return kivuNotify('Cannot resume cart: products in this held cart no longer exist in inventory.');
   saleCart=JSON.parse(JSON.stringify(validItems));
   const f=$('#saleForm');
   if(f){
@@ -1425,8 +1610,8 @@ window.resumeParkedCart=function(id){
   updateTenderedCalculator();
   window.showToast?.('Held cart restored to counter checkout.', 'info', 'Cart Resumed');
 };
-window.discardParkedCart=function(id){
-  if(!confirm('Discard this held cart?'))return;
+window.discardParkedCart=async function(id){
+  if(!(await kivuConfirm('Discard this held cart?',{danger:true})))return;
   const list=getHeldCarts(); saveHeldCarts(list.filter(x=>x.id!==id)); renderParkedCartsModal();
 };
 
@@ -1435,9 +1620,9 @@ let isSubmittingSale=false;
 $('#saleForm').onsubmit=async e=>{
   e.preventDefault();
   if(isSubmittingSale) return;
-  if(!saleCart.length)return alert('Add at least one product to the cart.');
+  if(!saleCart.length)return kivuNotify('Add at least one product to the cart.');
   const f=new FormData(e.target),cid=f.get('customerId')||null,name=customerName(cid)||(f.get('customerName')||'').trim()||null,rawPayment=f.get('payment'),discount=parseMoney(f.get('discount'));
-  if(rawPayment==='Credit'&&!cid&&!name)return alert('Select or enter a customer for a credit sale.');
+  if(rawPayment==='Credit'&&!cid&&!name)return kivuNotify('Select or enter a customer for a credit sale.');
 
   const subtotal=saleCart.reduce((a,x)=>a+saleLinePreview(x),0);
   const total=Math.max(0,subtotal-discount);
@@ -1448,7 +1633,7 @@ $('#saleForm').onsubmit=async e=>{
     const sm=Math.max(0,parseMoney($('#splitMomoInput')?.value||0));
     const sbk=Math.max(0,parseMoney($('#splitBankInput')?.value||0));
     if(Math.round(sc+sm+sbk)!==Math.round(total)){
-      return alert(`Split payment amounts (${money(sc+sm+sbk)}) do not match total to pay (${money(total)}). Please adjust.`);
+      return kivuNotify(`Split payment amounts (${money(sc+sm+sbk)}) do not match total to pay (${money(total)}). Please adjust.`);
     }
     splitDetails={cash:sc,momo:sm,bank:sbk};
     paymentStr=`Split (Cash ${sc}, MoMo ${sm}${sbk?`, Bank ${sbk}`:''})`;
@@ -1457,7 +1642,7 @@ $('#saleForm').onsubmit=async e=>{
   const tendered=parseMoney($('#amountTenderedInput')?.value||0);
   const cashTarget=rawPayment==='Split'?(splitDetails?.cash||0):(rawPayment==='Cash'?total:0);
   if(cashTarget>0&&tendered>0&&tendered<cashTarget){
-    if(!confirm(`Tendered cash (${money(tendered)}) is less than cash due (${money(cashTarget)}). Continue anyway?`))return;
+    if(!(await kivuConfirm(`Tendered cash (${money(tendered)}) is less than cash due (${money(cashTarget)}). Continue anyway?`,{confirmText:'Continue',danger:false})))return;
   }
   let currentSaleTendered=null;
   if(tendered>0&&cashTarget>0){
@@ -1483,13 +1668,13 @@ $('#saleForm').onsubmit=async e=>{
     const payload={items:payloadItems,payment:paymentStr,discount,customer_id:cid,customer_name:name,client_ref:clientRef};
 
     if(!navigator.onLine){
-      if(!window.KivuOffline)return alert('Offline queue is not available. Reconnect before recording this sale.');
+      if(!window.KivuOffline)return kivuNotify('Offline queue is not available. Reconnect before recording this sale.');
       await window.KivuOffline.enqueueSale({shop_id:shop.id,user_id:session.user.id,...payload});
       applyOfflineStockDraft(payload.items);
       if(splitDetails) saveSplitPaymentDetails(clientRef, splitDetails);
       if(currentSaleTendered) saveReceiptTendered(clientRef, currentSaleTendered);
       e.target.reset();resetSaleCart();$('#saleCustomerWrap').classList.add('hidden');$('#saleModal').close();saveOfflineSnapshot();await updateConnectivityUI();
-      alert('Sale saved safely on this device. It will sync when internet returns.');
+      kivuNotify('Sale saved safely on this device. It will sync when internet returns.');
       return;
     }
 
@@ -1499,13 +1684,13 @@ $('#saleForm').onsubmit=async e=>{
       const retry=await sb.rpc('record_sale_cart_v48',{p_items:payload.items,p_payment:fallback,p_discount:discount,p_customer_id:cid,p_customer_name:name,p_client_ref:payload.client_ref});
       if(!retry.error){receiptNo=retry.data; error=null;}
     }
-    if(error)return alert(error.message);
+    if(error)return kivuNotify(error.message,'error');
 
     if(splitDetails) saveSplitPaymentDetails(receiptNo, splitDetails);
     if(currentSaleTendered) saveReceiptTendered(receiptNo, currentSaleTendered);
 
     const {data:lines,error:se}=await sb.from('sales').select('*').eq('shop_id',shop.id).eq('receipt_no',receiptNo).order('created_at',{ascending:true});
-    if(se)return alert(se.message);
+    if(se)return kivuNotify(se.message);
     e.target.reset();resetSaleCart();$('#saleCustomerWrap').classList.add('hidden');$('#saleModal').close();await refresh();showReceiptGroup(lines||[], currentSaleTendered);window.showToast?.('Sale recorded successfully. Receipt issued.', 'success', 'Transaction Complete');
   } finally {
     isSubmittingSale=false;
@@ -1516,24 +1701,24 @@ $('#saleForm').onsubmit=async e=>{
 /* EXPENSES & PETTY CASH */
 $('#expenseForm').onsubmit=async e=>{
   e.preventDefault();
-  if(!can('owner','manager'))return alert('Only an owner or manager can record expenses.');
+  if(!can('owner','manager'))return kivuNotify('Only an owner or manager can record expenses.');
   if(!ensureSubscriptionAccess())return;
   const f=new FormData(e.target);
   const {data:expenseId,error}=await sb.rpc('record_expense',{p_description:(f.get('description')||'').trim(),p_amount:parseMoney(f.get('amount')),p_category:f.get('category')||'Other'});
-  if(error)return alert(error.message);
+  if(error)return kivuNotify(error.message,'error');
   e.target.reset();$('#expenseModal').close();await refresh();window.showToast?.('Operating expense recorded.', 'success', 'Expense Logged');
 };
 
 $('#pettyCashBtn')?.addEventListener('click',()=>{
-  if(!currentShift)return alert('You must have an open shift to log a petty cash drawer payout.');
+  if(!currentShift)return kivuNotify('You must have an open shift to log a petty cash drawer payout.');
   $('#pettyCashModal').showModal();
 });
 $('#pettyCashForm')?.addEventListener('submit',async e=>{
   e.preventDefault();
-  if(!currentShift)return alert('No open shift found.');
+  if(!currentShift)return kivuNotify('No open shift found.');
   const f=new FormData(e.target),amt=parseMoney(f.get('amount'));
-  if(!amt||amt<=0)return alert('Enter a valid amount.');
-  if(amt>5000)return alert('Petty cash payouts from the drawer must be under 5,000 RWF. Larger expenses require owner/manager recording.');
+  if(!amt||amt<=0)return kivuNotify('Enter a valid amount.');
+  if(amt>5000)return kivuNotify('Petty cash payouts from the drawer must be under 5,000 RWF. Larger expenses require owner/manager recording.');
   const reason=(f.get('description')||'').trim(),cat=f.get('category')||'Supplies',paidTo=(f.get('paidTo')||'').trim();
   const desc=`Petty cash payout: ${reason}${paidTo?` (Paid to: ${paidTo})`:''}`;
 
@@ -1550,34 +1735,34 @@ $('#pettyCashForm')?.addEventListener('submit',async e=>{
 
   await audit('logged petty cash payout','shift',{shift_id:currentShift.id,amount:amt,reason});
   e.target.reset();$('#pettyCashModal').close();await refresh();
-  alert(`Petty cash payout of ${money(amt)} recorded and deducted from cash drawer.`);
+  kivuNotify(`Petty cash payout of ${money(amt)} recorded and deducted from cash drawer.`);
   window.showToast?.('Petty cash drawer payout recorded.', 'warning', 'Petty Cash Payout');
 });
 
 /* STAFF INVITES */
 $('#staffInviteForm').onsubmit=async e=>{
   e.preventDefault();
-  if(profile.role!=='owner')return alert('Only the owner can invite staff.');
+  if(profile.role!=='owner')return kivuNotify('Only the owner can invite staff.');
   if(!requireFeature('employees','Staff accounts are included from Kivu Business.'))return;
   const f=new FormData(e.target);
   const phone=normalizeRwPhone(f.get('phone'));
-  if(!/^\+2507\d{8}$/.test(phone))return alert('Enter a valid Rwanda phone number, for example 0788 123 456.');
+  if(!/^\+2507\d{8}$/.test(phone))return kivuNotify('Enter a valid Rwanda phone number, for example 0788 123 456.');
   const {data:code,error}=await sb.rpc('create_staff_invite',{p_employee_name:f.get('name'),p_phone:phone,p_role:f.get('role')});
-  if(error)return alert(error.message);
+  if(error)return kivuNotify(error.message,'error');
   e.target.reset();$('#staffInviteModal').close();await refresh();
-  alert(`Staff invite created.\n\nInvite code: ${code}\nPhone: ${phone}\n\nThe employee should choose Join as staff, enter this code and phone number, then create a 6-digit PIN. The invite expires in 14 days.`);
+  kivuNotify(`Staff invite created.\n\nInvite code: ${code}\nPhone: ${phone}\n\nThe employee should choose Join as staff, enter this code and phone number, then create a 6-digit PIN. The invite expires in 14 days.`);
   window.showToast?.('Staff invite code generated.', 'success', 'Invite Created');
 };
 
 /* SHIFTS & RECONCILIATION */
-$('#openShiftBtn').onclick=()=>{if(!requireFeature('shifts','Shift management is included from Kivu Business.'))return;currentShift?alert('You already have an open shift.'):$('#openShiftModal').showModal()};
+$('#openShiftBtn').onclick=()=>{if(!requireFeature('shifts','Shift management is included from Kivu Business.'))return;currentShift?kivuNotify('You already have an open shift.'):$('#openShiftModal').showModal()};
 $('#openShiftForm').onsubmit=async e=>{
   e.preventDefault();
-  if(!can('owner','manager','cashier'))return alert('Your role does not use cash shifts.');
+  if(!can('owner','manager','cashier'))return kivuNotify('Your role does not use cash shifts.');
   if(!requireFeature('shifts','Shift management is included from Kivu Business.'))return;
   const f=new FormData(e.target);
   const openingAmt=parseMoney(f.get('openingCash')); const {error}=await sb.from('shifts').insert({shop_id:shop.id,user_id:session.user.id,employee_name:profile.full_name||roleLabel(profile.role),opening_cash:openingAmt,status:'open'});
-  if(error)return alert(error.message);
+  if(error)return kivuNotify(error.message,'error');
   await audit('opened shift','shift',{opening_cash:openingAmt});e.target.reset();$('#openShiftModal').close();await refresh();window.showToast?.('Register shift opened. Opening float recorded.', 'success', 'Shift Opened');
 };
 
@@ -1662,10 +1847,10 @@ $('#closeShiftForm').onsubmit=async e=>{
   e.preventDefault();if(!currentShift)return;
   const f=new FormData(e.target),c=calcShift(currentShift),actual=parseMoney(f.get('actualCash'));
   const diff=actual-c.expected,reason=(f.get('varianceReason')||'').trim();
-  if(Math.abs(diff)>0.001&&!reason)return alert('Enter a reason for the cash difference before closing the shift.');
+  if(Math.abs(diff)>0.001&&!reason)return kivuNotify('Enter a reason for the cash difference before closing the shift.');
   const closedId=currentShift.id;
   const {error}=await sb.rpc('close_shift_controlled',{p_shift_id:closedId,p_actual_cash:actual,p_variance_reason:reason||null});
-  if(error)return alert(error.message);
+  if(error)return kivuNotify(error.message,'error');
   try{ await sb.from('shifts').update({expected_cash:c.expected, difference:diff, actual_cash:actual}).eq('id',closedId); }catch(_e){}
   e.target.reset();$('#closeShiftModal').close();await refresh();
   openShiftZReport(closedId);
@@ -1675,7 +1860,7 @@ $('#closeShiftForm').onsubmit=async e=>{
 /* PRINTABLE 80MM SHIFT Z-REPORT */
 window.openShiftZReport=function(shiftId){
   const s=shifts.find(x=>x.id===shiftId)||currentShift;
-  if(!s)return alert('Shift not found.');
+  if(!s)return kivuNotify('Shift not found.');
   const c=calcShift(s);
   const diff=s.actual_cash!=null ? (Number(s.actual_cash) - c.expected) : (s.difference!=null ? Number(s.difference) : null);
   const varianceStatus=diff==null?'PENDING COUNT':diff===0?'BALANCED (0 RWF)':diff>0?`OVERAGE (+${money(diff)})`:`SHORTAGE (${money(diff)})`;
@@ -1735,7 +1920,7 @@ window.openShiftZReport=function(shiftId){
   `;
   $('#zReportModal').showModal();
 };
-$('#printCurrentShiftZBtn')?.addEventListener('click',()=>{if(!currentShift)return alert('No shift open.');openShiftZReport(currentShift.id);});
+$('#printCurrentShiftZBtn')?.addEventListener('click',()=>{if(!currentShift)return kivuNotify('No shift open.');openShiftZReport(currentShift.id);});
 $('#printZReportBtn')?.addEventListener('click',()=>window.print());
 
 /* RECEIPTS */
@@ -1769,13 +1954,13 @@ $('#printReceiptBtn').onclick=()=>window.print();
 
 /* OWNER SETTINGS + PLAN TESTING */
 $$('.plan-btn').forEach(b=>b.onclick=async()=>{
-  if(profile.role!=='owner')return alert('Only the owner can request a plan change.');
+  if(profile.role!=='owner')return kivuNotify('Only the owner can request a plan change.');
   const plan=b.dataset.plan,selected=PLAN_CONFIG[plan];if(!selected)return;
   if(plan===(shop.plan||'basic')&&subscriptionAllowsAccess())return;
-  if(!confirm(`Request ${selected.label}${selected.oneTime?` for ${money(selected.price)} one time`:` at ${money(selected.price)}/month`}? Your current plan stays unchanged until Platinum Tech confirms payment and activation.`))return;
+  if(!(await kivuConfirm(`Request ${selected.label}${selected.oneTime?` for ${money(selected.price)} one time`:` at ${money(selected.price)}/month`}? Your current plan stays unchanged until Platinum Tech confirms payment and activation.`,{title:'Request Plan',confirmText:'Request'})))return;
   const {error}=await sb.rpc('request_plan_change',{p_plan:plan});
-  if(error)return alert(error.message);
-  alert('Plan request sent to Platinum Tech. Your current access remains unchanged until activation is confirmed.');
+  if(error)return kivuNotify(error.message,'error');
+  kivuNotify('Plan request sent to Platinum Tech. Your current access remains unchanged until activation is confirmed.');
 });
 
 async function setTestSubscriptionStatus(status){
@@ -1786,17 +1971,17 @@ async function setTestSubscriptionStatus(status){
   if(status==='grace'){const period=new Date(now),grace=new Date(now);period.setDate(period.getDate()-1);grace.setDate(grace.getDate()+SUBSCRIPTION_GRACE_DAYS);Object.assign(patch,{current_period_end:period.toISOString(),grace_ends_at:grace.toISOString(),cancelled_at:null});}
   if(status==='expired'){const past=new Date(now);past.setDate(past.getDate()-1);Object.assign(patch,{current_period_end:past.toISOString(),grace_ends_at:past.toISOString()});}
   if(status==='cancelled')patch.cancelled_at=now.toISOString();
-  const {error}=await sb.from('shops').update(patch).eq('id',shop.id);if(error)return alert(error.message);
+  const {error}=await sb.from('shops').update(patch).eq('id',shop.id);if(error)return kivuNotify(error.message,'error');
   Object.assign(shop,patch);await audit('changed subscription status','subscription',{status});await load();render();
 }
 // Production build: subscription lifecycle test controls are intentionally disabled.
 
 $('#settingsForm').onsubmit=async e=>{
-  e.preventDefault();if(profile.role!=='owner')return alert('Only the owner can change business settings.');
+  e.preventDefault();if(profile.role!=='owner')return kivuNotify('Only the owner can change business settings.');
   const p={name:$('#settingsBusinessName').value,phone:$('#settingsPhone').value||null,receipt_footer:$('#settingsReceiptFooter').value||null,business_type:$('#settingsBusinessType')?.value||'retail',ebm_enabled:false};
-  const {error}=await sb.rpc('update_shop_settings_v486',{p_name:p.name,p_phone:p.phone,p_receipt_footer:p.receipt_footer,p_business_type:p.business_type});if(error)return alert(error.message);
-  const tax=await sb.rpc('update_shop_tax_settings',{p_tax_rate:Number($('#settingsTaxRate')?.value||0),p_tax_label:$('#settingsTaxLabel')?.value||'VAT',p_tax_number:$('#settingsTaxNumber')?.value||null});if(tax.error)return alert(tax.error.message);
-  Object.assign(shop,p,{tax_rate:Number($('#settingsTaxRate')?.value||0),tax_label:$('#settingsTaxLabel')?.value||'VAT',tax_number:$('#settingsTaxNumber')?.value||null});await audit('updated settings','settings',{business_type:p.business_type,tax_rate:shop.tax_rate});render();alert('Settings saved.');window.showToast?.('Business settings updated successfully.', 'success', 'Settings Saved');
+  const {error}=await sb.rpc('update_shop_settings_v486',{p_name:p.name,p_phone:p.phone,p_receipt_footer:p.receipt_footer,p_business_type:p.business_type});if(error)return kivuNotify(error.message,'error');
+  const tax=await sb.rpc('update_shop_tax_settings',{p_tax_rate:Number($('#settingsTaxRate')?.value||0),p_tax_label:$('#settingsTaxLabel')?.value||'VAT',p_tax_number:$('#settingsTaxNumber')?.value||null});if(tax.error)return kivuNotify(tax.error.message);
+  Object.assign(shop,p,{tax_rate:Number($('#settingsTaxRate')?.value||0),tax_label:$('#settingsTaxLabel')?.value||'VAT',tax_number:$('#settingsTaxNumber')?.value||null});await audit('updated settings','settings',{business_type:p.business_type,tax_rate:shop.tax_rate});render();kivuNotify('Settings saved.');window.showToast?.('Business settings updated successfully.', 'success', 'Settings Saved');
 };
 if($('#ebmEnabled')){$('#ebmEnabled').checked=false;$('#ebmEnabled').disabled=true;}
 $('#reportPeriod').onchange=renderReports;
@@ -2271,12 +2456,12 @@ function renderDashboard(){
 }
 window.openDrawerPettyCash=function(){
   const activeShift=currentShift||shifts.find(x=>x.status==='open');
-  if(!activeShift) return alert('An active open shift is required to record a drawer petty cash payout.');
+  if(!activeShift) return kivuNotify('An active open shift is required to record a drawer petty cash payout.');
   $('#pettyCashModal')?.showModal();
 };
 window.openQuickAddStock=function(productId){
   if(!ensureSubscriptionAccess())return;
-  if(!can('owner','manager','stock_clerk')) return alert('You do not have permission to add stock.');
+  if(!can('owner','manager','stock_clerk')) return kivuNotify('You do not have permission to add stock.');
   const modal=$('#stockModal');
   if(!modal)return;
   const sel=modal.querySelector('select[name="productId"]');
@@ -2406,7 +2591,7 @@ window.setSalesDateFilter = function(filter){
 };
 
 window.exportSalesCsv = function(){
-  if(!sales || !sales.length) return alert('No sales data to export.');
+  if(!sales || !sales.length) return kivuNotify('No sales data to export.');
   const headers = ['Receipt No', 'Date', 'Time', 'Product', 'Quantity', 'Unit', 'Payment Method', 'Customer', 'Cashier', 'Total (RWF)', 'Status'];
   const rows = sales.map(s => {
     const d = new Date(s.created_at);
@@ -2762,11 +2947,11 @@ window.openEditCustomer=function(id){
 $('#editCustomerForm')?.addEventListener('submit',async e=>{
   e.preventDefault(); const f=new FormData(e.target);
   const {error}=await sb.rpc('update_customer_details',{p_customer_id:f.get('id'),p_name:(f.get('name')||'').trim(),p_phone:(f.get('phone')||'').trim()||null,p_email:(f.get('email')||'').trim()||null});
-  if(error)return alert(error.message); $('#editCustomerModal').close(); await refresh();
+  if(error)return kivuNotify(error.message,'error'); $('#editCustomerModal').close(); await refresh();
 });
 window.removeCustomer=async function(id){
-  const c=customers.find(x=>x.id===id); if(!c||!confirm(`Delete ${c.name}? If it has transaction history Kivu Solutions will archive it instead.`))return;
-  const {data,error}=await sb.rpc('remove_customer_safe',{p_customer_id:id}); if(error)return alert(error.message); alert(data==='archived'?'Customer archived because financial history exists.':'Customer deleted.'); await refresh();
+  const c=customers.find(x=>x.id===id); if(!c||!(await kivuConfirm(`Delete ${c.name}? If it has transaction history Kivu Solutions will archive it instead.`,{danger:true})))return;
+  const {data,error}=await sb.rpc('remove_customer_safe',{p_customer_id:id}); if(error)return kivuNotify(error.message,'error'); kivuNotify(data==='archived'?'Customer archived because financial history exists.':'Customer deleted.'); await refresh();
 };
 window.openEditSupplier=function(id){
   if(!can('owner','manager'))return;
@@ -2776,11 +2961,11 @@ window.openEditSupplier=function(id){
 $('#editSupplierForm')?.addEventListener('submit',async e=>{
   e.preventDefault(); const f=new FormData(e.target);
   const {error}=await sb.rpc('update_supplier_details',{p_supplier_id:f.get('id'),p_name:(f.get('name')||'').trim(),p_phone:(f.get('phone')||'').trim()||null,p_address:(f.get('address')||'').trim()||null,p_notes:(f.get('notes')||'').trim()||null});
-  if(error)return alert(error.message); $('#editSupplierModal').close(); await refresh();
+  if(error)return kivuNotify(error.message,'error'); $('#editSupplierModal').close(); await refresh();
 });
 window.removeSupplier=async function(id){
-  const s=suppliers.find(x=>x.id===id); if(!s||!confirm(`Delete ${s.name}? If purchase history exists Kivu Solutions will archive it instead.`))return;
-  const {data,error}=await sb.rpc('remove_supplier_safe',{p_supplier_id:id}); if(error)return alert(error.message); alert(data==='archived'?'Supplier archived because purchase history exists.':'Supplier deleted.'); await refresh();
+  const s=suppliers.find(x=>x.id===id); if(!s||!(await kivuConfirm(`Delete ${s.name}? If purchase history exists Kivu Solutions will archive it instead.`,{danger:true})))return;
+  const {data,error}=await sb.rpc('remove_supplier_safe',{p_supplier_id:id}); if(error)return kivuNotify(error.message,'error'); kivuNotify(data==='archived'?'Supplier archived because purchase history exists.':'Supplier deleted.'); await refresh();
 };
 function renderDukaAdmin(){
   if(!isDukaAdmin)return;
@@ -2795,12 +2980,12 @@ function renderDukaAdmin(){
 }
 
 window.setEmployeeActive=async(id,active)=>{
-  if(!can('owner','manager'))return alert('Only an owner or manager can change staff access.');
+  if(!can('owner','manager'))return kivuNotify('Only an owner or manager can change staff access.');
   const emp=employees.find(x=>x.id===id);if(!emp)return;
-  if(emp.user_id===session.user.id)return alert('You cannot disable your own account.');
-  if(!confirm(`${active?'Reactivate':'Disable'} ${emp.name}?`))return;
+  if(emp.user_id===session.user.id)return kivuNotify('You cannot disable your own account.');
+  if(!(await kivuConfirm(`${active?'Reactivate':'Disable'} ${emp.name}?`,{danger:!active})))return;
   const {error}=await sb.rpc('set_employee_active',{p_employee_id:id,p_active:!!active});
-  if(error)return alert(error.message);
+  if(error)return kivuNotify(error.message,'error');
   await refresh();
 };
 
@@ -2808,11 +2993,11 @@ $('#changePinBtn')?.addEventListener('click',()=>$('#changePinModal').showModal(
 $('#changePinForm')?.addEventListener('submit',async e=>{
   e.preventDefault();
   const f=new FormData(e.target),pin=String(f.get('pin')||''),confirmPin=String(f.get('confirmPin')||'');
-  if(!/^\d{6}$/.test(pin))return alert('PIN must be exactly 6 digits.');
-  if(pin!==confirmPin)return alert('PINs do not match.');
+  if(!/^\d{6}$/.test(pin))return kivuNotify('PIN must be exactly 6 digits.');
+  if(pin!==confirmPin)return kivuNotify('PINs do not match.');
   const {error}=await sb.auth.updateUser({password:pin});
-  if(error)return alert(error.message);
-  e.target.reset();$('#changePinModal').close();alert('Your PIN has been changed.');
+  if(error)return kivuNotify(error.message,'error');
+  e.target.reset();$('#changePinModal').close();kivuNotify('Your PIN has been changed.');
 });
 
 
@@ -3053,7 +3238,7 @@ async function loadPlatformV41(){
 
 async function openDukaAdmin(){
   if(!isDukaAdmin)return;
-  try{await loadPlatformV41();renderDukaAdmin();showPage('dukaadmin',true);}catch(e){alert(e.message);}
+  try{await loadPlatformV41();renderDukaAdmin();showPage('dukaadmin',true);}catch(e){kivuNotify(e.message);}
 }
 
 $('#modeSwitchBtn')?.addEventListener('click',()=>{
@@ -3088,7 +3273,7 @@ function renderAdminShopRows(){
 $('#adminShopSearch')?.addEventListener('input',renderAdminShopRows);
 
 window.openShopSupport=async function(id){
-  const {data,error}=await sb.rpc('duka_shop_support_view',{p_shop_id:id}); if(error)return alert(error.message);
+  const {data,error}=await sb.rpc('duka_shop_support_view',{p_shop_id:id}); if(error)return kivuNotify(error.message,'error');
   selectedSupportShopId=id;selectedSupportData=data;renderShopSupport();$('#shopSupportPanel').classList.remove('hidden');$('#shopSupportPanel').scrollIntoView({behavior:'smooth',block:'start'});
 };
 
@@ -3107,36 +3292,36 @@ function renderShopSupport(){
   $('#suspendShopBtn').classList.toggle('hidden',!!s.platform_suspended);$('#reactivateShopBtn').classList.toggle('hidden',!s.platform_suspended);
 }
 
-$('#supportNoteForm')?.addEventListener('submit',async e=>{e.preventDefault();if(!selectedSupportShopId)return;const note=new FormData(e.target).get('note');const {error}=await sb.rpc('duka_add_shop_note',{p_shop_id:selectedSupportShopId,p_note:note});if(error)return alert(error.message);e.target.reset();await openShopSupport(selectedSupportShopId);});
-$('#supportTicketForm')?.addEventListener('submit',async e=>{e.preventDefault();if(!selectedSupportShopId)return;const f=new FormData(e.target);const {error}=await sb.rpc('duka_create_ticket',{p_shop_id:selectedSupportShopId,p_subject:f.get('subject'),p_description:f.get('description')||null,p_priority:f.get('priority')});if(error)return alert(error.message);e.target.reset();await openShopSupport(selectedSupportShopId);});
-window.updateSupportTicket=async function(id,current){const status=prompt('Status: open, in_progress, waiting_customer, resolved, closed',current);if(!status)return;const note=prompt('Resolution / update note (optional)','')||null;const {error}=await sb.rpc('duka_update_ticket',{p_ticket_id:id,p_status:status,p_resolution:note});if(error)return alert(error.message);await openShopSupport(selectedSupportShopId);};
+$('#supportNoteForm')?.addEventListener('submit',async e=>{e.preventDefault();if(!selectedSupportShopId)return;const note=new FormData(e.target).get('note');const {error}=await sb.rpc('duka_add_shop_note',{p_shop_id:selectedSupportShopId,p_note:note});if(error)return kivuNotify(error.message,'error');e.target.reset();await openShopSupport(selectedSupportShopId);});
+$('#supportTicketForm')?.addEventListener('submit',async e=>{e.preventDefault();if(!selectedSupportShopId)return;const f=new FormData(e.target);const {error}=await sb.rpc('duka_create_ticket',{p_shop_id:selectedSupportShopId,p_subject:f.get('subject'),p_description:f.get('description')||null,p_priority:f.get('priority')});if(error)return kivuNotify(error.message,'error');e.target.reset();await openShopSupport(selectedSupportShopId);});
+window.updateSupportTicket=async function(id,current){const status=await kivuPrompt('Status: open, in_progress, waiting_customer, resolved, closed',{title:'Ticket Status',defaultValue:current});if(!status)return;const note=(await kivuPrompt('Resolution / update note (optional)',{title:'Resolution Note',defaultValue:''}))||null;const {error}=await sb.rpc('duka_update_ticket',{p_ticket_id:id,p_status:status,p_resolution:note});if(error)return kivuNotify(error.message,'error');await openShopSupport(selectedSupportShopId);};
 
-async function setShopSuspension(flag){if(!selectedSupportShopId)return;const reason=prompt(flag?'Reason for suspending this shop:':'Reason for reactivating this shop:');if(!reason)return;const {error}=await sb.rpc('duka_set_shop_suspension',{p_shop_id:selectedSupportShopId,p_suspended:flag,p_reason:reason});if(error)return alert(error.message);await loadPlatformV41();await openShopSupport(selectedSupportShopId);renderDukaAdmin();}
+async function setShopSuspension(flag){if(!selectedSupportShopId)return;const reason=await kivuPrompt(flag?'Reason for suspending this shop:':'Reason for reactivating this shop:',{title:flag?'Suspend Shop':'Reactivate Shop'});if(!reason)return;const {error}=await sb.rpc('duka_set_shop_suspension',{p_shop_id:selectedSupportShopId,p_suspended:flag,p_reason:reason});if(error)return kivuNotify(error.message,'error');await loadPlatformV41();await openShopSupport(selectedSupportShopId);renderDukaAdmin();}
 $('#suspendShopBtn')?.addEventListener('click',()=>setShopSuspension(true));$('#reactivateShopBtn')?.addEventListener('click',()=>setShopSuspension(false));
 
 $('#confirmPaymentBtn')?.addEventListener('click',()=>{if(!selectedSupportShopId)return;const f=$('#adminPaymentForm');f.elements.shopId.value=selectedSupportShopId;const now=new Date(),end=new Date();end.setDate(end.getDate()+29);f.elements.from.value=day(now);f.elements.to.value=day(end);$('#adminPaymentModal').showModal();});
-$('#adminPaymentForm')?.addEventListener('submit',async e=>{e.preventDefault();const f=new FormData(e.target);const {error}=await sb.rpc('duka_confirm_subscription_payment',{p_shop_id:f.get('shopId'),p_amount:parseMoney(f.get('amount')),p_plan:f.get('plan'),p_payment_method:f.get('method'),p_reference:f.get('reference')||null,p_covered_from:f.get('from'),p_covered_to:f.get('to'),p_note:f.get('note')||null});if(error)return alert(error.message);$('#adminPaymentModal').close();e.target.reset();await loadPlatformV41();await openShopSupport(selectedSupportShopId);renderDukaAdmin();});
+$('#adminPaymentForm')?.addEventListener('submit',async e=>{e.preventDefault();const f=new FormData(e.target);const {error}=await sb.rpc('duka_confirm_subscription_payment',{p_shop_id:f.get('shopId'),p_amount:parseMoney(f.get('amount')),p_plan:f.get('plan'),p_payment_method:f.get('method'),p_reference:f.get('reference')||null,p_covered_from:f.get('from'),p_covered_to:f.get('to'),p_note:f.get('note')||null});if(error)return kivuNotify(error.message,'error');$('#adminPaymentModal').close();e.target.reset();await loadPlatformV41();await openShopSupport(selectedSupportShopId);renderDukaAdmin();});
 
-$('#onboardingStatusBtn')?.addEventListener('click',async()=>{if(!selectedSupportShopId)return;const status=prompt('Status: registered, setup_incomplete, active, needs_assistance',selectedSupportData?.shop?.onboarding_status||'setup_incomplete');if(!status)return;const reason=prompt('Reason / note:','Support update')||'Support update';const {error}=await sb.rpc('duka_set_onboarding_status',{p_shop_id:selectedSupportShopId,p_status:status,p_reason:reason});if(error)return alert(error.message);await loadPlatformV41();await openShopSupport(selectedSupportShopId);renderDukaAdmin();});
+$('#onboardingStatusBtn')?.addEventListener('click',async()=>{if(!selectedSupportShopId)return;const status=await kivuPrompt('Status: registered, setup_incomplete, active, needs_assistance',{title:'Onboarding Status',defaultValue:selectedSupportData?.shop?.onboarding_status||'setup_incomplete'});if(!status)return;const reason=(await kivuPrompt('Reason / note:',{title:'Reason / Note',defaultValue:'Support update'}))||'Support update';const {error}=await sb.rpc('duka_set_onboarding_status',{p_shop_id:selectedSupportShopId,p_status:status,p_reason:reason});if(error)return kivuNotify(error.message,'error');await loadPlatformV41();await openShopSupport(selectedSupportShopId);renderDukaAdmin();});
 
 function renderAdminUsers(){
   const panel=$('#adminManagementPanel');if(!panel)return;const superAdmin=platformAdminProfile?.role==='super_admin';panel.classList.toggle('hidden',!superAdmin);if(!superAdmin)return;
   $('#adminUsersList').innerHTML=platformAdmins.length?platformAdmins.map(a=>`<div class="item"><div><b>${esc(a.display_name||a.email)}</b><small>${esc(adminRoleLabel(a.admin_role))}${a.district?' · '+esc(a.district):a.province?' · '+esc(a.province):''}</small></div><span class="badge">${a.active?'Active':'Disabled'}</span></div>`).join(''):'<div class="notice mini">No admins.</div>';
 }
 $('#addAdminBtn')?.addEventListener('click',()=>$('#adminUserModal').showModal());
-$('#adminUserForm')?.addEventListener('submit',async e=>{e.preventDefault();const f=new FormData(e.target);const {error}=await sb.rpc('duka_manage_admin',{p_email:f.get('email'),p_role:f.get('role'),p_province:f.get('province')||null,p_district:f.get('district')||null,p_display_name:f.get('displayName')||null,p_active:f.get('active')==='true'});if(error)return alert(error.message);$('#adminUserModal').close();e.target.reset();await loadPlatformV41();renderDukaAdmin();});
+$('#adminUserForm')?.addEventListener('submit',async e=>{e.preventDefault();const f=new FormData(e.target);const {error}=await sb.rpc('duka_manage_admin',{p_email:f.get('email'),p_role:f.get('role'),p_province:f.get('province')||null,p_district:f.get('district')||null,p_display_name:f.get('displayName')||null,p_active:f.get('active')==='true'});if(error)return kivuNotify(error.message,'error');$('#adminUserModal').close();e.target.reset();await loadPlatformV41();renderDukaAdmin();});
 
 function renderPlatformAudit(){const el=$('#platformAuditList');if(!el)return;el.innerHTML=platformAudit.length?platformAudit.slice(0,50).map(x=>`<div class="item"><div><b>${esc(x.action)}</b><small>${esc(x.admin_name||'Admin')} ${x.shop_name?'· '+esc(x.shop_name):''} · ${fmt(x.created_at)}</small>${x.reason?`<small>${esc(x.reason)}</small>`:''}</div></div>`).join(''):'<div class="notice mini">No platform actions yet.</div>';}
 async function renderPlatformStatus(){const el=$('#platformStatusBody');if(!el)return;const {data}=await sb.rpc('duka_app_status');appStatusCache=data||{};el.innerHTML=`<div class="item"><div><b>Current version ${esc(appStatusCache.current_version||'4.3')}</b><small>Minimum ${esc(appStatusCache.minimum_version||'4.0')} · Maintenance ${appStatusCache.maintenance_mode?'ON':'OFF'}</small></div>${platformAdminProfile?.role==='super_admin'?'<button id="editPlatformStatusBtn" class="btn secondary">Edit</button>':''}</div>`;$('#editPlatformStatusBtn')?.addEventListener('click',editPlatformStatus);}
-async function editPlatformStatus(){const current=appStatusCache||{};const maintenance=confirm('Turn maintenance mode ON?\nOK = ON, Cancel = OFF');const message=prompt('Maintenance message',current.maintenance_message||'')||'';const cv=prompt('Current app version',current.current_version||'4.3')||'4.1';const mv=prompt('Minimum supported version',current.minimum_version||'4.0')||'4.0';const {error}=await sb.rpc('duka_set_app_status',{p_maintenance:maintenance,p_message:message,p_current_version:cv,p_minimum_version:mv});if(error)return alert(error.message);await loadPlatformV41();renderDukaAdmin();}
+async function editPlatformStatus(){const current=appStatusCache||{};const maintenance=await kivuConfirm('Turn maintenance mode ON?\nOK = ON, Cancel = OFF',{title:'Maintenance Mode',confirmText:'Turn ON',cancelText:'Turn OFF',danger:true});const message=(await kivuPrompt('Maintenance message',{title:'Maintenance Message',defaultValue:current.maintenance_message||''}))||'';const cv=(await kivuPrompt('Current app version',{title:'Current App Version',defaultValue:current.current_version||'5.3'}))||'5.3';const mv=(await kivuPrompt('Minimum supported version',{title:'Minimum Version',defaultValue:current.minimum_version||'5.0'}))||'5.0';const {error}=await sb.rpc('duka_set_app_status',{p_maintenance:maintenance,p_message:message,p_current_version:cv,p_minimum_version:mv});if(error)return kivuNotify(error.message,'error');await loadPlatformV41();renderDukaAdmin();}
 
 // Device/session heartbeat. Revoked devices sign out on the next heartbeat.
 function getDeviceKey(){let k=localStorage.getItem('duka_device_key');if(!k){k=(crypto.randomUUID?crypto.randomUUID():Date.now()+'-'+Math.random());localStorage.setItem('duka_device_key',k);}return k;}
-async function deviceHeartbeat(){if(!session||!shop)return;const label=`${navigator.platform||'Device'} · ${navigator.userAgent.includes('Mobile')?'Mobile':'Browser'}`;const {data,error}=await sb.rpc('register_app_device',{p_device_key:getDeviceKey(),p_device_label:label,p_app_version:DUKA_APP_VERSION});if(!error&&data?.revoked){localStorage.removeItem('duka_device_key');alert('This device session was signed out by the business owner. You can sign in again to start a new authorized session.');await sb.auth.signOut();}}
+async function deviceHeartbeat(){if(!session||!shop)return;const label=`${navigator.platform||'Device'} · ${navigator.userAgent.includes('Mobile')?'Mobile':'Browser'}`;const {data,error}=await sb.rpc('register_app_device',{p_device_key:getDeviceKey(),p_device_label:label,p_app_version:DUKA_APP_VERSION});if(!error&&data?.revoked){localStorage.removeItem('duka_device_key');kivuNotify('This device session was signed out by the business owner. You can sign in again to start a new authorized session.');await sb.auth.signOut();}}
 setInterval(()=>deviceHeartbeat().catch(()=>{}),60000);setTimeout(()=>deviceHeartbeat().catch(()=>{}),2500);
 
 // App version / maintenance check.
-async function checkAppStatus(){const {data,error}=await sb.rpc('duka_app_status');if(error)return;appStatusCache=data||{};if(appStatusCache.maintenance_mode&&!isDukaAdmin){alert(appStatusCache.maintenance_message||'Kivu Solutions is temporarily under maintenance. Please try again later.');}}
+async function checkAppStatus(){const {data,error}=await sb.rpc('duka_app_status');if(error)return;appStatusCache=data||{};if(appStatusCache.maintenance_mode&&!isDukaAdmin){kivuNotify(appStatusCache.maintenance_message||'Kivu Solutions is temporarily under maintenance. Please try again later.');}}
 setTimeout(()=>checkAppStatus().catch(()=>{}),1800);
 
 // Notifications Center: persistent state, live business alerts, and modern card rendering.
@@ -3492,19 +3677,19 @@ async function renderOwnerDevices(){
 }
 window.revokeOwnerDevice=async function(id){
   const {data:rows}=await sb.from('app_devices').select('id,device_key').eq('id',id).limit(1);
-  if(rows?.[0]?.device_key===getDeviceKey())return alert('You cannot revoke the device you are currently using. Use another owner device if you need to force this device out later.');
-  const reason=prompt('Reason for revoking this device:','Lost device / staff left')||'';if(!reason)return;
-  const {error}=await sb.rpc('revoke_app_device',{p_device_id:id,p_reason:reason});if(error)return alert(error.message);await renderOwnerDevices();
+  if(rows?.[0]?.device_key===getDeviceKey())return kivuNotify('You cannot revoke the device you are currently using. Use another owner device if you need to force this device out later.');
+  const reason=(await kivuPrompt('Reason for revoking this device:',{title:'Revoke Device',defaultValue:'Lost device / staff left'}))||'';if(!reason)return;
+  const {error}=await sb.rpc('revoke_app_device',{p_device_id:id,p_reason:reason});if(error)return kivuNotify(error.message,'error');await renderOwnerDevices();
 };
 window.restoreOwnerDevice=async function(id){
-  if(!confirm('Re-authorize this device? It will be allowed to use Kivu Solutions again.'))return;
-  const {error}=await sb.rpc('restore_app_device',{p_device_id:id});if(error)return alert(error.message);await renderOwnerDevices();
+  if(!(await kivuConfirm('Re-authorize this device? It will be allowed to use Kivu Solutions again.')))return;
+  const {error}=await sb.rpc('restore_app_device',{p_device_id:id});if(error)return kivuNotify(error.message,'error');await renderOwnerDevices();
 };
 const oldRenderSettingsV41=renderSettingsV41;
 renderSettingsV41=function(){oldRenderSettingsV41();renderOwnerDevices().catch(()=>{});};
 
-$('#featureFlagBtn')?.addEventListener('click',async()=>{if(!selectedSupportShopId)return;const key=prompt('Feature key to enable/disable (example: new_reports):');if(!key)return;const enabled=confirm('Enable this feature? OK = enable, Cancel = disable');const note=prompt('Reason / note:','Pilot feature')||'';const {error}=await sb.rpc('duka_set_feature_flag',{p_shop_id:selectedSupportShopId,p_key:key,p_enabled:enabled,p_note:note});if(error)return alert(error.message);alert(`Feature ${key} ${enabled?'enabled':'disabled'} for this shop.`);});
-$('#generateExpiryAlertsBtn')?.addEventListener('click',async()=>{const {data,error}=await sb.rpc('generate_subscription_notifications');if(error)return alert(error.message);alert(`${data||0} subscription expiry notification(s) generated.`);});
+$('#featureFlagBtn')?.addEventListener('click',async()=>{if(!selectedSupportShopId)return;const key=await kivuPrompt('Feature key to enable/disable (example: new_reports):',{title:'Feature Key'});if(!key)return;const enabled=await kivuConfirm('Enable this feature? OK = enable, Cancel = disable',{title:'Feature Flag',confirmText:'Enable',cancelText:'Disable'});const note=(await kivuPrompt('Reason / note:',{title:'Feature Note',defaultValue:'Pilot feature'}))||'';const {error}=await sb.rpc('duka_set_feature_flag',{p_shop_id:selectedSupportShopId,p_key:key,p_enabled:enabled,p_note:note});if(error)return kivuNotify(error.message,'error');kivuNotify(`Feature ${key} ${enabled?'enabled':'disabled'} for this shop.`);});
+$('#generateExpiryAlertsBtn')?.addEventListener('click',async()=>{const {data,error}=await sb.rpc('generate_subscription_notifications');if(error)return kivuNotify(error.message,'error');kivuNotify(`${data||0} subscription expiry notification(s) generated.`);});
 
 // Live notification conditions are handled directly inside renderNotifications().
 
@@ -3592,30 +3777,30 @@ function renderHospitality(){
 
 $('#newTableBtn')?.addEventListener('click',()=>$('#hospitalityTableModal')?.showModal());
 $('#newTabBtn')?.addEventListener('click',()=>{fillHospitalitySelects();$('#hospitalityTabModal')?.showModal();});
-$('#wastageBtn')?.addEventListener('click',()=>{if(!can('owner','manager'))return alert('Owner or manager approval is required.');fillHospitalitySelects();$('#hospitalityWastageModal')?.showModal();});
-$('#recipeBtn')?.addEventListener('click',()=>{if(!can('owner','manager'))return alert('Only an owner or manager can configure recipes.');fillHospitalitySelects();loadRecipeRows();$('#hospitalityRecipeModal')?.showModal();});
+$('#wastageBtn')?.addEventListener('click',()=>{if(!can('owner','manager'))return kivuNotify('Owner or manager approval is required.');fillHospitalitySelects();$('#hospitalityWastageModal')?.showModal();});
+$('#recipeBtn')?.addEventListener('click',()=>{if(!can('owner','manager'))return kivuNotify('Only an owner or manager can configure recipes.');fillHospitalitySelects();loadRecipeRows();$('#hospitalityRecipeModal')?.showModal();});
 
-$('#hospitalityTableForm')?.addEventListener('submit',async e=>{e.preventDefault();const f=new FormData(e.target);const {error}=await sb.rpc('hospitality_save_table',{p_table_id:null,p_name:String(f.get('name')).trim(),p_seats:Number(f.get('seats')||0)||null,p_active:true});if(error)return alert(error.message);e.target.reset();$('#hospitalityTableModal').close();await refresh();});
-$('#hospitalityTabForm')?.addEventListener('submit',async e=>{e.preventDefault();const f=new FormData(e.target);const {data,error}=await sb.rpc('hospitality_open_tab',{p_table_id:f.get('tableId')||null,p_label:f.get('label')||null,p_customer_name:f.get('customerName')||null});if(error)return alert(error.message);e.target.reset();$('#hospitalityTabModal').close();await refresh();openHospitalityOrder(data);});
-window.quickOpenHospitalityTable=async id=>{const {data,error}=await sb.rpc('hospitality_open_tab',{p_table_id:id,p_label:null,p_customer_name:null});if(error)return alert(error.message);await refresh();openHospitalityOrder(data);};
+$('#hospitalityTableForm')?.addEventListener('submit',async e=>{e.preventDefault();const f=new FormData(e.target);const {error}=await sb.rpc('hospitality_save_table',{p_table_id:null,p_name:String(f.get('name')).trim(),p_seats:Number(f.get('seats')||0)||null,p_active:true});if(error)return kivuNotify(error.message,'error');e.target.reset();$('#hospitalityTableModal').close();await refresh();});
+$('#hospitalityTabForm')?.addEventListener('submit',async e=>{e.preventDefault();const f=new FormData(e.target);const {data,error}=await sb.rpc('hospitality_open_tab',{p_table_id:f.get('tableId')||null,p_label:f.get('label')||null,p_customer_name:f.get('customerName')||null});if(error)return kivuNotify(error.message,'error');e.target.reset();$('#hospitalityTabModal').close();await refresh();openHospitalityOrder(data);});
+window.quickOpenHospitalityTable=async id=>{const {data,error}=await sb.rpc('hospitality_open_tab',{p_table_id:id,p_label:null,p_customer_name:null});if(error)return kivuNotify(error.message,'error');await refresh();openHospitalityOrder(data);};
 window.openHospitalityOrder=id=>{const t=hospitalityTabs.find(x=>x.id===id);if(!t)return;const f=$('#hospitalityOrderForm');f.elements.tabId.value=id;if($('#hospitalityOrderHeading')) $('#hospitalityOrderHeading').textContent=hTableName(t.table_id)||t.label||t.customer_name||'Open bill';renderHospitalityOrder(id);fillHospitalitySelects();$('#hospitalityOrderModal')?.showModal();};
 function renderHospitalityOrder(id){const items=hTabItems(id);$('#hospitalityOrderItems').innerHTML=items.length?items.map(i=>`<div class="hospitality-line"><div><b>${esc(i.product_name)}</b><small>${i.qty} × ${money(i.unit_price)}${i.note?' · '+esc(i.note):''}${i.complimentary?' · COMPLIMENTARY':''}</small></div><div><b>${i.complimentary?'0 RWF':money(i.qty*i.unit_price)}</b><small>${i.served_at?'Served':i.sent_at?'Sent':'Not sent'}</small></div></div>`).join(''):'<div class="notice mini">No items on this bill yet.</div>';$('#hospitalityOrderItems').insertAdjacentHTML('beforeend',`<div class="sale-cart-total grand"><span>Bill total</span><strong>${money(hTabTotal(id))}</strong></div>`);}
-$('#addHospitalityItemBtn')?.addEventListener('click',async()=>{const f=$('#hospitalityOrderForm'),id=f.elements.tabId.value,pid=f.elements.productId.value,qty=Number(f.elements.qty.value);const {error}=await sb.rpc('hospitality_add_item',{p_tab_id:id,p_product_id:pid,p_qty:qty,p_note:f.elements.note.value||null,p_complimentary:!!f.elements.complimentary.checked});if(error)return alert(error.message);f.elements.note.value='';f.elements.complimentary.checked=false;await refresh();renderHospitalityOrder(id);});
-$('#sendHospitalityOrderBtn')?.addEventListener('click',async()=>{const id=$('#hospitalityOrderForm').elements.tabId.value;const {error}=await sb.rpc('hospitality_send_tab',{p_tab_id:id});if(error)return alert(error.message);await refresh();renderHospitalityOrder(id);});
-window.markHospitalityServed=async id=>{const {error}=await sb.rpc('hospitality_mark_served',{p_item_id:id});if(error)return alert(error.message);await refresh();};
-window.printKitchenTicket=id=>{const i=hospitalityItems.find(x=>x.id===id),t=i&&hospitalityTabs.find(x=>x.id===i.tab_id);if(!i)return;const w=window.open('','_blank','width=360,height=520');if(!w)return alert('Allow pop-ups to print kitchen/bar tickets.');w.document.write(`<!doctype html><meta charset="utf-8"><title>Order ticket</title><style>body{font:16px/1.35 monospace;padding:14px;width:72mm}h2{margin:0 0 8px;border-bottom:1px dashed #000;padding-bottom:8px}b{font-size:22px}.line{border-top:1px dashed #000;margin:10px 0}</style><h2>${esc(shop.name)} — ORDER</h2><div>${esc(hTableName(t?.table_id)||t?.label||'Counter / Takeaway')}</div><div class="line"></div><b>${esc(i.product_name)} × ${esc(i.qty)}</b><p>${esc(i.note||'No special note')}</p><div class="line"></div><small>${fmt(i.sent_at||i.created_at)} · ${esc(t?.waiter_name||i.created_by_name||'Staff')}</small>`);w.document.close();w.focus();setTimeout(()=>w.print(),150);};
+$('#addHospitalityItemBtn')?.addEventListener('click',async()=>{const f=$('#hospitalityOrderForm'),id=f.elements.tabId.value,pid=f.elements.productId.value,qty=Number(f.elements.qty.value);const {error}=await sb.rpc('hospitality_add_item',{p_tab_id:id,p_product_id:pid,p_qty:qty,p_note:f.elements.note.value||null,p_complimentary:!!f.elements.complimentary.checked});if(error)return kivuNotify(error.message,'error');f.elements.note.value='';f.elements.complimentary.checked=false;await refresh();renderHospitalityOrder(id);});
+$('#sendHospitalityOrderBtn')?.addEventListener('click',async()=>{const id=$('#hospitalityOrderForm').elements.tabId.value;const {error}=await sb.rpc('hospitality_send_tab',{p_tab_id:id});if(error)return kivuNotify(error.message,'error');await refresh();renderHospitalityOrder(id);});
+window.markHospitalityServed=async id=>{const {error}=await sb.rpc('hospitality_mark_served',{p_item_id:id});if(error)return kivuNotify(error.message,'error');await refresh();};
+window.printKitchenTicket=id=>{const i=hospitalityItems.find(x=>x.id===id),t=i&&hospitalityTabs.find(x=>x.id===i.tab_id);if(!i)return;const w=window.open('','_blank','width=360,height=520');if(!w)return kivuNotify('Allow pop-ups to print kitchen/bar tickets.');w.document.write(`<!doctype html><meta charset="utf-8"><title>Order ticket</title><style>body{font:16px/1.35 monospace;padding:14px;width:72mm}h2{margin:0 0 8px;border-bottom:1px dashed #000;padding-bottom:8px}b{font-size:22px}.line{border-top:1px dashed #000;margin:10px 0}</style><h2>${esc(shop.name)} — ORDER</h2><div>${esc(hTableName(t?.table_id)||t?.label||'Counter / Takeaway')}</div><div class="line"></div><b>${esc(i.product_name)} × ${esc(i.qty)}</b><p>${esc(i.note||'No special note')}</p><div class="line"></div><small>${fmt(i.sent_at||i.created_at)} · ${esc(t?.waiter_name||i.created_by_name||'Staff')}</small>`);w.document.close();w.focus();setTimeout(()=>w.print(),150);};
 
 function addHospitalityPaymentRow(method='Cash',amount=''){const box=$('#hospitalityPaymentRows');const d=document.createElement('div');d.className='form-grid hospitality-payment-row';d.innerHTML=`<label>Method<select name="payMethod"><option ${method==='Cash'?'selected':''}>Cash</option><option>Mobile Money</option><option>Bank</option><option>Credit</option><option>Other</option></select></label><label>Amount<input name="payAmount" type="text" inputmode="decimal" class="money-input" value="${formatMoneyString(amount)}" required></label>`;box.appendChild(d);initMoneyInputs(d);}
 $('#addHospitalityPaymentBtn')?.addEventListener('click',()=>addHospitalityPaymentRow('Mobile Money',''));
 $('#settleHospitalityBtn')?.addEventListener('click',()=>{const id=$('#hospitalityOrderForm').elements.tabId.value,total=hTabTotal(id);$('#hospitalityPaymentForm').elements.tabId.value=id;$('#hospitalityPaymentSummary').innerHTML=`Amount due: <b>${money(total)}</b><br>Use one payment or add rows to split the amount across Cash / MoMo / Bank.`;$('#hospitalityPaymentRows').innerHTML='';addHospitalityPaymentRow('Cash',total);$('#hospitalityPaymentModal')?.showModal();});
-$('#hospitalityPaymentForm')?.addEventListener('submit',async e=>{e.preventDefault();const id=e.target.elements.tabId.value;const rows=[...e.target.querySelectorAll('.hospitality-payment-row')],payments=rows.map(r=>({method:r.querySelector('[name=payMethod]').value,amount:parseMoney(r.querySelector('[name=payAmount]').value)})).filter(x=>x.amount>0);const {data,error}=await sb.rpc('hospitality_close_tab',{p_tab_id:id,p_payments:payments});if(error)return alert(error.message);$('#hospitalityPaymentModal').close();$('#hospitalityOrderModal').close();alert(`Bill closed. Receipt: ${data}`);await refresh();});
-$('#hospitalityWastageForm')?.addEventListener('submit',async e=>{e.preventDefault();const f=new FormData(e.target);const {error}=await sb.rpc('hospitality_record_wastage',{p_product_id:f.get('productId'),p_qty:Number(f.get('qty')),p_reason:f.get('reason')});if(error)return alert(error.message);e.target.reset();$('#hospitalityWastageModal').close();await refresh();});
+$('#hospitalityPaymentForm')?.addEventListener('submit',async e=>{e.preventDefault();const id=e.target.elements.tabId.value;const rows=[...e.target.querySelectorAll('.hospitality-payment-row')],payments=rows.map(r=>({method:r.querySelector('[name=payMethod]').value,amount:parseMoney(r.querySelector('[name=payAmount]').value)})).filter(x=>x.amount>0);const {data,error}=await sb.rpc('hospitality_close_tab',{p_tab_id:id,p_payments:payments});if(error)return kivuNotify(error.message,'error');$('#hospitalityPaymentModal').close();$('#hospitalityOrderModal').close();kivuNotify(`Bill closed. Receipt: ${data}`);await refresh();});
+$('#hospitalityWastageForm')?.addEventListener('submit',async e=>{e.preventDefault();const f=new FormData(e.target);const {error}=await sb.rpc('hospitality_record_wastage',{p_product_id:f.get('productId'),p_qty:Number(f.get('qty')),p_reason:f.get('reason')});if(error)return kivuNotify(error.message,'error');e.target.reset();$('#hospitalityWastageModal').close();await refresh();});
 
 function recipeRow(ingredient='',qty=''){const d=document.createElement('div');d.className='form-grid recipe-row';d.innerHTML=`<label>Ingredient / stock item<select name="ingredientId">${products.map(p=>`<option value="${p.id}" ${p.id===ingredient?'selected':''}>${esc(p.name)} (${esc(baseUnitLabel(p))})</option>`).join('')}</select></label><label>Qty consumed per menu item<input name="ingredientQty" type="number" min="0.001" step="0.001" value="${qty}" required></label>`;return d;}
 function loadRecipeRows(){const f=$('#hospitalityRecipeForm');if(!f)return;const pid=f.elements.menuProductId.value,box=$('#hospitalityRecipeRows');box.innerHTML='';const rs=hospitalityRecipes.filter(r=>r.menu_product_id===pid);(rs.length?rs:[{}]).forEach(r=>box.appendChild(recipeRow(r.ingredient_product_id||'',r.qty_per_unit||'')));}
 $('#hospitalityRecipeForm select[name="menuProductId"]')?.addEventListener('change',loadRecipeRows);
 $('#addRecipeRowBtn')?.addEventListener('click',()=>$('#hospitalityRecipeRows')?.appendChild(recipeRow()));
-$('#hospitalityRecipeForm')?.addEventListener('submit',async e=>{e.preventDefault();const pid=e.target.elements.menuProductId.value,rows=[...e.target.querySelectorAll('.recipe-row')];const payload=rows.map(r=>({ingredient_product_id:r.querySelector('[name=ingredientId]').value,qty_per_unit:Number(r.querySelector('[name=ingredientQty]').value)})).filter(x=>x.qty_per_unit>0);const saved=await sb.rpc('hospitality_replace_recipe',{p_menu_product_id:pid,p_components:payload});if(saved.error)return alert(saved.error.message);$('#hospitalityRecipeModal').close();await refresh();alert('Recipe saved. Ingredient stock will be consumed when the bill is settled.');});
+$('#hospitalityRecipeForm')?.addEventListener('submit',async e=>{e.preventDefault();const pid=e.target.elements.menuProductId.value,rows=[...e.target.querySelectorAll('.recipe-row')];const payload=rows.map(r=>({ingredient_product_id:r.querySelector('[name=ingredientId]').value,qty_per_unit:Number(r.querySelector('[name=ingredientQty]').value)})).filter(x=>x.qty_per_unit>0);const saved=await sb.rpc('hospitality_replace_recipe',{p_menu_product_id:pid,p_components:payload});if(saved.error)return kivuNotify(saved.error.message);$('#hospitalityRecipeModal').close();await refresh();kivuNotify('Recipe saved. Ingredient stock will be consumed when the bill is settled.');});
 
 
 /* ============================================================
@@ -3750,7 +3935,7 @@ enter=function(){
     }catch(err){
       console.error('Enter background refresh error:',err);
       if(!hasCache){
-        alert(err.message||'Could not load Kivu Solutions.');
+        kivuNotify(err.message||'Could not load Kivu Solutions.');
         await sb.auth.signOut();
       }
     }finally{
@@ -3827,20 +4012,20 @@ async function runOfflineSalesSync(){
 }
 window.addEventListener('online',()=>{updateConnectivityUI();syncOfflineSales().catch(console.warn);});
 window.addEventListener('offline',()=>updateConnectivityUI());
-$('#offlineQueueBtn')?.addEventListener('click',async()=>{const rows=await window.KivuOffline.listSales(shop.id);const errors=rows.filter(x=>x.status==='needs_attention');alert(rows.length?`${rows.length} offline sale(s) waiting. ${errors.length?errors.length+' need attention because server validation failed. Reconnect and retry after correcting stock/customer data.':'They will sync automatically when online.'}`:'No offline sales waiting.');if(navigator.onLine)syncOfflineSales().catch(console.warn);});
+$('#offlineQueueBtn')?.addEventListener('click',async()=>{const rows=await window.KivuOffline.listSales(shop.id);const errors=rows.filter(x=>x.status==='needs_attention');kivuNotify(rows.length?`${rows.length} offline sale(s) waiting. ${errors.length?errors.length+' need attention because server validation failed. Reconnect and retry after correcting stock/customer data.':'They will sync automatically when online.'}`:'No offline sales waiting.');if(navigator.onLine)syncOfflineSales().catch(console.warn);});
 if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('./sw.js?v=5.3.0',{updateViaCache:'none'}).then(reg=>{reg.update().catch(()=>{});reg.addEventListener('updatefound',()=>{const newWorker=reg.installing;if(!newWorker)return;newWorker.addEventListener('statechange',()=>{if(newWorker.state==='installed'&&navigator.serviceWorker.controller){newWorker.postMessage({type:'SKIP_WAITING'});}});});}).catch(e=>console.warn('Service worker:',e.message));let refreshing=false;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(refreshing)return;refreshing=true;window.location.reload();});});}
 
 function findProductByBarcode(code){const clean=String(code||'').trim();return products.find(x=>String(x.barcode||'').trim()===clean);}
-function chooseProductFromBarcode(code,{autoAdd=false,formSelector='#saleForm'}={}){const p=findProductByBarcode(code);if(!p){alert('No product matches that barcode. Register the barcode in Inventory first.');return null;}const f=$(formSelector);if(f?.elements?.productId){f.elements.productId.value=p.id;if(formSelector==='#saleForm')refreshSaleUnitOptions();if(f.elements.qty)f.elements.qty.value='1';}if(autoAdd)$('#addSaleItemBtn')?.click();return p;}
+function chooseProductFromBarcode(code,{autoAdd=false,formSelector='#saleForm'}={}){const p=findProductByBarcode(code);if(!p){kivuNotify('No product matches that barcode. Register the barcode in Inventory first.');return null;}const f=$(formSelector);if(f?.elements?.productId){f.elements.productId.value=p.id;if(formSelector==='#saleForm')refreshSaleUnitOptions();if(f.elements.qty)f.elements.qty.value='1';}if(autoAdd)$('#addSaleItemBtn')?.click();return p;}
 $('#saleBarcodeInput')?.addEventListener('keydown',e=>{if(e.key!=='Enter')return;e.preventDefault();const code=e.currentTarget.value.trim();if(!code)return;chooseProductFromBarcode(code,{autoAdd:true});e.currentTarget.value='';});
-$('#scanSaleBarcodeBtn')?.addEventListener('click',async()=>{const code=await window.KivuCameraScanner?.open('Scan product for sale');if(!code)return;const p=findProductByBarcode(code);if(!p)return alert('No product matches that barcode. Register the barcode in Inventory first.');quickAddProductToCart(p.id);});
+$('#scanSaleBarcodeBtn')?.addEventListener('click',async()=>{const code=await window.KivuCameraScanner?.open('Scan product for sale');if(!code)return;const p=findProductByBarcode(code);if(!p)return kivuNotify('No product matches that barcode. Register the barcode in Inventory first.');quickAddProductToCart(p.id);});
 $('#scanProductBarcodeBtn')?.addEventListener('click',async()=>{const code=await window.KivuCameraScanner?.open('Scan barcode for new product');if(code){const input=$('#productBarcodeInput');if(input)input.value=code;}});
 $('#scanEditProductBarcodeBtn')?.addEventListener('click',async()=>{const code=await window.KivuCameraScanner?.open('Scan product barcode');if(code){const input=$('#editProductBarcodeInput');if(input)input.value=code;}});
-$('#scanStockProductBtn')?.addEventListener('click',async()=>{const code=await window.KivuCameraScanner?.open('Scan product to add stock');if(!code)return;const p=findProductByBarcode(code);if(!p)return alert('No product matches that barcode. Register the barcode in Inventory first.');const f=$('#stockForm');f.elements.productId.value=p.id;f.elements.qty.focus();});
+$('#scanStockProductBtn')?.addEventListener('click',async()=>{const code=await window.KivuCameraScanner?.open('Scan product to add stock');if(!code)return;const p=findProductByBarcode(code);if(!p)return kivuNotify('No product matches that barcode. Register the barcode in Inventory first.');const f=$('#stockForm');f.elements.productId.value=p.id;f.elements.qty.focus();});
 
 function parseCsv(text){const rows=[];let row=[],cell='',q=false;for(let i=0;i<text.length;i++){const c=text[i],n=text[i+1];if(c==='"'){if(q&&n==='"'){cell+='"';i++;}else q=!q;}else if(c===','&&!q){row.push(cell);cell='';}else if((c==='\n'||c==='\\r')&&!q){if(c==='\\r'&&n==='\n')i++;row.push(cell);if(row.some(x=>x.trim()!==''))rows.push(row);row=[];cell='';}else cell+=c;}row.push(cell);if(row.some(x=>x.trim()!==''))rows.push(row);if(rows.length<2)return[];const h=rows[0].map(x=>x.trim().toLowerCase());return rows.slice(1).map(r=>Object.fromEntries(h.map((k,i)=>[k,(r[i]||'').trim()])));}
 $('#importDataBtn')?.addEventListener('click',()=>{if(!can('owner','manager'))return;$('#importDataModal')?.showModal();});
-$('#importDataForm')?.addEventListener('submit',async e=>{e.preventDefault();if(!can('owner','manager'))return alert('Only owner or manager can import data.');const f=new FormData(e.target),file=f.get('file'),type=f.get('type');if(!file?.text)return alert('Choose a CSV file.');const rows=parseCsv(await file.text());if(!rows.length)return alert('No data rows found.');if(rows.length>2000)return alert('Import at most 2,000 rows at a time.');let payload;if(type==='products'){payload=rows.map(r=>({shop_id:shop.id,name:r.name,qty:Number(r.qty||0),cost:Number(r.cost||0),price:Number(r.price||0),low_stock:Number(r.low_stock||r.low||0),barcode:r.barcode||null,base_unit:r.base_unit||'Piece',bulk_unit:r.bulk_unit||'Carton',units_per_bulk:Number(r.units_per_bulk||1)})).filter(x=>x.name);}else{payload=rows.map(r=>({shop_id:shop.id,name:r.name,phone:r.phone||null,email:r.email||null})).filter(x=>x.name);}if(!payload.length)return alert('No valid rows found.');const table=type==='products'?'products':'customers';const {error}=await sb.from(table).insert(payload);if(error)return alert(`Import stopped: ${error.message}`);await audit('imported csv',table,{rows:payload.length});e.target.reset();$('#importDataModal').close();await refresh();alert(`${payload.length} ${type} imported.`);});
+$('#importDataForm')?.addEventListener('submit',async e=>{e.preventDefault();if(!can('owner','manager'))return kivuNotify('Only owner or manager can import data.');const f=new FormData(e.target),file=f.get('file'),type=f.get('type');if(!file?.text)return kivuNotify('Choose a CSV file.');const rows=parseCsv(await file.text());if(!rows.length)return kivuNotify('No data rows found.');if(rows.length>2000)return kivuNotify('Import at most 2,000 rows at a time.');let payload;if(type==='products'){payload=rows.map(r=>({shop_id:shop.id,name:r.name,qty:Number(r.qty||0),cost:Number(r.cost||0),price:Number(r.price||0),low_stock:Number(r.low_stock||r.low||0),barcode:r.barcode||null,base_unit:r.base_unit||'Piece',bulk_unit:r.bulk_unit||'Carton',units_per_bulk:Number(r.units_per_bulk||1)})).filter(x=>x.name);}else{payload=rows.map(r=>({shop_id:shop.id,name:r.name,phone:r.phone||null,email:r.email||null})).filter(x=>x.name);}if(!payload.length)return kivuNotify('No valid rows found.');const table=type==='products'?'products':'customers';const {error}=await sb.from(table).insert(payload);if(error)return kivuNotify(`Import stopped: ${error.message}`,'error');await audit('imported csv',table,{rows:payload.length});e.target.reset();$('#importDataModal').close();await refresh();kivuNotify(`${payload.length} ${type} imported.`);});
 
 $('#accountantExportBtn')?.addEventListener('click',()=>{if(!can('owner','manager'))return;const rate=Number(shop.tax_rate||0);const rows=sales.map(x=>{const net=Number(x.total||0),tax=rate>0?Math.round(net*rate/(100+rate)):0;return{date:x.created_at,receipt:x.receipt_no,payment:x.payment,customer:x.customer,product:x.product_name,quantity:x.entered_qty||x.qty,unit:x.sold_unit||'',net_sales:net,discount:Number(x.discount||0),cost:Number(x.cost||0),gross_profit:net-Number(x.cost||0),tax_rate:rate,tax_included:tax,employee:x.employee_name};});downloadText(`kivu-accountant-sales-${day(new Date())}.csv`,rowsToCsv(rows),'text/csv');});
 
@@ -3852,7 +4037,7 @@ renderHospitality=function(){
   $('#hospitalityManagementHead')?.classList.toggle('hidden',role==='kitchen');$('#hospitalityStats')?.classList.toggle('hidden',['waiter','kitchen'].includes(role));$('#hospitalityFloorSection')?.classList.toggle('hidden',role==='kitchen');$('#hospitalityClosedSection')?.classList.toggle('hidden',['waiter','kitchen'].includes(role));
   const panel=$('#hospitalityApprovalsPanel'),list=$('#hospitalityApprovalsList');if(panel&&list&&can('owner','manager')){const pending=approvalRequests.filter(x=>x.request_type==='hospitality_complimentary'&&x.status==='pending');panel.classList.toggle('hidden',pending.length===0);list.innerHTML=pending.map(x=>`<div class="item"><div><b>Complimentary request</b><small>${esc(x.requested_by_name||'Staff')} · ${esc(x.reason||'No reason')}</small></div><div><button class="btn primary" onclick="reviewApproval('${x.id}','approved')">Approve</button> <button class="btn danger" onclick="reviewApproval('${x.id}','rejected')">Reject</button></div></div>`).join('');}else panel?.classList.add('hidden');
 };
-$('#requestComplimentaryBtn')?.addEventListener('click',async()=>{if(!can('cashier','waiter'))return;const f=$('#hospitalityOrderForm'),reason=prompt('Reason for complimentary item (required):','');if(!reason?.trim())return;const {error}=await sb.rpc('hospitality_request_complimentary',{p_tab_id:f.elements.tabId.value,p_product_id:f.elements.productId.value,p_qty:Number(f.elements.qty.value),p_note:f.elements.note.value||null,p_reason:reason.trim()});if(error)return alert(error.message);f.elements.note.value='';alert('Complimentary request sent to owner/manager for approval.');await refresh();});
+$('#requestComplimentaryBtn')?.addEventListener('click',async()=>{if(!can('cashier','waiter'))return;const f=$('#hospitalityOrderForm'),reason=await kivuPrompt('Reason for complimentary item (required):',{title:'Complimentary Reason',required:true,defaultValue:''});if(!reason?.trim())return;const {error}=await sb.rpc('hospitality_request_complimentary',{p_tab_id:f.elements.tabId.value,p_product_id:f.elements.productId.value,p_qty:Number(f.elements.qty.value),p_note:f.elements.note.value||null,p_reason:reason.trim()});if(error)return kivuNotify(error.message,'error');f.elements.note.value='';kivuNotify('Complimentary request sent to owner/manager for approval.');await refresh();});
 
 renderSettingsV41=function(){if(profile?.role!=='owner'||!shop)return;$('#settingsProvince').value=shop.province||'';$('#settingsDistrict').value=shop.district||'';$('#settingsSector').value=shop.sector||'';$('#settingsCell').value=shop.cell||'';$('#settingsLanguage').value=shop.preferred_language||'en';if($('#settingsTaxRate'))$('#settingsTaxRate').value=Number(shop.tax_rate||0);if($('#settingsTaxLabel'))$('#settingsTaxLabel').value=shop.tax_label||'VAT';if($('#settingsTaxNumber'))$('#settingsTaxNumber').value=shop.tax_number||'';};
 setTimeout(()=>updateConnectivityUI().catch(()=>{}),1000);

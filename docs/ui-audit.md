@@ -1,8 +1,8 @@
 # Kivu Solutions UI Audit Report
 
-Generated: 2026-10-29T16:25:49.804Z
-Total Controls & Surfaces Audited: 273
-Bound: 273 | Unbound: 0
+Generated: 2026-10-29T16:42:47.536Z
+Total Controls & Surfaces Audited: 280
+Bound: 280 | Unbound: 0
 
 | Kind | ID | Label / Context | Handler Evidence | Status |
 |---|---|---|---|---|
@@ -209,6 +209,10 @@ Bound: 273 | Unbound: 0
 | button | `(no id)` | Close | cancel-btn dialog closer | ✅ |
 | button | `printZReportBtn` | 🖨️ Print 80mm Z-Report | referenced by #printZReportBtn in JS | ✅ |
 | button | `(no id)` | Close | cancel-btn dialog closer | ✅ |
+| button | `confirmCancelBtn` | Cancel | cancel-btn dialog closer; referenced by #confirmCancelBtn in JS | ✅ |
+| button | `confirmOkBtn` | Confirm | referenced by #confirmOkBtn in JS | ✅ |
+| button | `promptCancelBtn` | Cancel | cancel-btn dialog closer; referenced by #promptCancelBtn in JS; inside form #promptForm handled in JS | ✅ |
+| button | `promptOkBtn` | OK | referenced by #promptOkBtn in JS; submit button for form #promptForm | ✅ |
 | dialog | `supplierModal` | supplierModal | open count in HTML: 1; in JS: yes | ✅ |
 | dialog | `purchaseModal` | purchaseModal | open count in HTML: 2; in JS: yes | ✅ |
 | dialog | `supplierPaymentModal` | supplierPaymentModal | open count in HTML: 0; in JS: yes | ✅ |
@@ -245,6 +249,8 @@ Bound: 273 | Unbound: 0
 | dialog | `pettyCashModal` | pettyCashModal | open count in HTML: 0; in JS: yes | ✅ |
 | dialog | `zReportModal` | zReportModal | open count in HTML: 0; in JS: yes | ✅ |
 | dialog | `parkedCartsModal` | parkedCartsModal | open count in HTML: 0; in JS: yes | ✅ |
+| dialog | `confirmDialog` | confirmDialog | open count in HTML: 0; in JS: yes | ✅ |
+| dialog | `promptDialog` | promptDialog | open count in HTML: 0; in JS: yes | ✅ |
 | form | `loginForm` | loginForm | handled in JS | ✅ |
 | form | `signupForm` | signupForm | handled in JS | ✅ |
 | form | `supportNoteForm` | supportNoteForm | handled in JS | ✅ |
@@ -279,3 +285,4 @@ Bound: 273 | Unbound: 0
 | form | `adminUserForm` | adminUserForm | handled in JS | ✅ |
 | form | `creditRepaymentForm` | creditRepaymentForm | handled in JS | ✅ |
 | form | `pettyCashForm` | pettyCashForm | handled in JS | ✅ |
+| form | `promptForm` | promptForm | handled in JS | ✅ |

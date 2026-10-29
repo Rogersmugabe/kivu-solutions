@@ -23,6 +23,17 @@
 
 ---
 
-## Phase 2: Non-blocking Dialogs & UX Primitives (In Progress)
+## Phase 2: Non-blocking Dialogs & UX Primitives (Observed)
 
-*(Will be updated as Phase 2 call sites are converted and verified)*
+| Test ID | Description | Command / Execution | Status | Observed Output |
+|---|---|---|---|---|
+| **T12** | Every former `alert()` call site | Full codebase conversion | ✅ PASS | 149 sites converted to `kivuNotify()` / `showToast()` |
+| **T13** | Every former `confirm()` call site | Full codebase conversion | ✅ PASS | 10 sites converted to `await kivuConfirm()` |
+| **T14** | Every former `prompt()` call site | Full codebase conversion | ✅ PASS | 15 sites converted to `await kivuPrompt()` |
+| **T15b** | Native dialog strict pattern check | `node tools/check.js` | ✅ PASS | `alert=0, confirm=0, prompt=0` call sites outside helper definitions |
+| **T16** | Accessible `#toastRegion` | DOM audit | ✅ PASS | `<div id="toastRegion" class="sr-only" aria-live="polite">` present in `index.html` |
+| **T17** | Unified SaaS dialog elements | DOM audit | ✅ PASS | `<dialog id="confirmDialog">` and `<dialog id="promptDialog">` present and styled |
+
+---
+
+## Phase 3: Accessibility & Design Tokens (In Progress)
