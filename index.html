@@ -12,7 +12,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
-<link rel="stylesheet" href="css/style.css?v=5.1.0"/>
+<link rel="stylesheet" href="css/style.css?v=5.2.1"/>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 (function(){
@@ -291,27 +291,139 @@
 
 <div class="main">
 <header class="topbar">
-  <div><button id="menuBtn" class="mobile-menu">☰</button><b id="pageTitle">Overview</b><small id="todayDate"></small></div>
-  <div class="top-actions"><span id="connectivityBadge" class="pill connectivity online">Online</span><button id="offlineQueueBtn" class="btn ghost hidden" type="button">Offline sales <span id="offlineQueueCount">0</span></button><button id="modeSwitchBtn" class="btn secondary hidden" type="button">Platinum Tech Admin</button><select id="languageSelect" class="top-select"><option value="en">EN</option><option value="rw">RW</option><option value="fr">FR</option></select><button id="notificationsBtn" class="btn ghost" type="button">🔔 <span id="notificationCount">0</span></button><span id="topRoleBadge" class="pill">owner</span><button id="changePinBtn" class="btn ghost hidden" type="button">Change PIN</button><button id="quickSaleBtn" class="btn primary">+ New sale</button><button id="topLogoutBtn" class="btn ghost" type="button">Sign out</button></div>
+  <div>
+    <button id="menuBtn" class="mobile-menu" aria-label="Toggle navigation menu">☰</button>
+    <div class="topbar-breadcrumbs">
+      <span class="topbar-crumb-root">Kivu</span>
+      <span class="topbar-crumb-sep">/</span>
+      <b id="pageTitle">Overview</b>
+    </div>
+    <small id="todayDate" class="topbar-date-badge"></small>
+  </div>
+  <div class="top-actions"><span id="connectivityBadge" class="pill connectivity online"><span class="pulse-dot"></span>Online</span><button id="offlineQueueBtn" class="btn ghost hidden" type="button">Offline sales <span id="offlineQueueCount">0</span></button><button id="modeSwitchBtn" class="btn secondary hidden" type="button">Platinum Tech Admin</button><select id="languageSelect" class="top-select" aria-label="Language"><option value="en">EN</option><option value="rw">RW</option><option value="fr">FR</option></select><button id="notificationsBtn" class="btn ghost" type="button" aria-label="Notifications">🔔 <span id="notificationCount">0</span></button><span id="topRoleBadge" class="pill">owner</span><button id="changePinBtn" class="btn ghost hidden" type="button">Change PIN</button><button id="quickSaleBtn" class="btn primary pos-quick-btn pos-action-btn" type="button" title="Open POS counter checkout (F2)">+ New sale <span class="btn-pos-badge">F2</span></button><button id="topLogoutBtn" class="btn ghost" type="button">Sign out</button></div>
 </header>
+<div id="toastContainer" class="toast-container" aria-live="polite"></div>
 
 <main class="content">
 <section id="page-dashboard" class="page active">
-  <div class="page-head"><div><p class="eyebrow">TODAY</p><h1>Business overview</h1></div><div id="shiftStatusCard" class="status">No open shift</div></div>
-  <div class="stats">
-    <article><span>Sales today</span><strong id="salesToday">0 RWF</strong></article>
-    <article><span>Expenses today</span><strong id="expensesToday">0 RWF</strong></article>
-    <article><span>Estimated profit</span><strong id="profitToday">0 RWF</strong></article>
-    <article><span>Customer credit</span><strong id="creditTotal">0 RWF</strong></article>
-    <article><span>Low stock</span><strong id="lowStockCount">0</strong></article>
-    <article><span>Stock value</span><strong id="stockValue">0 RWF</strong></article>
+  <div class="dashboard-header">
+    <div class="dashboard-title-group">
+      <div class="dashboard-meta-row">
+        <p class="eyebrow">COMMAND CENTER</p>
+        <span id="dashboardShopTypePill" class="dashboard-business-pill">Business Overview</span>
+      </div>
+      <h1 id="dashboardShopHeading">Executive Command Center</h1>
+    </div>
+    <div class="dashboard-header-actions">
+      <div id="shiftStatusCard" class="status">No open shift</div>
+      <button type="button" class="btn-refresh" onclick="refresh()" title="Reload live business data">🔄 Refresh</button>
+    </div>
   </div>
-  <div class="quick">
-    <button data-open="saleModal">＋<b>New sale</b></button>
-    <button data-open="stockModal">↥<b>Add stock</b></button>
-    <button data-open="expenseModal">−<b>Add expense</b></button>
-    <button data-open="creditModal">◎<b>Add credit</b></button>
+
+  <div id="dashboardAlertsRibbon" class="dashboard-alerts-ribbon"></div>
+
+  <div class="dashboard-kpi-grid">
+    <div class="kpi-card" onclick="showPage('sales')" role="button" tabindex="0" title="View sales transactions">
+      <div class="kpi-top-row">
+        <span class="kpi-title">Sales Today</span>
+        <span class="kpi-icon-wrap kpi-icon-sales">💵</span>
+      </div>
+      <strong id="salesToday" class="kpi-value-text">0 RWF</strong>
+      <p id="kpiSalesSubtext" class="kpi-subtext">0 transactions today</p>
+    </div>
+    <div class="kpi-card" onclick="showPage('expenses')" role="button" tabindex="0" title="View expenses">
+      <div class="kpi-top-row">
+        <span class="kpi-title">Expenses Today</span>
+        <span class="kpi-icon-wrap kpi-icon-expenses">📉</span>
+      </div>
+      <strong id="expensesToday" class="kpi-value-text">0 RWF</strong>
+      <p id="kpiExpensesSubtext" class="kpi-subtext">Operating outflows</p>
+    </div>
+    <div class="kpi-card" onclick="showPage('reports')" role="button" tabindex="0" title="View estimated profit report">
+      <div class="kpi-top-row">
+        <span class="kpi-title">Est. Gross Profit</span>
+        <span class="kpi-icon-wrap kpi-icon-profit">📈</span>
+      </div>
+      <strong id="profitToday" class="kpi-value-text">0 RWF</strong>
+      <p id="kpiProfitSubtext" class="kpi-subtext">Sales − Cost − Expenses</p>
+    </div>
+    <div class="kpi-card" onclick="showPage('customers')" role="button" tabindex="0" title="View customer credit ledger">
+      <div class="kpi-top-row">
+        <span class="kpi-title">Customer Credit</span>
+        <span class="kpi-icon-wrap kpi-icon-credit">🤝</span>
+      </div>
+      <strong id="creditTotal" class="kpi-value-text">0 RWF</strong>
+      <p id="kpiCreditSubtext" class="kpi-subtext">Outstanding "Amadeni"</p>
+    </div>
+    <div class="kpi-card" onclick="showPage('inventory')" role="button" tabindex="0" title="View low stock products">
+      <div class="kpi-top-row">
+        <span class="kpi-title">Low Stock Alerts</span>
+        <span class="kpi-icon-wrap kpi-icon-lowstock">⚠️</span>
+      </div>
+      <strong id="lowStockCount" class="kpi-value-text">0</strong>
+      <p id="kpiLowStockSubtext" class="kpi-subtext">Items needing reorder</p>
+    </div>
+    <div class="kpi-card" onclick="showPage('inventory')" role="button" tabindex="0" title="View catalog valuation">
+      <div class="kpi-top-row">
+        <span class="kpi-title">Stock Valuation</span>
+        <span class="kpi-icon-wrap kpi-icon-stockvalue">📦</span>
+      </div>
+      <strong id="stockValue" class="kpi-value-text">0 RWF</strong>
+      <p id="kpiStockValSubtext" class="kpi-subtext">Total catalog at cost</p>
+    </div>
   </div>
+
+  <div class="quick-actions-bar">
+    <button class="quick-action-card quick-action-primary" data-open="saleModal" title="Open POS counter checkout (F2)">
+      <span class="quick-action-icon">＋</span>
+      <div class="quick-action-info">
+        <span class="quick-action-title">+ New POS Sale <span class="btn-pos-badge">F2</span></span>
+        <span class="quick-action-sub">Fast counter checkout</span>
+      </div>
+    </button>
+    <button class="quick-action-card" data-open="stockModal" title="Add stock to inventory">
+      <span class="quick-action-icon">📦</span>
+      <div class="quick-action-info">
+        <span class="quick-action-title">Add Stock</span>
+        <span class="quick-action-sub">Replenish units</span>
+      </div>
+    </button>
+    <button class="quick-action-card" data-open="expenseModal" title="Record an operating expense">
+      <span class="quick-action-icon">💸</span>
+      <div class="quick-action-info">
+        <span class="quick-action-title">Add Expense</span>
+        <span class="quick-action-sub">Log cash outflow</span>
+      </div>
+    </button>
+    <button class="quick-action-card" data-open="creditModal" title="Record customer credit / debt">
+      <span class="quick-action-icon">📝</span>
+      <div class="quick-action-info">
+        <span class="quick-action-title">Add Credit</span>
+        <span class="quick-action-sub">"Amadeni" debtor record</span>
+      </div>
+    </button>
+  </div>
+
+  <section class="trend-card" id="dashboardTrendChartCard">
+    <div class="trend-card-top">
+      <div class="trend-title-box">
+        <p class="eyebrow">REVENUE MOMENTUM</p>
+        <h3>7-Day Sales Trend & Daily Velocity</h3>
+      </div>
+      <div class="trend-metrics-strip">
+        <div class="trend-metric-pill">
+          <span>7-Day Volume</span>
+          <strong id="trend7dTotal">0 RWF</strong>
+        </div>
+        <div class="trend-metric-pill">
+          <span>Daily Average</span>
+          <strong id="trend7dAvg">0 RWF</strong>
+        </div>
+      </div>
+    </div>
+    <div id="trendBarsContainer" class="trend-bars-container"></div>
+    <div id="trendDaysAxis" class="trend-days-axis"></div>
+  </section>
   <div class="overview-grid-2">
     <!-- Card 1: Today's Payment Channels & Performance -->
     <section class="panel overview-panel" id="panelPaymentChannels">
@@ -555,7 +667,12 @@
 
 <section id="page-hospitality" class="page">
   <div id="hospitalityManagementHead" class="page-head"><div><p class="eyebrow">HOSPITALITY</p><h1 id="hospitalityTitle">Tables & open bills</h1></div><div><button id="recipeBtn" class="btn secondary" type="button">Recipes</button> <button id="newTableBtn" class="btn secondary" type="button">+ Table</button> <button id="newTabBtn" class="btn primary" type="button">+ Open bill</button></div></div>
-  <div id="hospitalityStats" class="stats hospitality-stats"><article><span>Open bills</span><strong id="openTabsCount">0</strong></article><article><span>Open value</span><strong id="openTabsValue">0 RWF</strong></article><article><span>Tables occupied</span><strong id="occupiedTablesCount">0</strong></article><article><span>Today closed</span><strong id="closedTabsToday">0</strong></article></div>
+  <div id="hospitalityStats" class="page-kpi-row">
+    <div class="page-kpi-card"><span>Open Bills / Tabs</span><strong id="openTabsCount">0</strong></div>
+    <div class="page-kpi-card"><span>Open Bill Valuation</span><strong id="openTabsValue" style="color:var(--color-brand-600)">0 RWF</strong></div>
+    <div class="page-kpi-card"><span>Tables Occupied</span><strong id="occupiedTablesCount">0</strong></div>
+    <div class="page-kpi-card"><span>Today Closed Bills</span><strong id="closedTabsToday" style="color:var(--color-emerald-600)">0</strong></div>
+  </div>
   <div id="hospitalityFloorSection" class="grid2"><section class="panel"><div class="panel-head"><div><p class="eyebrow">FLOOR</p><h2>Tables</h2></div></div><div id="hospitalityTablesGrid" class="hospitality-table-grid"></div></section><section class="panel"><div class="panel-head"><div><p class="eyebrow">SERVICE</p><h2>Open bills / tabs</h2></div></div><div id="hospitalityTabsList" class="list"></div></section></div>
   <section id="hospitalityTicketsSection" class="panel"><div class="panel-head"><div><p class="eyebrow">TICKETS</p><h2>Kitchen / bar queue</h2></div></div><div id="hospitalityTicketsList" class="list"></div></section>
   <section id="hospitalityClosedSection" class="panel"><div class="panel-head"><div><p class="eyebrow">RECENT</p><h2>Closed bills</h2></div><button id="wastageBtn" class="btn secondary" type="button">Record wastage</button></div><div class="table-wrap"><table><thead><tr><th>Closed</th><th>Table / tab</th><th>Waiter</th><th>Total</th><th>Receipt</th></tr></thead><tbody id="hospitalityClosedBody"></tbody></table></div></section>
@@ -576,17 +693,40 @@
       <button class="btn primary" data-open="productModal">+ Add product</button>
     </div>
   </div>
+  <div class="page-kpi-row">
+    <div class="page-kpi-card"><span>Total Catalog Products</span><strong id="inventoryTotalProducts">0</strong></div>
+    <div class="page-kpi-card"><span>Catalog Valuation</span><strong id="inventoryTotalValue">0 RWF</strong></div>
+    <div class="page-kpi-card"><span>Low Stock Alerts</span><strong id="inventoryLowCount" style="color:var(--color-amber-600)">0</strong></div>
+    <div class="page-kpi-card"><span>Out of Stock</span><strong id="inventoryOutCount" style="color:var(--color-rose-600)">0</strong></div>
+  </div>
+  <div class="filter-strip" id="inventoryStatusFilterStrip">
+    <button type="button" class="filter-pill-btn active" data-status="all" onclick="filterInventoryStatus('all')">All Products</button>
+    <button type="button" class="filter-pill-btn" data-status="instock" onclick="filterInventoryStatus('instock')">In Stock</button>
+    <button type="button" class="filter-pill-btn" data-status="low" onclick="filterInventoryStatus('low')">⚠️ Low Stock</button>
+    <button type="button" class="filter-pill-btn" data-status="out" onclick="filterInventoryStatus('out')">🚫 Out of Stock</button>
+  </div>
   <div id="inventoryCategoryPills" class="category-pills"></div>
   <section class="panel"><div class="table-wrap"><table><thead><tr><th>Product</th><th>Category</th><th>Stock</th><th>Cost</th><th>Selling price</th><th>Margin</th><th>Preferred supplier</th><th>Expiry</th><th>Status</th><th></th></tr></thead><tbody id="productsBody"></tbody></table></div></section>
 </section>
 
 
 <section id="page-suppliers" class="page">
-  <div class="page-head"><div><p class="eyebrow">SUPPLIERS</p><h1>Purchases & supplier debts</h1></div><div><button class="btn secondary" data-open="supplierModal">+ Supplier</button> <button class="btn primary" data-open="purchaseModal">+ Record purchase</button></div></div>
-  <div class="stats three">
-    <article><span>Total supplier debt</span><strong id="supplierDebtTotal">0 RWF</strong></article>
-    <article><span>Suppliers owed</span><strong id="suppliersOwedCount">0</strong></article>
-    <article><span>Purchases this month</span><strong id="supplierPurchasesMonth">0 RWF</strong></article>
+  <div class="page-head">
+    <div><p class="eyebrow">SUPPLIERS</p><h1>Purchases & supplier debts</h1></div>
+    <div class="head-actions">
+      <div class="search-input-wrap">
+        <span class="search-icon">🔍</span>
+        <input id="supplierSearchInput" type="search" placeholder="Search supplier name, phone, invoice...">
+        <button id="clearSupplierSearchBtn" type="button" class="btn ghost clear-search hidden" title="Clear">✕</button>
+      </div>
+      <button class="btn secondary" data-open="supplierModal">+ Supplier</button>
+      <button class="btn primary" data-open="purchaseModal">+ Record purchase</button>
+    </div>
+  </div>
+  <div class="page-kpi-row" style="grid-template-columns: repeat(3, 1fr);">
+    <div class="page-kpi-card"><span>Total Supplier Debt</span><strong id="supplierDebtTotal" style="color:var(--color-rose-600)">0 RWF</strong></div>
+    <div class="page-kpi-card"><span>Suppliers Owed</span><strong id="suppliersOwedCount">0</strong></div>
+    <div class="page-kpi-card"><span>Purchases This Month</span><strong id="supplierPurchasesMonth">0 RWF</strong></div>
   </div>
   <section class="panel">
     <p class="eyebrow">SUPPLIER BALANCES</p><h2>Who the business owes</h2>
@@ -603,19 +743,56 @@
 </section>
 
 <section id="page-expenses" class="page">
-  <div class="page-head"><div><p class="eyebrow">EXPENSES</p><h1>Money going out</h1></div><button class="btn primary" data-open="expenseModal">+ Record expense</button></div>
-  <div class="notice">Every expense is tied to the person who recorded it. Only the owner and managers can record expenses. Every expense is tied to the person who recorded it.</div>
+  <div class="page-head">
+    <div><p class="eyebrow">EXPENSES</p><h1>Operating expenses</h1></div>
+    <div class="head-actions">
+      <div class="search-input-wrap">
+        <span class="search-icon">🔍</span>
+        <input id="expensesSearchInput" type="search" placeholder="Search description, recorded by...">
+        <button id="clearExpensesSearchBtn" type="button" class="btn ghost clear-search hidden" title="Clear">✕</button>
+      </div>
+      <button class="btn primary" data-open="expenseModal">+ Record expense</button>
+    </div>
+  </div>
+  <div class="page-kpi-row" style="grid-template-columns: repeat(3, 1fr);">
+    <div class="page-kpi-card"><span>Expenses Today</span><strong id="expKpiToday">0 RWF</strong></div>
+    <div class="page-kpi-card"><span>Expenses This Month</span><strong id="expKpiMonth">0 RWF</strong></div>
+    <div class="page-kpi-card"><span>Top Category</span><strong id="expKpiTopCat">—</strong></div>
+  </div>
+  <div id="expensesCategoryPills" class="category-pills" style="margin-bottom:14px;"></div>
+  <div class="notice">Every expense is tied to the person who recorded it. Only the owner and managers can record expenses.</div>
   <section class="panel"><div class="table-wrap"><table><thead><tr><th>Date</th><th>Category</th><th>Description</th><th>Recorded by</th><th>Amount</th></tr></thead><tbody id="expensesBody"></tbody></table></div></section>
 </section>
 
 <section id="page-customers" class="page">
-  <div class="page-head"><div><p class="eyebrow">CUSTOMERS</p><h1>Customer records</h1></div><button class="btn primary" data-open="customerModal">+ Add customer</button></div>
+  <div class="page-head">
+    <div><p class="eyebrow">CUSTOMERS & CREDIT</p><h1>Customer records & "Amadeni"</h1></div>
+    <div class="head-actions">
+      <div class="search-input-wrap">
+        <span class="search-icon">🔍</span>
+        <input id="customerSearchInput" type="search" placeholder="Search customer, phone, email...">
+        <button id="clearCustomerSearchBtn" type="button" class="btn ghost clear-search hidden" title="Clear">✕</button>
+      </div>
+      <button class="btn primary" data-open="customerModal">+ Add customer</button>
+    </div>
+  </div>
+  <div class="page-kpi-row">
+    <div class="page-kpi-card"><span>Total Customers</span><strong id="custKpiTotal">0</strong></div>
+    <div class="page-kpi-card"><span>Total Outstanding Amadeni</span><strong id="custKpiDebt" style="color:var(--color-rose-600)">0 RWF</strong></div>
+    <div class="page-kpi-card"><span>Active Debtors</span><strong id="custKpiDebtors">0</strong></div>
+    <div class="page-kpi-card"><span>Debt Collections</span><strong id="custKpiCollections" style="color:var(--color-emerald-600)">0 RWF</strong></div>
+  </div>
   <section class="panel"><div class="table-wrap"><table><thead><tr><th>Name</th><th>Phone</th><th>Email</th><th>Outstanding</th><th>Actions</th></tr></thead><tbody id="customersBody"></tbody></table></div></section>
   <section class="panel"><p class="eyebrow">CREDIT</p><h2>Outstanding balances</h2><div id="creditList"></div></section>
 </section>
 
 <section id="page-employees" class="page">
   <div class="page-head"><div><p class="eyebrow">EMPLOYEES</p><h1>Team accountability</h1></div><button id="inviteStaffBtn" class="btn primary owner-only" data-open="staffInviteModal">+ Invite staff</button></div>
+  <div class="page-kpi-row" style="grid-template-columns: repeat(3, 1fr);">
+    <div class="page-kpi-card"><span>Total Team Members</span><strong id="empKpiTotal">0</strong></div>
+    <div class="page-kpi-card"><span>Active Staff Accounts</span><strong id="empKpiActive">0</strong></div>
+    <div class="page-kpi-card"><span>Pending Invites</span><strong id="empKpiInvites">0</strong></div>
+  </div>
   <div class="notice">Each staff member gets their own login. Permissions are enforced in the database, and sensitive actions are tied to the logged-in user.</div>
   <section class="panel owner-only"><p class="eyebrow">PENDING INVITES</p><h2>Staff invite codes</h2><div id="staffInvitesList"></div></section>
   <section class="panel"><div class="table-wrap"><table><thead><tr><th>Employee</th><th>Role</th><th>Phone</th><th>Status</th><th>Sales today</th><th>Actions</th></tr></thead><tbody id="employeesBody"></tbody></table></div></section>
@@ -631,10 +808,10 @@
       <button id="openShiftBtn" class="btn primary">Open shift</button>
     </div>
   </div>
-  <div class="stats three">
-    <article><span>Opening cash</span><strong id="shiftOpeningCash">0 RWF</strong></article>
-    <article><span>Expected cash</span><strong id="shiftExpectedCash">0 RWF</strong></article>
-    <article><span>Cash difference</span><strong id="shiftDifference">—</strong></article>
+  <div class="page-kpi-row" style="grid-template-columns: repeat(3, 1fr);">
+    <div class="page-kpi-card"><span>Opening Float Cash</span><strong id="shiftOpeningCash">0 RWF</strong></div>
+    <div class="page-kpi-card"><span>Expected Drawer Cash</span><strong id="shiftExpectedCash" style="color:var(--color-brand-600)">0 RWF</strong></div>
+    <div class="page-kpi-card"><span>Cash Difference / Variance</span><strong id="shiftDifference">—</strong></div>
   </div>
   <section class="panel">
     <div class="page-head"><div><p class="eyebrow">CURRENT SHIFT</p><h2 id="currentShiftTitle">No open shift</h2></div><button id="closeShiftBtn" class="btn danger hidden">Close shift</button></div>
@@ -659,24 +836,56 @@
 
 <section id="page-controls" class="page">
   <div class="page-head"><div><p class="eyebrow">ANTI-THEFT CONTROLS</p><h1>Approvals & exceptions</h1></div></div>
-  <div class="stats four">
-    <article><span>Pending approvals</span><strong id="pendingApprovalCount">0</strong></article>
-    <article><span>Voided sales today</span><strong id="voidedSalesToday">0</strong></article>
-    <article><span>Stock adjustments today</span><strong id="stockAdjustmentsToday">0</strong></article>
-    <article><span>Cash variances today</span><strong id="cashVarianceToday">0 RWF</strong></article>
+  <div class="page-kpi-row">
+    <div class="page-kpi-card"><span>Pending Approvals</span><strong id="pendingApprovalCount" style="color:var(--color-amber-600)">0</strong></div>
+    <div class="page-kpi-card"><span>Voided Sales Today</span><strong id="voidedSalesToday" style="color:var(--color-rose-600)">0</strong></div>
+    <div class="page-kpi-card"><span>Stock Adjustments Today</span><strong id="stockAdjustmentsToday">0</strong></div>
+    <div class="page-kpi-card"><span>Cash Variances Today</span><strong id="cashVarianceToday" style="color:var(--color-rose-600)">0 RWF</strong></div>
   </div>
   <section class="panel"><p class="eyebrow">PENDING APPROVALS</p><h2>Actions waiting for owner / manager</h2><div id="approvalsList"></div></section>
   <section class="panel"><p class="eyebrow">RECENT EXCEPTIONS</p><h2>Voids, stock changes and cash differences</h2><div id="controlAlertsList"></div></section>
 </section>
 
 <section id="page-reports" class="page">
-  <div class="page-head"><div><p class="eyebrow">REPORTS</p><h1>Business performance</h1></div><div><button id="accountantExportBtn" class="btn secondary" type="button">Accountant CSV</button> <button id="exportCsvBtn" class="btn secondary" type="button">Export data</button> <button id="exportBackupBtn" class="btn secondary" type="button">Backup JSON</button></div></div>
+  <div class="page-head">
+    <div><p class="eyebrow">REPORTS & ANALYTICS</p><h1>Business performance & profitability</h1></div>
+    <div class="head-actions">
+      <button id="accountantExportBtn" class="btn secondary" type="button">Accountant CSV</button>
+      <button id="exportCsvBtn" class="btn secondary" type="button">Export data</button>
+      <button id="exportBackupBtn" class="btn secondary" type="button">Backup JSON</button>
+    </div>
+  </div>
   <label class="period">Period<select id="reportPeriod"><option value="7">Last 7 days</option><option value="30" selected>Last 30 days</option><option value="90">Last 90 days</option></select></label>
   <div class="stats four">
-    <article><span>Sales</span><strong id="reportSales">0 RWF</strong></article>
-    <article><span>Expenses</span><strong id="reportExpenses">0 RWF</strong></article>
-    <article><span>Estimated profit</span><strong id="reportProfit">0 RWF</strong></article>
+    <article><span>Sales Volume</span><strong id="reportSales">0 RWF</strong></article>
+    <article><span>Operating Expenses</span><strong id="reportExpenses">0 RWF</strong></article>
+    <article><span>Estimated Profit</span><strong id="reportProfit">0 RWF</strong></article>
     <article><span>Transactions</span><strong id="reportTransactions">0</strong></article>
+  </div>
+  <div class="reports-performance-grid">
+    <section class="panel">
+      <p class="eyebrow">REVENUE BY PAYMENT METHOD</p>
+      <h2>Payment Channel Share</h2>
+      <div id="reportChannelsList" class="payment-channels-list"></div>
+    </section>
+    <section class="panel">
+      <p class="eyebrow">PERIOD PERFORMANCE</p>
+      <h2>Operational Metrics</h2>
+      <div class="payment-metrics-summary" style="margin-top:10px;">
+        <div class="metric-pill">
+          <span class="metric-label">Average Basket</span>
+          <strong id="reportAvgBasket">0 RWF</strong>
+        </div>
+        <div class="metric-pill">
+          <span class="metric-label">Gross Margin</span>
+          <strong id="reportMarginPct">0%</strong>
+        </div>
+        <div class="metric-pill">
+          <span class="metric-label">Daily Avg Sales</span>
+          <strong id="reportDailyAvg">0 RWF</strong>
+        </div>
+      </div>
+    </section>
   </div>
 </section>
 
@@ -1152,24 +1361,66 @@
 
 <section id="page-settings" class="page">
   <div class="page-head"><div><p class="eyebrow">SETTINGS</p><h1>Business settings</h1></div></div>
-  <section class="panel">
-    <form id="settingsForm">
-      <div class="form-grid">
-        <label>Business name<input id="settingsBusinessName"></label><label>Business type<select id="settingsBusinessType"><option value="retail">Shop / Retail</option><option value="bar">Bar</option><option value="restaurant">Restaurant</option><option value="bar_restaurant">Bar & Restaurant</option></select></label>
-        <label>Phone<input id="settingsPhone"></label>
-        <label>Receipt footer<input id="settingsReceiptFooter" placeholder="Thank you for your business"></label>
-        <label>Province<input id="settingsProvince"></label>
-        <label>District<input id="settingsDistrict"></label>
-        <label>Sector<input id="settingsSector"></label>
-        <label>Cell<input id="settingsCell"></label>
-        <label>Language<select id="settingsLanguage"><option value="en">English</option><option value="rw">Kinyarwanda</option><option value="fr">Français</option></select></label><label>Tax / VAT rate (%)<input id="settingsTaxRate" type="number" min="0" max="100" step="0.01" value="0"></label><label>Tax label<input id="settingsTaxLabel" value="VAT" placeholder="VAT / TVA"></label><label>Tax number <small>(optional)</small><input id="settingsTaxNumber" placeholder="TIN / tax number"></label>
+    <form id="settingsForm" class="settings-form-layout">
+      <!-- Section 1: Business Profile & Type -->
+      <div class="settings-section">
+        <div class="settings-section-head">
+          <h3 class="settings-section-title">Business Profile & Operational Model</h3>
+          <p class="settings-section-desc">Define your trade name, operational category (Retail, Bar, or Restaurant), and official contact number.</p>
+        </div>
+        <div class="form-grid">
+          <label>Business name<input id="settingsBusinessName" placeholder="e.g. Kigali Wholesale or Kivu Lounge"></label>
+          <label>Business type<select id="settingsBusinessType"><option value="retail">Shop / Retail</option><option value="bar">Bar</option><option value="restaurant">Restaurant</option><option value="bar_restaurant">Bar & Restaurant</option></select></label>
+          <label>Phone<input id="settingsPhone" inputmode="tel" placeholder="0788 123 456"></label>
+        </div>
       </div>
-      <div class="notice"><b>Tax note:</b> Kivu can show a configured tax/VAT breakdown on normal receipts. This does not make the receipt an EBM fiscal invoice. Fiscal EBM is not enabled in the public build until approved integration is completed.</div>
-      <input id="ebmEnabled" type="checkbox" class="hidden" disabled>
-      <div id="ebmPlanNotice" class="hidden"></div><div id="ebmNotice" class="hidden"></div>
-      <button class="btn primary">Save settings</button>
+
+      <!-- Section 2: Location & Administrative Entity -->
+      <div class="settings-section">
+        <div class="settings-section-head">
+          <h3 class="settings-section-title">Physical Location & Administration</h3>
+          <p class="settings-section-desc">Store location for municipal compliance, Rwanda DPPO registration, and local tax attribution.</p>
+        </div>
+        <div class="form-grid">
+          <label>Province<input id="settingsProvince" placeholder="e.g. Kigali City"></label>
+          <label>District<input id="settingsDistrict" placeholder="e.g. Gasabo"></label>
+          <label>Sector<input id="settingsSector" placeholder="e.g. Kimironko"></label>
+          <label>Cell<input id="settingsCell" placeholder="e.g. Kibagabaga"></label>
+        </div>
+      </div>
+
+      <!-- Section 3: Tax & Fiscal Compliance -->
+      <div class="settings-section">
+        <div class="settings-section-head">
+          <h3 class="settings-section-title">Tax & Fiscal Compliance</h3>
+          <p class="settings-section-desc">Configure commercial VAT/TVA rate for customer receipts and your official TIN / Tax Number.</p>
+        </div>
+        <div class="form-grid">
+          <label>Tax / VAT rate (%)<input id="settingsTaxRate" type="number" min="0" max="100" step="0.01" value="0"></label>
+          <label>Tax label<input id="settingsTaxLabel" value="VAT" placeholder="VAT / TVA"></label>
+          <label>Tax number <small>(optional)</small><input id="settingsTaxNumber" placeholder="TIN / tax number"></label>
+        </div>
+        <div class="notice"><b>Tax note:</b> Kivu can show a configured tax/VAT breakdown on normal receipts. This does not make the receipt an EBM fiscal invoice. Fiscal EBM is not enabled in the public build until approved integration is completed.</div>
+        <input id="ebmEnabled" type="checkbox" class="hidden" disabled>
+        <div id="ebmPlanNotice" class="hidden"></div><div id="ebmNotice" class="hidden"></div>
+      </div>
+
+      <!-- Section 4: Receipts & Localization -->
+      <div class="settings-section">
+        <div class="settings-section-head">
+          <h3 class="settings-section-title">Receipts & Language Preferences</h3>
+          <p class="settings-section-desc">Choose customer receipt print language and custom thank-you footer printed on 80mm receipts.</p>
+        </div>
+        <div class="form-grid">
+          <label>Language<select id="settingsLanguage"><option value="en">English</option><option value="rw">Kinyarwanda</option><option value="fr">Français</option></select></label>
+          <label>Receipt footer<input id="settingsReceiptFooter" placeholder="Thank you for your business"></label>
+        </div>
+      </div>
+
+      <div class="settings-form-actions">
+        <button class="btn primary" type="submit">Save settings</button>
+      </div>
     </form>
-  </section>
   <section class="panel owner-only"><p class="eyebrow">DEVICES & SESSIONS</p><h2>Signed-in devices</h2><div id="ownerDevicesList"></div></section><section class="panel"><p class="eyebrow">LEGAL & TRUST</p><h2>Policies</h2><p><a href="legal/privacy.html" target="_blank" rel="noopener">Privacy notice</a> · <a href="legal/terms.html" target="_blank" rel="noopener">Terms of service</a></p><small>These launch drafts should be reviewed by your legal adviser before wider rollout.</small></section>
 </section>
 </main>
@@ -1293,12 +1544,12 @@
 <dialog id="parkedCartsModal"><div class="parked-carts-card"><h3>Held Carts (Parked)</h3><p class="tag mini">Resume a previously held cart or discard it</p><div id="parkedCartsList" class="parked-carts-list"></div><div class="modal-actions"><button type="button" class="btn ghost cancel-btn">Close</button></div></div></dialog>
 
 
-<script src="js/config.js?v=5.1.0"></script>
-<script src="js/offline-queue.js?v=5.1.0"></script>
+<script src="js/config.js?v=5.2.1"></script>
+<script src="js/offline-queue.js?v=5.2.1"></script>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="https://unpkg.com/@zxing/browser@0.1.1/umd/zxing-browser.min.js"></script>
-<script src="js/camera-scanner.js?v=5.1.0"></script>
-<script src="js/app.js?v=5.1.0"></script>
-<script src="js/pwa-install.js?v=5.1.0"></script>
+<script src="js/camera-scanner.js?v=5.2.1"></script>
+<script src="js/app.js?v=5.2.1"></script>
+<script src="js/pwa-install.js?v=5.2.1"></script>
 </body>
 </html>
