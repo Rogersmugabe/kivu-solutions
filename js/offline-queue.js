@@ -81,7 +81,8 @@
   function loadSnapshot(userId){
     try{
       const s=JSON.parse(localStorage.getItem(SNAPSHOT_KEY)||'null');
-      if(!s||!s.user_id||s.user_id!==userId)return null;
+      if(!s||!s.profile||!s.shop)return null;
+      if(userId&&s.user_id&&s.user_id!==userId)return null;
       return s;
     }catch(_e){return null;}
   }

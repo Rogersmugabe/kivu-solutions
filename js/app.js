@@ -367,19 +367,21 @@ sb.auth.onAuthStateChange(async(event,s)=>{
   }
 });
 
-$('#logoutBtn').onclick=async()=>{await sb.auth.signOut();};
-$('#topLogoutBtn').onclick=async()=>{await sb.auth.signOut();};
+function showAppInitLoader(text){const el=$('#appInitLoader');if(!el)return;const t=$('#appInitLoaderText');if(t&&text)t.textContent=text;el.classList.remove('hidden');}
+function hideAppInitLoader(){const el=$('#appInitLoader');if(el)el.classList.add('hidden');}
+$('#logoutBtn').onclick=async()=>{try{localStorage.removeItem('kivu_offline_snapshot_v1');}catch(_e){}document.documentElement.classList.remove('has-cached-session');await sb.auth.signOut();};
+$('#topLogoutBtn').onclick=async()=>{try{localStorage.removeItem('kivu_offline_snapshot_v1');}catch(_e){}document.documentElement.classList.remove('has-cached-session');await sb.auth.signOut();};
 sb.auth.onAuthStateChange(async(_event,s)=>{session=s;if(s)await enter();else showAuth()});
 (async()=>{const {data}=await sb.auth.getSession();session=data.session;if(session)await enter();else showAuth()})();
 
-function showAuth(){
+function showAuth(){try{localStorage.removeItem('kivu_offline_snapshot_v1');}catch(_e){}document.documentElement.classList.remove('has-cached-session');hideAppInitLoader();
   $('#authScreen').classList.remove('hidden');
   $('#appShell').classList.add('hidden');
 }
 
 async function enter(){
-  $('#authScreen').classList.add('hidden');
-  $('#appShell').classList.remove('hidden');
+  if(profile&&shop){$('#authScreen').classList.add('hidden');$('#appShell').classList.remove('hidden');}
+
   try{
     await ensureProfileAndShop();
     const subStatus=effectiveSubscriptionStatus();
@@ -399,6 +401,8 @@ async function enter(){
     }
     applyPermissions();
     render();
+    $('#authScreen').classList.add('hidden');
+    $('#appShell').classList.remove('hidden');
   }catch(err){
     console.error(err);
     console.error(err); alert(err.message||'Could not load Kivu Solutions.');
@@ -3145,26 +3149,123 @@ $('#hospitalityRecipeForm')?.addEventListener('submit',async e=>{e.preventDefaul
 let offlineSnapshotMode=false;
 function saveOfflineSnapshot(){
   if(!window.KivuOffline||!session?.user?.id||!shop)return;
-  window.KivuOffline.saveSnapshot(session.user.id,{profile,shop,shopFeatureFlags,products,sales,expenses,stockPurchases,customers,credits,employees,shifts,suppliers,supplierPurchases,supplierPayments,currentShift,saved_at:new Date().toISOString()});
+  window.KivuOffline.saveSnapshot(session.user.id,{
+    profile,shop,shopFeatureFlags,products,sales,expenses,stockPurchases,
+    customers,credits,employees,shifts,suppliers,supplierPurchases,
+    supplierPayments,currentShift,
+    hospitalityTables:typeof hospitalityTables!=='undefined'?hospitalityTables:[],
+    hospitalityTabs:typeof hospitalityTabs!=='undefined'?hospitalityTabs:[],
+    hospitalityItems:typeof hospitalityItems!=='undefined'?hospitalityItems:[],
+    hospitalityPayments:typeof hospitalityPayments!=='undefined'?hospitalityPayments:[],
+    hospitalityRecipes:typeof hospitalityRecipes!=='undefined'?hospitalityRecipes:[],
+    hospitalityWastage:typeof hospitalityWastage!=='undefined'?hospitalityWastage:[],
+    shopNotifications:typeof shopNotifications!=='undefined'?shopNotifications:[],
+    audits:typeof audits!=='undefined'?audits:[],
+    staffInvites:typeof staffInvites!=='undefined'?staffInvites:[],
+    approvalRequests:typeof approvalRequests!=='undefined'?approvalRequests:[],
+    stockAdjustments:typeof stockAdjustments!=='undefined'?stockAdjustments:[],
+    saved_at:new Date().toISOString()
+  });
 }
-function restoreOfflineSnapshot(){
-  const snap=window.KivuOffline?.loadSnapshot?.(session?.user?.id);if(!snap)return false;
-  ({profile,shop,shopFeatureFlags={},products=[],sales=[],expenses=[],stockPurchases=[],customers=[],credits=[],employees=[],shifts=[],suppliers=[],supplierPurchases=[],supplierPayments=[],currentShift=null}=snap);
-  offlineSnapshotMode=true;return !!profile&&!!shop;
+
+function restoreOfflineSnapshot(explicitUserId){
+  const snap=window.KivuOffline?.loadSnapshot?.(explicitUserId||session?.user?.id);
+  if(!snap||!snap.profile||!snap.shop)return false;
+  profile=snap.profile;
+  shop=snap.shop;
+  shopFeatureFlags=snap.shopFeatureFlags||{};
+  products=Array.isArray(snap.products)?snap.products:[];
+  sales=Array.isArray(snap.sales)?snap.sales:[];
+  expenses=Array.isArray(snap.expenses)?snap.expenses:[];
+  stockPurchases=Array.isArray(snap.stockPurchases)?snap.stockPurchases:[];
+  customers=Array.isArray(snap.customers)?snap.customers:[];
+  credits=Array.isArray(snap.credits)?snap.credits:[];
+  employees=Array.isArray(snap.employees)?snap.employees:[];
+  shifts=Array.isArray(snap.shifts)?snap.shifts:[];
+  suppliers=Array.isArray(snap.suppliers)?snap.suppliers:[];
+  supplierPurchases=Array.isArray(snap.supplierPurchases)?snap.supplierPurchases:[];
+  supplierPayments=Array.isArray(snap.supplierPayments)?snap.supplierPayments:[];
+  currentShift=snap.currentShift||null;
+  if(Array.isArray(snap.hospitalityTables))hospitalityTables=snap.hospitalityTables;
+  if(Array.isArray(snap.hospitalityTabs))hospitalityTabs=snap.hospitalityTabs;
+  if(Array.isArray(snap.hospitalityItems))hospitalityItems=snap.hospitalityItems;
+  if(Array.isArray(snap.hospitalityPayments))hospitalityPayments=snap.hospitalityPayments;
+  if(Array.isArray(snap.hospitalityRecipes))hospitalityRecipes=snap.hospitalityRecipes;
+  if(Array.isArray(snap.hospitalityWastage))hospitalityWastage=snap.hospitalityWastage;
+  if(Array.isArray(snap.shopNotifications))shopNotifications=snap.shopNotifications;
+  if(Array.isArray(snap.audits))audits=snap.audits;
+  if(Array.isArray(snap.staffInvites))staffInvites=snap.staffInvites;
+  if(Array.isArray(snap.approvalRequests))approvalRequests=snap.approvalRequests;
+  if(Array.isArray(snap.stockAdjustments))stockAdjustments=snap.stockAdjustments;
+  offlineSnapshotMode=true;
+  return true;
 }
+
+function hydrateFromCache(){
+  if(!restoreOfflineSnapshot())return false;
+  document.documentElement.classList.add('has-cached-session');
+  $('#authScreen')?.classList.add('hidden');
+  $('#appShell')?.classList.remove('hidden');
+  try{
+    applyPermissions();
+    render();
+  }catch(_e){}
+  return true;
+}
+
 function applyOfflineStockDraft(items){
   for(const item of items){const p=products.find(x=>x.id===item.product_id);if(!p)continue;const ratio=item.unit_mode==='bulk'?unitsPerBulk(p):1;p.qty=Math.max(0,Number(p.qty||0)-Number(item.entered_qty||0)*ratio);}
   renderInventory();
 }
+
+let enterInFlight=null;
 const _enterV48=enter;
-enter=async function(){
-  if(!navigator.onLine&&restoreOfflineSnapshot()){
-    $('#authScreen').classList.add('hidden');$('#appShell').classList.remove('hidden');isDukaAdmin=false;applyPermissions();render();await updateConnectivityUI();return;
-  }
-  offlineSnapshotMode=false;await _enterV48();if(session&&shop){saveOfflineSnapshot();await updateConnectivityUI();syncOfflineSales().catch(console.warn);}
+enter=function(){
+  if(enterInFlight)return enterInFlight;
+  enterInFlight=(async()=>{
+    const hasCache=hydrateFromCache();
+    if(!hasCache&&(!profile||!shop)){
+      showAppInitLoader('Preparing your workspace...');
+    }
+    if(!navigator.onLine&&hasCache){
+      await updateConnectivityUI();
+      return;
+    }
+    try{
+      offlineSnapshotMode=false;
+      await _enterV48();
+      if(session&&shop){
+        saveOfflineSnapshot();
+        await updateConnectivityUI();
+        syncOfflineSales().catch(console.warn);
+      }
+    }catch(err){
+      console.error('Enter background refresh error:',err);
+      if(!hasCache){
+        alert(err.message||'Could not load Kivu Solutions.');
+        await sb.auth.signOut();
+      }
+    }finally{
+      hideAppInitLoader();
+      $('#authScreen')?.classList.add('hidden');
+      $('#appShell')?.classList.remove('hidden');
+      enterInFlight=null;
+    }
+  })();
+  return enterInFlight;
 };
+
 const _refreshV48=refresh;
-refresh=async function(){if(!navigator.onLine){saveOfflineSnapshot();render();return;}await _refreshV48();saveOfflineSnapshot();await updateConnectivityUI();};
+refresh=async function(){
+  if(!navigator.onLine){
+    saveOfflineSnapshot();
+    render();
+    return;
+  }
+  await _refreshV48();
+  saveOfflineSnapshot();
+  await updateConnectivityUI();
+};
 
 async function updateConnectivityUI(){
   const badge=$('#connectivityBadge'),button=$('#offlineQueueBtn'),countEl=$('#offlineQueueCount');
@@ -3219,7 +3320,7 @@ async function runOfflineSalesSync(){
 window.addEventListener('online',()=>{updateConnectivityUI();syncOfflineSales().catch(console.warn);});
 window.addEventListener('offline',()=>updateConnectivityUI());
 $('#offlineQueueBtn')?.addEventListener('click',async()=>{const rows=await window.KivuOffline.listSales(shop.id);const errors=rows.filter(x=>x.status==='needs_attention');alert(rows.length?`${rows.length} offline sale(s) waiting. ${errors.length?errors.length+' need attention because server validation failed. Reconnect and retry after correcting stock/customer data.':'They will sync automatically when online.'}`:'No offline sales waiting.');if(navigator.onLine)syncOfflineSales().catch(console.warn);});
-if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('./sw.js?v=5.0.0',{updateViaCache:'none'}).then(reg=>{reg.update().catch(()=>{});reg.addEventListener('updatefound',()=>{const newWorker=reg.installing;if(!newWorker)return;newWorker.addEventListener('statechange',()=>{if(newWorker.state==='installed'&&navigator.serviceWorker.controller){newWorker.postMessage({type:'SKIP_WAITING'});}});});}).catch(e=>console.warn('Service worker:',e.message));let refreshing=false;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(refreshing)return;refreshing=true;window.location.reload();});});}
+if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('./sw.js?v=5.1.0',{updateViaCache:'none'}).then(reg=>{reg.update().catch(()=>{});reg.addEventListener('updatefound',()=>{const newWorker=reg.installing;if(!newWorker)return;newWorker.addEventListener('statechange',()=>{if(newWorker.state==='installed'&&navigator.serviceWorker.controller){newWorker.postMessage({type:'SKIP_WAITING'});}});});}).catch(e=>console.warn('Service worker:',e.message));let refreshing=false;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(refreshing)return;refreshing=true;window.location.reload();});});}
 
 function findProductByBarcode(code){const clean=String(code||'').trim();return products.find(x=>String(x.barcode||'').trim()===clean);}
 function chooseProductFromBarcode(code,{autoAdd=false,formSelector='#saleForm'}={}){const p=findProductByBarcode(code);if(!p){alert('No product matches that barcode. Register the barcode in Inventory first.');return null;}const f=$(formSelector);if(f?.elements?.productId){f.elements.productId.value=p.id;if(formSelector==='#saleForm')refreshSaleUnitOptions();if(f.elements.qty)f.elements.qty.value='1';}if(autoAdd)$('#addSaleItemBtn')?.click();return p;}
@@ -3267,3 +3368,5 @@ if (document.readyState === 'loading') {
 } else {
   initMoneyInputs();
 }
+// Instant Pre-Hydration: populate the entire website with cached data immediately in 0ms!
+hydrateFromCache();
