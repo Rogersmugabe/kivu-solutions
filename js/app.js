@@ -266,7 +266,9 @@ function initMoneyInputs(root=document){
   }catch(_e){}
 }
 window.initMoneyInputs=initMoneyInputs;
-const day=d=>new Date(d).toISOString().slice(0,10);
+const pad2=n=>String(n).padStart(2,'0');
+const localDay=d=>{const x=new Date(d);if(isNaN(x.getTime()))return '';return `${x.getFullYear()}-${pad2(x.getMonth()+1)}-${pad2(x.getDate())}`;};
+const day=localDay;
 const fmt=d=>new Date(d).toLocaleString('en-RW',{dateStyle:'medium',timeStyle:'short'});
 const roleLabel=r=>({owner:'Owner',manager:'Manager',cashier:'Cashier',stock_clerk:'Stock Clerk',waiter:'Waiter',kitchen:'Kitchen / Bar Prep'})[r]||r;
 const can=(...roles)=>roles.includes(profile?.role);
@@ -1742,7 +1744,7 @@ function showReceipt(s){showReceiptGroup([s], getReceiptTendered(s?.receipt_no))
 function showReceiptGroup(lines, optTendered){
   if(!requireFeature('receipts','Digital receipts are included in Kivu Lite.'))return;if(!lines?.length)return;
   const s=lines[0],gross=lines.reduce((a,x)=>a+Number(x.total||0)+Number(x.discount||0),0),discount=lines.reduce((a,x)=>a+Number(x.discount||0),0),total=lines.reduce((a,x)=>a+Number(x.total||0),0);
-  const rate=Math.max(0,Number(shop.tax_rate||0)),tax=rate>0?total*rate/(100+rate):0,taxLabel=shop.tax_label||'VAT';
+  const rate=Math.max(0,Number(shop.tax_rate||0)),tax=rate>0?Math.round(total*rate/(100+rate)):0,taxLabel=shop.tax_label||'VAT';
   const items=lines.map(x=>`<div class="receipt-row"><span>${esc(x.product_name)} × ${x.entered_qty?`${x.entered_qty} ${esc(x.sold_unit||'')}`:x.qty}</span><span>${money(Number(x.total||0)+Number(x.discount||0))}</span></div>`).join('');
 
   const savedSplit=(s.receipt_no?getSplitPaymentDetails(s.receipt_no):null)||(s.client_ref?getSplitPaymentDetails(s.client_ref):null);
@@ -3621,12 +3623,34 @@ $('#hospitalityRecipeForm')?.addEventListener('submit',async e=>{e.preventDefaul
    Offline queue, barcode checkout, role-specific hospitality, imports.
    ============================================================ */
 let offlineSnapshotMode=false;
+function getAuthUserIdSync(){
+  try{
+    for(let i=0;i<localStorage.length;i++){
+      const k=localStorage.key(i);
+      if(k&&/^sb-.*-auth-token$/.test(k)){
+        const raw=localStorage.getItem(k);
+        if(!raw)continue;
+        const parsed=JSON.parse(raw);
+        const uid=parsed?.user?.id||parsed?.currentSession?.user?.id;
+        if(uid)return uid;
+      }
+    }
+  }catch(_e){}
+  return null;
+}
+
 function saveOfflineSnapshot(){
   if(!window.KivuOffline||!session?.user?.id||!shop)return;
+  const isOwnerOrManager=['owner','manager'].includes(profile?.role);
   window.KivuOffline.saveSnapshot(session.user.id,{
-    profile,shop,shopFeatureFlags,products,sales,expenses,stockPurchases,
-    customers,credits,employees,shifts,suppliers,supplierPurchases,
-    supplierPayments,currentShift,
+    profile,shop,shopFeatureFlags,products,sales,
+    expenses:isOwnerOrManager?expenses:[],
+    stockPurchases,
+    customers,credits,
+    employees:isOwnerOrManager?employees:[],
+    shifts,suppliers,supplierPurchases,
+    supplierPayments:isOwnerOrManager?supplierPayments:[],
+    currentShift,
     hospitalityTables:typeof hospitalityTables!=='undefined'?hospitalityTables:[],
     hospitalityTabs:typeof hospitalityTabs!=='undefined'?hospitalityTabs:[],
     hospitalityItems:typeof hospitalityItems!=='undefined'?hospitalityItems:[],
@@ -3634,16 +3658,18 @@ function saveOfflineSnapshot(){
     hospitalityRecipes:typeof hospitalityRecipes!=='undefined'?hospitalityRecipes:[],
     hospitalityWastage:typeof hospitalityWastage!=='undefined'?hospitalityWastage:[],
     shopNotifications:typeof shopNotifications!=='undefined'?shopNotifications:[],
-    audits:typeof audits!=='undefined'?audits:[],
-    staffInvites:typeof staffInvites!=='undefined'?staffInvites:[],
-    approvalRequests:typeof approvalRequests!=='undefined'?approvalRequests:[],
-    stockAdjustments:typeof stockAdjustments!=='undefined'?stockAdjustments:[],
+    audits:isOwnerOrManager&&typeof audits!=='undefined'?audits:[],
+    staffInvites:isOwnerOrManager&&typeof staffInvites!=='undefined'?staffInvites:[],
+    approvalRequests:isOwnerOrManager&&typeof approvalRequests!=='undefined'?approvalRequests:[],
+    stockAdjustments:isOwnerOrManager&&typeof stockAdjustments!=='undefined'?stockAdjustments:[],
     saved_at:new Date().toISOString()
   });
 }
 
 function restoreOfflineSnapshot(explicitUserId){
-  const snap=window.KivuOffline?.loadSnapshot?.(explicitUserId||session?.user?.id);
+  const uid=explicitUserId||session?.user?.id||getAuthUserIdSync();
+  if(!uid)return false;
+  const snap=window.KivuOffline?.loadSnapshot?.(uid);
   if(!snap||!snap.profile||!snap.shop)return false;
   profile=snap.profile;
   shop=snap.shop;
@@ -3676,7 +3702,15 @@ function restoreOfflineSnapshot(explicitUserId){
 }
 
 function hydrateFromCache(){
-  if(!restoreOfflineSnapshot())return false;
+  const uid=getAuthUserIdSync();
+  if(!uid){
+    window.KivuOffline?.clearSnapshot?.();
+    return false;
+  }
+  if(!restoreOfflineSnapshot(uid)){
+    window.KivuOffline?.clearSnapshot?.();
+    return false;
+  }
   document.documentElement.classList.add('has-cached-session');
   $('#authScreen')?.classList.add('hidden');
   $('#appShell')?.classList.remove('hidden');
@@ -3794,7 +3828,7 @@ async function runOfflineSalesSync(){
 window.addEventListener('online',()=>{updateConnectivityUI();syncOfflineSales().catch(console.warn);});
 window.addEventListener('offline',()=>updateConnectivityUI());
 $('#offlineQueueBtn')?.addEventListener('click',async()=>{const rows=await window.KivuOffline.listSales(shop.id);const errors=rows.filter(x=>x.status==='needs_attention');alert(rows.length?`${rows.length} offline sale(s) waiting. ${errors.length?errors.length+' need attention because server validation failed. Reconnect and retry after correcting stock/customer data.':'They will sync automatically when online.'}`:'No offline sales waiting.');if(navigator.onLine)syncOfflineSales().catch(console.warn);});
-if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('./sw.js?v=5.1.0',{updateViaCache:'none'}).then(reg=>{reg.update().catch(()=>{});reg.addEventListener('updatefound',()=>{const newWorker=reg.installing;if(!newWorker)return;newWorker.addEventListener('statechange',()=>{if(newWorker.state==='installed'&&navigator.serviceWorker.controller){newWorker.postMessage({type:'SKIP_WAITING'});}});});}).catch(e=>console.warn('Service worker:',e.message));let refreshing=false;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(refreshing)return;refreshing=true;window.location.reload();});});}
+if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('./sw.js?v=5.3.0',{updateViaCache:'none'}).then(reg=>{reg.update().catch(()=>{});reg.addEventListener('updatefound',()=>{const newWorker=reg.installing;if(!newWorker)return;newWorker.addEventListener('statechange',()=>{if(newWorker.state==='installed'&&navigator.serviceWorker.controller){newWorker.postMessage({type:'SKIP_WAITING'});}});});}).catch(e=>console.warn('Service worker:',e.message));let refreshing=false;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(refreshing)return;refreshing=true;window.location.reload();});});}
 
 function findProductByBarcode(code){const clean=String(code||'').trim();return products.find(x=>String(x.barcode||'').trim()===clean);}
 function chooseProductFromBarcode(code,{autoAdd=false,formSelector='#saleForm'}={}){const p=findProductByBarcode(code);if(!p){alert('No product matches that barcode. Register the barcode in Inventory first.');return null;}const f=$(formSelector);if(f?.elements?.productId){f.elements.productId.value=p.id;if(formSelector==='#saleForm')refreshSaleUnitOptions();if(f.elements.qty)f.elements.qty.value='1';}if(autoAdd)$('#addSaleItemBtn')?.click();return p;}
@@ -3808,7 +3842,7 @@ function parseCsv(text){const rows=[];let row=[],cell='',q=false;for(let i=0;i<t
 $('#importDataBtn')?.addEventListener('click',()=>{if(!can('owner','manager'))return;$('#importDataModal')?.showModal();});
 $('#importDataForm')?.addEventListener('submit',async e=>{e.preventDefault();if(!can('owner','manager'))return alert('Only owner or manager can import data.');const f=new FormData(e.target),file=f.get('file'),type=f.get('type');if(!file?.text)return alert('Choose a CSV file.');const rows=parseCsv(await file.text());if(!rows.length)return alert('No data rows found.');if(rows.length>2000)return alert('Import at most 2,000 rows at a time.');let payload;if(type==='products'){payload=rows.map(r=>({shop_id:shop.id,name:r.name,qty:Number(r.qty||0),cost:Number(r.cost||0),price:Number(r.price||0),low_stock:Number(r.low_stock||r.low||0),barcode:r.barcode||null,base_unit:r.base_unit||'Piece',bulk_unit:r.bulk_unit||'Carton',units_per_bulk:Number(r.units_per_bulk||1)})).filter(x=>x.name);}else{payload=rows.map(r=>({shop_id:shop.id,name:r.name,phone:r.phone||null,email:r.email||null})).filter(x=>x.name);}if(!payload.length)return alert('No valid rows found.');const table=type==='products'?'products':'customers';const {error}=await sb.from(table).insert(payload);if(error)return alert(`Import stopped: ${error.message}`);await audit('imported csv',table,{rows:payload.length});e.target.reset();$('#importDataModal').close();await refresh();alert(`${payload.length} ${type} imported.`);});
 
-$('#accountantExportBtn')?.addEventListener('click',()=>{if(!can('owner','manager'))return;const rate=Number(shop.tax_rate||0);const rows=sales.map(x=>{const net=Number(x.total||0),tax=rate>0?net*rate/(100+rate):0;return{date:x.created_at,receipt:x.receipt_no,payment:x.payment,customer:x.customer,product:x.product_name,quantity:x.entered_qty||x.qty,unit:x.sold_unit||'',net_sales:net,discount:Number(x.discount||0),cost:Number(x.cost||0),gross_profit:net-Number(x.cost||0),tax_rate:rate,tax_included:tax,employee:x.employee_name};});downloadText(`kivu-accountant-sales-${day(new Date())}.csv`,rowsToCsv(rows),'text/csv');});
+$('#accountantExportBtn')?.addEventListener('click',()=>{if(!can('owner','manager'))return;const rate=Number(shop.tax_rate||0);const rows=sales.map(x=>{const net=Number(x.total||0),tax=rate>0?Math.round(net*rate/(100+rate)):0;return{date:x.created_at,receipt:x.receipt_no,payment:x.payment,customer:x.customer,product:x.product_name,quantity:x.entered_qty||x.qty,unit:x.sold_unit||'',net_sales:net,discount:Number(x.discount||0),cost:Number(x.cost||0),gross_profit:net-Number(x.cost||0),tax_rate:rate,tax_included:tax,employee:x.employee_name};});downloadText(`kivu-accountant-sales-${day(new Date())}.csv`,rowsToCsv(rows),'text/csv');});
 
 const _renderHospitalityV48=renderHospitality;
 renderHospitality=function(){

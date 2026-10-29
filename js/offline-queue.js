@@ -80,12 +80,16 @@
   }
   function loadSnapshot(userId){
     try{
+      if(!userId)return null;
       const s=JSON.parse(localStorage.getItem(SNAPSHOT_KEY)||'null');
       if(!s||!s.profile||!s.shop)return null;
-      if(userId&&s.user_id&&s.user_id!==userId)return null;
+      if(s.user_id!==userId)return null;
       return s;
     }catch(_e){return null;}
   }
+  function clearSnapshot(){
+    try{localStorage.removeItem(SNAPSHOT_KEY);}catch(_e){}
+  }
 
-  window.KivuOffline={enqueueSale,listSales,updateSale,removeSale,countPending,countSales:countPending,makeRef,newClientRef:makeRef,saveSnapshot,loadSnapshot};
+  window.KivuOffline={enqueueSale,listSales,updateSale,removeSale,countPending,countSales:countPending,makeRef,newClientRef:makeRef,saveSnapshot,loadSnapshot,clearSnapshot};
 })();

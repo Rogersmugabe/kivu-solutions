@@ -1,0 +1,28 @@
+# Kivu Solutions — Test & Verification Log
+
+**Environment**: Node v24.21.0 on Windows (powershell)
+**Target**: Kivu Solutions Web Platform (Vanilla PWA + Supabase)
+**Asset Version**: 5.3.0
+
+---
+
+## Phase 0 & Phase 1: Tooling & Correctness (Observed)
+
+| Test ID | Description | Command / Execution | Status | Observed Output |
+|---|---|---|---|---|
+| **T01** | `money(2000000)` formats as integer RWF with commas | `node --test tools/tests/helpers.test.js` | ✅ PASS | `"2,000,000 RWF"` (en-RW Intl integer formatting) |
+| **T02** | `money(1999.6)` rounds correctly to 2,000 RWF | `node --test tools/tests/helpers.test.js` | ✅ PASS | `"2,000 RWF"` (Math.round boundary) |
+| **T03** | `parseMoney("2,000,000")` parses to 2000000 | `node --test tools/tests/helpers.test.js` | ✅ PASS | `2000000` |
+| **T04** | `parseMoney("")` and invalid strings parse to 0 | `node --test tools/tests/helpers.test.js` | ✅ PASS | `0` |
+| **T05** | `formatMoneyString("2000000")` formats with commas | `node --test tools/tests/helpers.test.js` | ✅ PASS | `"2,000,000"` |
+| **T06** | `day()` timezone test: 22:30 UTC is 00:30 next day in Kigali | `$env:TZ="Africa/Kigali"; node --test ...` | ✅ PASS | Returned `"2026-10-30"` (was `"2026-10-29"` before S1.1 fix) |
+| **T07** | `day()` daytime test | `$env:TZ="Africa/Kigali"; node --test ...` | ✅ PASS | Returned `"2026-10-29"` |
+| **T08** | `day()` leap year month-end boundary test | `$env:TZ="Africa/Kigali"; node --test ...` | ✅ PASS | Returned `"2028-03-01"` |
+| **T11** | Version consistency check across 3 files | `node tools/check.js` | ✅ PASS | `index.html` ?v=5.3.0, `sw.js` kivu-v5-3-0-shell, `app.js` ?v=5.3.0 |
+| **T15** | UI Audit & RPC Contract generation | `node tools/audit-ui.js` | ✅ PASS | 273 controls audited, 0 unbound; 55 distinct RPCs contracted |
+
+---
+
+## Phase 2: Non-blocking Dialogs & UX Primitives (In Progress)
+
+*(Will be updated as Phase 2 call sites are converted and verified)*
