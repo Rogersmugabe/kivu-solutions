@@ -1,13 +1,13 @@
-const CACHE='kivu-v5-3-1-shell';
+const CACHE='kivu-v5-3-2-shell';
 const SHELL=[
   './',
   './index.html',
-  './css/style.css?v=5.3.1',
-  './js/config.js?v=5.3.1',
-  './js/offline-queue.js?v=5.3.1',
-  './js/camera-scanner.js?v=5.3.1',
-  './js/app.js?v=5.3.1',
-  './js/pwa-install.js?v=5.3.1',
+  './css/style.css?v=5.3.2',
+  './js/config.js?v=5.3.2',
+  './js/offline-queue.js?v=5.3.2',
+  './js/camera-scanner.js?v=5.3.2',
+  './js/app.js?v=5.3.2',
+  './js/pwa-install.js?v=5.3.2',
   './manifest.webmanifest',
   './icons/kivu-192.png',
   './icons/kivu-512.png'
