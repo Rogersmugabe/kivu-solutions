@@ -5546,3 +5546,263 @@ body {
   stroke: currentColor;
   vertical-align: -2px;
 }
+
+
+/* ==========================================================
+   CLOUD-BASED POS & RBAC TERMINAL ARCHITECTURE
+   ========================================================== */
+.lock-terminal-top-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 700;
+  color: #475569;
+}
+.lock-terminal-top-btn:hover {
+  color: #0f172a;
+  background: #f1f5f9;
+}
+
+/* Fast Terminal Lock Overlay */
+dialog.terminal-lock-modal {
+  width: min(92vw, 420px);
+  border-radius: 24px;
+  border: none;
+  padding: 0;
+  box-shadow: 0 30px 90px rgba(15, 23, 42, 0.45);
+  overflow: hidden;
+  background: #ffffff;
+}
+dialog.terminal-lock-modal::backdrop {
+  background: rgba(15, 23, 42, 0.7);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.terminal-lock-card {
+  padding: 32px 28px 24px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.lock-brand-row {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.lock-icon-wrap {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  background: #f1f5f9;
+  color: #2563eb;
+  display: grid;
+  place-items: center;
+  margin-bottom: 4px;
+}
+.lock-brand-row h3 {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+.lock-shop-name {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #64748b;
+}
+.lock-hint {
+  font-size: 0.82rem;
+  color: #64748b;
+  margin: 6px 0 20px;
+}
+.pin-display-dots {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  margin-bottom: 12px;
+}
+.pin-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid #cbd5e1;
+  background: transparent;
+  transition: all 0.15s ease;
+}
+.pin-dot.filled {
+  background: #2563eb;
+  border-color: #2563eb;
+  transform: scale(1.15);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+}
+.lock-error-msg {
+  min-height: 20px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #dc2626;
+  margin-bottom: 12px;
+}
+.pin-keypad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  width: 100%;
+  max-width: 280px;
+  margin: 0 auto 20px;
+}
+.pin-key {
+  height: 58px;
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #0f172a;
+  font-size: 1.35rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: all 0.1s ease;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.pin-key:hover {
+  background: #e2e8f0;
+  transform: translateY(-1px);
+}
+.pin-key:active {
+  background: #cbd5e1;
+  transform: translateY(1px);
+}
+.pin-key.pin-clear {
+  color: #dc2626;
+  font-size: 1.1rem;
+}
+.pin-key.pin-back {
+  color: #475569;
+  font-size: 1.15rem;
+}
+.lock-footer {
+  width: 100%;
+  border-top: 1px solid #f1f5f9;
+  padding-top: 14px;
+}
+
+/* Supervisor Override Modal */
+dialog.supervisor-override-modal {
+  width: min(92vw, 440px);
+  border-radius: 20px;
+  border: none;
+  padding: 0;
+  overflow: hidden;
+  box-shadow: 0 25px 80px rgba(15, 23, 42, 0.35);
+  background: #ffffff;
+}
+dialog.supervisor-override-modal::backdrop {
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(4px);
+}
+.supervisor-card {
+  padding: 24px;
+}
+.override-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+.override-icon-wrap {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: #eff6ff;
+  color: #2563eb;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+.override-header h3 {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+.override-reason {
+  margin: 3px 0 0;
+  font-size: 0.8rem;
+  color: #64748b;
+  line-height: 1.4;
+}
+.override-pin-section {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+.override-pin-section label {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #475569;
+  margin-bottom: 8px;
+}
+.override-pin-section input {
+  width: 100%;
+  font-size: 1.5rem;
+  letter-spacing: 0.4em;
+  text-align: center;
+  padding: 10px;
+  font-weight: 800;
+  border: 2px solid #cbd5e1;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #0f172a;
+}
+.override-pin-section input:focus {
+  border-color: #2563eb;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+.override-error {
+  min-height: 18px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: #dc2626;
+  margin-top: 6px;
+  text-align: center;
+}
+
+/* Blind Cash Drawer Reconciliation */
+.blind-count-card {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+}
+.blind-count-header {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+.blind-icon {
+  stroke: #16a34a;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.blind-count-header strong {
+  display: block;
+  color: #166534;
+  font-size: 0.92rem;
+  margin-bottom: 4px;
+}
+.blind-count-header p {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #15803d;
+  line-height: 1.45;
+}

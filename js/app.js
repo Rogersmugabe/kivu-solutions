@@ -553,6 +553,10 @@ function showUpgrade(feature,customMessage){
 }
 const requireFeature=(feature,message)=>{
   if(hasFeature(feature)) return true;
+  if(profile?.role && profile.role !== 'owner'){
+    kivuNotify('This capability is restricted by store policy. Please contact your store owner to enable it.', 'info', 'Store Policy');
+    return false;
+  }
   showUpgrade(feature,message);
   return false;
 };
@@ -1754,7 +1758,19 @@ $('#saleForm').onsubmit=async e=>{
 
     const {data:lines,error:se}=await sb.from('sales').select('*').eq('shop_id',shop.id).eq('receipt_no',receiptNo).order('created_at',{ascending:true});
     if(se)return kivuNotify(se.message);
-    e.target.reset();resetSaleCart();$('#saleCustomerWrap').classList.add('hidden');$('#saleModal').close();await refresh();showReceiptGroup(lines||[], currentSaleTendered);window.showToast?.('Sale recorded successfully. Receipt issued.', 'success', 'Transaction Complete');
+    e.target.reset();resetSaleCart();$('#saleCustomerWrap')?.classList.add('hidden');
+    const isRegisterCashier = profile?.role === 'cashier' || window._continuousRegisterMode;
+    if (!isRegisterCashier) {
+      $('#saleModal')?.close();
+    }
+    await refresh();
+    showReceiptGroup(lines||[], currentSaleTendered);
+    if (isRegisterCashier) {
+      window.showToast?.('Sale recorded! Ready for next customer.', 'success', 'Next Customer');
+      setTimeout(() => { $('#saleProductSearch')?.focus(); }, 400);
+    } else {
+      window.showToast?.('Sale recorded successfully. Receipt issued.', 'success', 'Transaction Complete');
+    }
   } finally {
     isSubmittingSale=false;
     if(submitBtn){ submitBtn.disabled=false; submitBtn.textContent=origBtnText; }
@@ -1902,7 +1918,26 @@ function calcShift(s){
 $('#closeShiftBtn').onclick=()=>{
   if(!currentShift)return;
   const c=calcShift(currentShift);
-  $('#closeShiftPreview').innerHTML=`Opening float: <b>${money(currentShift.opening_cash)}</b><br>Cash sales: <b>${money(c.cash)}</b><br>Mobile Money: <b>${money(c.momo)}</b><br>Bank: <b>${money(c.bank)}</b><br>Credit sales: <b>${money(c.credit)}</b><br>Cash debt collections: <b>${money(c.debtCash)}</b><br>Petty cash payouts: <b>-${money(c.pettyCash)}</b><br>Other shift expenses: <b>-${money(c.otherExpenses)}</b><br>Total sales: <b>${money(c.total)}</b><br><hr>Expected physical cash in drawer: <b>${money(c.expected)}</b>`;
+  const isCashier = profile?.role === 'cashier';
+  if (isCashier) {
+    $('#closeShiftPreview').innerHTML=`
+      <div class="blind-count-card">
+        <div class="blind-count-header">
+          <svg class="blind-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"></rect><circle cx="12" cy="12" r="2"></circle><path d="M6 12h.01M18 12h.01"></path></svg>
+          <div>
+            <strong>Blind Drawer Reconciliation</strong>
+            <p>Count all physical cash currently in your register drawer and enter the total below. Register totals will be audited against system records upon closing.</p>
+          </div>
+        </div>
+      </div>
+    `;
+    const reasonWrap = $('#closeShiftForm input[name="varianceReason"]')?.closest('label');
+    if (reasonWrap) reasonWrap.classList.add('hidden');
+  } else {
+    $('#closeShiftPreview').innerHTML=`Opening float: <b>${money(currentShift.opening_cash)}</b><br>Cash sales: <b>${money(c.cash)}</b><br>Mobile Money: <b>${money(c.momo)}</b><br>Bank: <b>${money(c.bank)}</b><br>Credit sales: <b>${money(c.credit)}</b><br>Cash debt collections: <b>${money(c.debtCash)}</b><br>Petty cash payouts: <b>-${money(c.pettyCash)}</b><br>Other shift expenses: <b>-${money(c.otherExpenses)}</b><br>Total sales: <b>${money(c.total)}</b><br><hr>Expected physical cash in drawer: <b>${money(c.expected)}</b>`;
+    const reasonWrap = $('#closeShiftForm input[name="varianceReason"]')?.closest('label');
+    if (reasonWrap) reasonWrap.classList.remove('hidden');
+  }
   $('#closeShiftModal').showModal();
 };
 
@@ -4249,7 +4284,7 @@ async function runOfflineSalesSync(){
 window.addEventListener('online',()=>{updateConnectivityUI();syncOfflineSales().catch(console.warn);});
 window.addEventListener('offline',()=>updateConnectivityUI());
 $('#offlineQueueBtn')?.addEventListener('click',async()=>{const rows=await window.KivuOffline.listSales(shop.id);const errors=rows.filter(x=>x.status==='needs_attention');kivuNotify(rows.length?`${rows.length} offline sale(s) waiting. ${errors.length?errors.length+' need attention because server validation failed. Reconnect and retry after correcting stock/customer data.':'They will sync automatically when online.'}`:'No offline sales waiting.');if(navigator.onLine)syncOfflineSales().catch(console.warn);});
-if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('./sw.js?v=5.3.3',{updateViaCache:'none'}).then(reg=>{reg.update().catch(()=>{});reg.addEventListener('updatefound',()=>{const newWorker=reg.installing;if(!newWorker)return;newWorker.addEventListener('statechange',()=>{if(newWorker.state==='installed'&&navigator.serviceWorker.controller){newWorker.postMessage({type:'SKIP_WAITING'});}});});}).catch(e=>console.warn('Service worker:',e.message));let refreshing=false;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(refreshing)return;refreshing=true;window.location.reload();});});}
+if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('./sw.js?v=5.3.4',{updateViaCache:'none'}).then(reg=>{reg.update().catch(()=>{});reg.addEventListener('updatefound',()=>{const newWorker=reg.installing;if(!newWorker)return;newWorker.addEventListener('statechange',()=>{if(newWorker.state==='installed'&&navigator.serviceWorker.controller){newWorker.postMessage({type:'SKIP_WAITING'});}});});}).catch(e=>console.warn('Service worker:',e.message));let refreshing=false;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(refreshing)return;refreshing=true;window.location.reload();});});}
 
 function findProductByBarcode(code){const clean=String(code||'').trim();return products.find(x=>String(x.barcode||'').trim()===clean);}
 function chooseProductFromBarcode(code,{autoAdd=false,formSelector='#saleForm'}={}){const p=findProductByBarcode(code);if(!p){kivuNotify('No product matches that barcode. Register the barcode in Inventory first.');return null;}const f=$(formSelector);if(f?.elements?.productId){f.elements.productId.value=p.id;if(formSelector==='#saleForm')refreshSaleUnitOptions();if(f.elements.qty)f.elements.qty.value='1';}if(autoAdd)$('#addSaleItemBtn')?.click();return p;}
@@ -4386,3 +4421,216 @@ $('#salesFilterPayment')?.addEventListener('change', () => { salesCurrentPage = 
 $('#salesDateFrom')?.addEventListener('change', () => { salesCurrentPage = 1; renderSales(); });
 $('#salesDateTo')?.addEventListener('change', () => { salesCurrentPage = 1; renderSales(); });
 $('#salesSortSelect')?.addEventListener('change', () => { salesCurrentPage = 1; renderSales(); });
+
+
+/* ==========================================================
+   TERMINAL POS & ROLE-BASED ACCESS CONTROL SYSTEM
+   ========================================================== */
+
+let terminalPinBuffer = '';
+function updateTerminalPinUI() {
+  const dots = $$('#lockPinDots .pin-dot');
+  dots.forEach((dot, idx) => {
+    dot.classList.toggle('filled', idx < terminalPinBuffer.length);
+  });
+}
+
+window.lockTerminal = function() {
+  terminalPinBuffer = '';
+  updateTerminalPinUI();
+  if ($('#lockPinMsg')) $('#lockPinMsg').textContent = '';
+  if ($('#lockShopName') && shop) $('#lockShopName').textContent = shop.name || 'Kivu POS Terminal';
+  const modal = $('#terminalLockModal');
+  if (modal?.showModal && !modal.open) modal.showModal();
+};
+
+window.unlockTerminalWithPin = async function(pin) {
+  if (!pin || pin.length !== 6) return;
+  const msg = $('#lockPinMsg');
+  if (msg) msg.textContent = 'Verifying PIN...';
+
+  const candidateEmployees = (employees || []).filter(e => e.active);
+  let matchedUser = null;
+
+  for (const emp of candidateEmployees) {
+    try {
+      const { data, error } = await sb.auth.signInWithPassword({
+        email: staffAuthEmail(emp.phone),
+        password: pin
+      });
+      if (!error && data?.session) {
+        matchedUser = emp;
+        session = data.session;
+        break;
+      }
+    } catch (_e) {}
+  }
+
+  if (matchedUser) {
+    const res = await sb.from('profiles').select('*').eq('id', session.user.id).single();
+    if (!res.error && res.data) {
+      profile = res.data;
+    }
+    applyPermissions();
+    $('#terminalLockModal')?.close();
+    terminalPinBuffer = '';
+    updateTerminalPinUI();
+    window.showToast?.(`Register unlocked as ${profile.full_name || matchedUser.name} (${roleLabel(profile.role)})`, 'success', 'Terminal Unlocked');
+    if (profile.role === 'cashier') {
+      initSaleModal();
+      $('#saleModal')?.showModal();
+    }
+  } else {
+    if (msg) msg.textContent = 'Incorrect PIN. Try again.';
+    terminalPinBuffer = '';
+    updateTerminalPinUI();
+    const dotsEl = $('#lockPinDots');
+    if (dotsEl) {
+      dotsEl.style.transform = 'translateX(-8px)';
+      setTimeout(() => { dotsEl.style.transform = 'translateX(8px)'; }, 80);
+      setTimeout(() => { dotsEl.style.transform = 'translateX(0)'; }, 160);
+    }
+  }
+};
+
+// Wire Lock Keypad
+$('#terminalPinKeypad')?.addEventListener('click', e => {
+  const btn = e.target.closest('button');
+  if (!btn) return;
+  const digit = btn.dataset.digit;
+  const action = btn.dataset.action;
+
+  if (digit && terminalPinBuffer.length < 6) {
+    terminalPinBuffer += digit;
+    updateTerminalPinUI();
+    if (terminalPinBuffer.length === 6) {
+      unlockTerminalWithPin(terminalPinBuffer);
+    }
+  } else if (action === 'clear') {
+    terminalPinBuffer = '';
+    updateTerminalPinUI();
+    if ($('#lockPinMsg')) $('#lockPinMsg').textContent = '';
+  } else if (action === 'back' && terminalPinBuffer.length > 0) {
+    terminalPinBuffer = terminalPinBuffer.slice(0, -1);
+    updateTerminalPinUI();
+  }
+});
+
+$('#lockTerminalBtn')?.addEventListener('click', () => {
+  window.lockTerminal();
+});
+
+$('#lockSignOutBtn')?.addEventListener('click', () => {
+  $('#terminalLockModal')?.close();
+  $('#logoutBtn')?.click();
+});
+
+/* SUPERVISOR OVERRIDE SYSTEM */
+let currentOverrideCallback = null;
+window.requestSupervisorOverride = function(reason, onAuthorized) {
+  currentOverrideCallback = onAuthorized;
+  const reasonEl = $('#overrideReasonText');
+  const input = $('#supervisorPinInput');
+  const msg = $('#supervisorPinMsg');
+  if (reasonEl) reasonEl.textContent = reason || 'Manager authorization required for this action';
+  if (input) input.value = '';
+  if (msg) msg.textContent = '';
+  $('#supervisorOverrideModal')?.showModal();
+  setTimeout(() => input?.focus(), 200);
+};
+
+window.authorizeSupervisorOverride = async function() {
+  const input = $('#supervisorPinInput');
+  const pin = String(input?.value || '').trim();
+  const msg = $('#supervisorPinMsg');
+  if (!/^\d{6}$/.test(pin)) {
+    if (msg) msg.textContent = 'Enter a valid 6-digit PIN.';
+    return;
+  }
+
+  if (msg) msg.textContent = 'Verifying supervisor authority...';
+
+  const managers = (employees || []).filter(e => (e.role === 'manager' || e.role === 'owner') && e.active);
+  let authorizedSupervisor = null;
+
+  for (const mgr of managers) {
+    try {
+      const { data, error } = await sb.auth.signInWithPassword({
+        email: staffAuthEmail(mgr.phone),
+        password: pin
+      });
+      if (!error && data?.user) {
+        authorizedSupervisor = mgr;
+        break;
+      }
+    } catch (_e) {}
+  }
+
+  if (!authorizedSupervisor && profile?.role === 'owner') {
+    authorizedSupervisor = { name: profile.full_name || 'Owner', role: 'owner' };
+  }
+
+  if (authorizedSupervisor) {
+    $('#supervisorOverrideModal')?.close();
+    audit('supervisor_override', 'terminal', { authorized_by: authorizedSupervisor.name, role: authorizedSupervisor.role }).catch(() => {});
+    window.showToast?.(`Authorized by ${authorizedSupervisor.name} (${roleLabel(authorizedSupervisor.role)})`, 'success', 'Supervisor Override');
+    if (typeof currentOverrideCallback === 'function') {
+      const cb = currentOverrideCallback;
+      currentOverrideCallback = null;
+      cb(authorizedSupervisor);
+    }
+  } else {
+    if (msg) msg.textContent = 'Access denied. Valid Manager or Owner PIN required.';
+  }
+};
+
+$('#supervisorAuthorizeBtn')?.addEventListener('click', () => {
+  authorizeSupervisorOverride();
+});
+$('#supervisorPinInput')?.addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    authorizeSupervisorOverride();
+  }
+});
+
+// Wire Supervisor Override Trigger Buttons on Modals
+$('#voidSupervisorOverrideBtn')?.addEventListener('click', () => {
+  const saleId = $('#voidSaleForm input[name="saleId"]')?.value;
+  const reason = $('#voidSaleForm input[name="reason"]')?.value || 'Supervisor override void';
+  window.requestSupervisorOverride('Immediate Sale Void Authorization', async () => {
+    if (!saleId) return;
+    try {
+      const { error } = await sb.rpc('void_sale_cart_v48', { p_sale_id: saleId, p_reason: reason });
+      if (error) throw error;
+      $('#voidSaleModal')?.close();
+      await refresh();
+      window.showToast?.('Sale voided immediately via supervisor override.', 'success', 'Sale Voided');
+    } catch (err) {
+      kivuNotify('Void failed: ' + err.message, 'error');
+    }
+  });
+});
+
+$('#stockSupervisorOverrideBtn')?.addEventListener('click', () => {
+  const form = $('#stockAdjustForm');
+  const pid = form?.elements?.productId?.value;
+  const qtyDelta = Number(form?.elements?.qtyDelta?.value || 0);
+  const note = form?.elements?.note?.value || 'Supervisor stock adjustment';
+  if (!pid || !qtyDelta) return kivuNotify('Select a product and adjustment quantity first.');
+
+  window.requestSupervisorOverride('Immediate Stock Adjustment Authorization', async () => {
+    try {
+      const p = products.find(x => x.id === pid);
+      if (!p) throw new Error('Product not found');
+      const newQty = Math.max(0, Number(p.qty || 0) + qtyDelta);
+      const { error } = await sb.from('products').update({ qty: newQty }).eq('id', pid);
+      if (error) throw error;
+      $('#stockAdjustModal')?.close();
+      await refresh();
+      window.showToast?.('Stock adjustment applied immediately via supervisor override.', 'success', 'Stock Adjusted');
+    } catch (err) {
+      kivuNotify('Adjustment failed: ' + err.message, 'error');
+    }
+  });
+});
