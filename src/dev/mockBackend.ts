@@ -59,7 +59,7 @@ const db: Record<string, Record<string, unknown>[]> = {
     { id: 'hi1', shop_id: shopId, tab_id: 'tab1', product_name: 'Brochette', qty: 2, unit_price: 1500, sent_at: iso(now - H), created_at: iso(now - H) },
     { id: 'hi2', shop_id: shopId, tab_id: 'tab1', product_name: 'Primus 72cl', qty: 3, unit_price: 1000, created_at: iso(now - H) }
   ],
-  recipe_components: [], hospitality_wastage: [], hospitality_payments: []
+  recipe_components: [], hospitality_wastage: [], hospitality_payments: [], sale_payments: []
 };
 
 const pays = ['Cash', 'Mobile Money', 'Cash', 'Bank', 'Split (Cash 1000, MoMo 800)'];
@@ -81,6 +81,12 @@ const rpcAnswers: Record<string, (body: Record<string, unknown>) => unknown> = {
   request_or_void_sale: () => (role === 'owner' || role === 'manager' ? 'voided' : 'requested'),
   request_or_adjust_stock: () => (role === 'owner' || role === 'manager' ? 'applied' : 'requested'),
   hospitality_open_tab: () => 'tab-new',
+  record_sale_cart_v60: body => {
+    const parts = body.p_payments as { method: string; amount: number }[];
+    const no = String(rpcAnswers.record_sale_cart_v48({ ...body, p_payment: parts.length > 1 ? 'Split' : parts[0].method }));
+    if (parts.length > 1) for (const p of parts) db.sale_payments.unshift({ id: `sp-${no}-${p.method}`, shop_id: shopId, receipt_no: no, method: p.method, amount: p.amount, shift_id: 'sh1', created_at: new Date().toISOString() });
+    return no;
+  },
   record_sale_cart_v48: body => {
     const no = `KV-${++receipt}`;
     for (const it of body.p_items as { product_id: string; entered_qty: number; line_total: number }[]) {

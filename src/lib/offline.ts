@@ -20,6 +20,8 @@ export interface QueuedSale {
   user_id: string;
   items: unknown[];
   payment: string;
+  /** Parts of a split sale; when present the sale syncs through record_sale_cart_v60. */
+  payments?: { method: string; amount: number }[];
   discount: number;
   created_at: string;
   status: 'pending' | 'syncing' | 'failed';

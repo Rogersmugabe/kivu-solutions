@@ -74,10 +74,10 @@ export function MoneyInput({ value, onChange, className, ...rest }: { value: num
     if (parseMoney(text) !== value) setText(value ? formatAmount(value) : '');
   }, [value]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
-    <div className="relative">
+    <div className="relative min-w-0">
       <input
         inputMode="numeric"
-        className={cx('input pr-12 tabular', className)}
+        className={cx('input min-w-0 pr-11 tabular', className)}
         value={text}
         onChange={e => {
           const n = parseMoney(e.target.value);

@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { businessDay, minuteOfDay, money, normalizeRwPhone, parseMoney, isValidRwPhone } from './format';
 import { ROLE_PAGES, employeeRole, enabledFeatures, roleCan, subscriptionStatus, visiblePages } from './access';
-import { billPaymentsByReceipt, bulkPrice, cartTotals, groupReceipts, lineTotal, paymentBreakdown, unitsInCart } from './sales';
+import { addSalePayments, billPaymentsByReceipt, bulkPrice, cartTotals, groupReceipts, lineTotal, paymentBreakdown, unitsInCart } from './sales';
 import { parseCsv } from './csv';
 import { shiftTotals } from './shifts';
-import type { Expense, HospitalityPayment, Product, Sale, Shift, Shop } from './types';
+import type { Expense, HospitalityPayment, Product, Sale, SalePayment, Shift, Shop } from './types';
 
 const product = (over: Partial<Product> = {}): Product => ({ id: 'p1', shop_id: 's', name: 'Primus', qty: 48, cost: 700, price: 1000, low_stock: 10, units_per_bulk: 12, ...over });
 const sale = (over: Partial<Sale> = {}): Sale => ({ id: Math.random().toString(36), shop_id: 's', product_name: 'Primus', qty: 1, total: 1000, created_at: '2026-10-30T10:00:00Z', ...over });
@@ -136,6 +136,31 @@ describe('cash shift maths (mirrors close_shift_controlled)', () => {
     expect(t.expenses).toBe(1500);
     expect(t.expected).toBe(20_000 + 5000 + 4000 - 1500);
     expect(t.sales).toBe(9000);
+  });
+});
+
+describe('split payments (migration 002)', () => {
+  const shift: Shift = { id: 'sh', user_id: 'u1', opening_cash: 10_000, status: 'open', opened_at: '2026-10-30T06:00:00Z' };
+  const parts: SalePayment[] = [
+    { id: 'a', receipt_no: 'R1', method: 'Cash', amount: 3000, shift_id: 'sh', created_at: '2026-10-30T09:00:00Z' },
+    { id: 'b', receipt_no: 'R1', method: 'Mobile Money', amount: 7000, shift_id: 'sh', created_at: '2026-10-30T09:00:00Z' }
+  ];
+  it('counts the cash part of a split sale in the drawer', () => {
+    const sales = [sale({ shift_id: 'sh', receipt_no: 'R1', total: 6000, payment: 'Split' }), sale({ shift_id: 'sh', receipt_no: 'R1', total: 4000, payment: 'Split' })];
+    const t = shiftTotals(shift, sales, [], [], parts);
+    expect(t.cash).toBe(3000);
+    expect(t.momo).toBe(7000);
+    expect(t.expected).toBe(13_000);
+  });
+  it('reduces the cash part in proportion when a line of the receipt is voided', () => {
+    const sales = [sale({ shift_id: 'sh', receipt_no: 'R1', total: 6000, payment: 'Split' }), sale({ shift_id: 'sh', receipt_no: 'R1', total: 4000, payment: 'Split', status: 'voided' })];
+    // 60% of the receipt is still sold, so 60% of the 3,000 cash part is expected (same as the SQL).
+    expect(shiftTotals(shift, sales, [], [], parts).expected).toBe(10_000 + 1800);
+  });
+  it('apportions split parts across receipt lines for reports', () => {
+    const map = addSalePayments(new Map(), parts);
+    const a = sale({ receipt_no: 'R1', total: 6000, payment: 'Split' }), b = sale({ receipt_no: 'R1', total: 4000, payment: 'Split' });
+    expect(paymentBreakdown(a, [a, b], map)).toEqual({ cash: 1800, momo: 4200, bank: 0, other: 0 });
   });
 });
 

@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 import { createPortal } from 'react-dom';
 import type { Sale, Shift, Shop } from '@/lib/types';
 import { formatAmount, formatDateTime, money } from '@/lib/format';
-import { paymentBreakdown } from '@/lib/sales';
+import { paymentBreakdown, type BillPayments } from '@/lib/sales';
 
 /* Printing renders the document into #print-root (outside the app and any dialog) and the
    print stylesheet sends only that element to the printer, so long receipts are never cut. */
@@ -48,7 +48,8 @@ const Row = ({ left, right, bold }: { left: ReactNode; right: ReactNode; bold?: 
   <div className={`flex justify-between gap-2 ${bold ? 'font-bold' : ''}`}><span>{left}</span><span className="whitespace-nowrap text-right">{right}</span></div>
 );
 
-export function Receipt({ shop, rows }: { shop: Shop; rows: Sale[] }) {
+/** `bills` holds the real payment parts of split sales and table bills (keyed by receipt). */
+export function Receipt({ shop, rows, bills }: { shop: Shop; rows: Sale[]; bills?: BillPayments }) {
   const first = rows[0];
   const live = rows.filter(r => r.status !== 'voided');
   const lines = live.length ? live : rows;
@@ -58,7 +59,7 @@ export function Receipt({ shop, rows }: { shop: Shop; rows: Sale[] }) {
   const rate = Math.max(0, Number(shop.tax_rate || 0));
   const tax = rate > 0 ? Math.round((total * rate) / (100 + rate)) : 0;
   const isSplit = /split/i.test(first?.payment || '');
-  const split = isSplit ? lines.reduce((acc, r) => { const b = paymentBreakdown(r, lines); return { cash: acc.cash + b.cash, momo: acc.momo + b.momo, bank: acc.bank + b.bank }; }, { cash: 0, momo: 0, bank: 0 }) : null;
+  const split = isSplit ? lines.reduce((acc, r) => { const b = paymentBreakdown(r, lines, bills); return { cash: acc.cash + b.cash, momo: acc.momo + b.momo, bank: acc.bank + b.bank }; }, { cash: 0, momo: 0, bank: 0 }) : null;
   return (
     <div className={slip}>
       <div className="text-center">

@@ -78,6 +78,9 @@ export interface Sale {
 
 export interface Expense { id: string; description: string; amount: number; category?: string | null; created_at: string; user_id?: string | null; shift_id?: string | null; approval_status?: string | null; employee_name?: string | null }
 
+/** One part of a split sale (supabase/migrations/002). */
+export interface SalePayment { id: string; receipt_no: string; method: string; amount: number; shift_id?: string | null; created_at: string }
+
 export interface HospitalityPayment { id: string; tab_id: string; method: string; amount: number; shift_id?: string | null; created_at: string }
 
 export interface StockPurchase { id: string; product_id: string; product_name?: string | null; qty: number; total_cost?: number | null; created_at: string; user_name?: string | null }

@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Clock, Printer, LogIn, LogOut, HandCoins } from 'lucide-react';
 import { useShop } from '@/auth/AuthProvider';
-import { useAction, useExpenses, useHospitalityPayments, useSales, useShifts, writeAudit } from '@/data/hooks';
+import { useAction, useExpenses, useHospitalityPayments, useSalePayments, useSales, useShifts, writeAudit } from '@/data/hooks';
 import { isHospitality } from '@/lib/access';
 import { usePrint, ZReport } from '@/components/print';
 import { Badge, Button, Card, Dialog, EmptyState, Field, Input, MoneyInput, Notice, PageHeader, Spinner, Stat } from '@/components/ui';
@@ -19,6 +19,7 @@ export default function Shifts() {
   // Expenses are readable by owners and managers only (and only they can record pay-outs).
   const expenses = useExpenses(35, can('record_expense'));
   const tablePayments = useHospitalityPayments(isHospitality(shop.business_type));
+  const splitParts = useSalePayments(35);
   const [dialog, setDialog] = useState<'open' | 'close' | 'payout' | null>(null);
   const [opening, setOpening] = useState(0);
   const [counted, setCounted] = useState(0);
@@ -27,7 +28,7 @@ export default function Shifts() {
 
   const mine = (shifts.data ?? []).find(s => s.status === 'open' && s.user_id === session.user.id) ?? null;
   const seeExpected = can('see_money');
-  const totals = (s: Shift) => shiftTotals(s, sales.data ?? [], expenses.data ?? [], tablePayments.data ?? []);
+  const totals = (s: Shift) => shiftTotals(s, sales.data ?? [], expenses.data ?? [], tablePayments.data ?? [], splitParts.data ?? []);
   const current = mine ? totals(mine) : null;
   const history = (shifts.data ?? []).filter(s => seeExpected || s.user_id === session.user.id);
 

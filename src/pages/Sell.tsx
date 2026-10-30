@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { Minus, Plus, Trash2, PauseCircle, PlayCircle, ShoppingBag, Package, WifiOff, Printer, Banknote, Smartphone, Landmark } from 'lucide-react';
+import { Minus, Plus, Trash2, PauseCircle, PlayCircle, ShoppingBag, Package, WifiOff, Printer, Banknote, Smartphone, Landmark, SplitSquareHorizontal } from 'lucide-react';
 import { useShop } from '@/auth/AuthProvider';
 import { useMyOpenShift, useProducts } from '@/data/hooks';
 import { useFeedback } from '@/components/feedback';
@@ -9,7 +9,7 @@ import { Receipt, usePrint } from '@/components/print';
 import { BarcodeScannerButton } from '@/components/BarcodeScanner';
 import { Button, Card, Dialog, EmptyState, Field, MoneyInput, Notice, SearchInput, Spinner, cx } from '@/components/ui';
 import { formatAmount, money } from '@/lib/format';
-import { baseQty, baseUnit, bulkUnit, cartTotals, lineTotal, stockStatus, unitPrice, unitsInCart, unitsPerBulk, type CartLine, type PaymentMethod } from '@/lib/sales';
+import { baseQty, baseUnit, bulkUnit, cartTotals, lineTotal, stockStatus, unitPrice, unitsInCart, unitsPerBulk, addSalePayments, type BillPayments, type CartLine, type PaymentMethod, type PaymentPart } from '@/lib/sales';
 import { loadCatalogue, newClientRef, offlineQueue, saveCatalogue, useOnlineStatus, useQueuedSales } from '@/lib/offline';
 import { rpc, rows, supabase } from '@/lib/supabase';
 import type { Product, Sale } from '@/lib/types';
@@ -22,7 +22,8 @@ const writeParked = (shopId: string, list: ParkedSale[]) => { try { localStorage
 const PAY_OPTIONS: { value: PaymentMethod; label: string; icon: typeof Banknote }[] = [
   { value: 'Cash', label: 'Cash', icon: Banknote },
   { value: 'Mobile Money', label: 'MoMo', icon: Smartphone },
-  { value: 'Bank', label: 'Bank', icon: Landmark }
+  { value: 'Bank', label: 'Bank', icon: Landmark },
+  { value: 'Split', label: 'Split', icon: SplitSquareHorizontal }
 ];
 
 export default function Sell() {
@@ -48,6 +49,8 @@ export default function Sell() {
   const [discount, setDiscount] = useState(0);
   const [method, setMethod] = useState<PaymentMethod>('Cash');
   const [tendered, setTendered] = useState(0);
+  const [split, setSplit] = useState({ cash: 0, momo: 0, bank: 0 });
+  const [receiptBills, setReceiptBills] = useState<BillPayments | undefined>();
   const [busy, setBusy] = useState(false);
   const [receipt, setReceipt] = useState<Sale[] | null>(null);
   const [parked, setParked] = useState<ParkedSale[]>(() => readParked(shop.id));
@@ -62,7 +65,8 @@ export default function Sell() {
 
   const totals = cartTotals(lines, byId, discount);
   const itemCount = lines.reduce((a, l) => a + l.entered_qty, 0);
-  const cashDue = method === 'Cash' ? totals.total : 0;
+  const splitSum = split.cash + split.momo + split.bank;
+  const cashDue = method === 'Cash' ? totals.total : method === 'Split' ? split.cash : 0;
   // The database refuses discounts from cashiers, so they are not offered one.
   const canDiscount = role !== 'cashier';
   const change = tendered > 0 ? tendered - cashDue : 0;
@@ -101,7 +105,7 @@ export default function Sell() {
   }
 
   function clearCart() {
-    setLines([]); setDiscount(0); setTendered(0); setMethod('Cash');
+    setLines([]); setDiscount(0); setTendered(0); setSplit({ cash: 0, momo: 0, bank: 0 }); setMethod('Cash');
   }
 
   function onSearchEnter() {
@@ -134,31 +138,42 @@ export default function Sell() {
 
   async function checkout() {
     if (!lines.length || busy) return;
+    if (method === 'Split' && splitSum !== totals.total) { toast('warning', 'The parts must add up to the total', `${money(splitSum)} entered, ${money(totals.total)} due.`); return; }
     if (cashDue > 0 && tendered > 0 && tendered < cashDue && !(await confirm({ title: 'Cash received is less than due', message: `Received ${money(tendered)}, due ${money(cashDue)}. Record the sale anyway?`, confirmLabel: 'Record sale' }))) return;
     for (const l of lines) {
       const p = byId.get(l.product_id);
       if (p && unitsInCart(lines, p) > available(p)) { toast('warning', `Not enough ${p.name} in stock`); return; }
     }
     const items = lines.map(l => { const p = byId.get(l.product_id)!; return { ...l, unit_price: unitPrice(p, l.unit_mode), line_total: lineTotal(p, l) }; });
-    const payment: PaymentMethod = method;
+    const parts: PaymentPart[] = method === 'Split'
+      ? ([['Cash', split.cash], ['Mobile Money', split.momo], ['Bank', split.bank]] as const).filter(([, v]) => v > 0).map(([m, v]) => ({ method: m, amount: v }))
+      : [];
+    const payment = method === 'Split' ? 'Split' : method;
     const clientRef = newClientRef();
     setBusy(true);
     try {
       if (!navigator.onLine) {
-        await offlineQueue.add({ client_ref: clientRef, shop_id: shop.id, user_id: session.user.id, items, payment, discount: totals.discount });
+        await offlineQueue.add({ client_ref: clientRef, shop_id: shop.id, user_id: session.user.id, items, payment, discount: totals.discount, ...(parts.length ? { payments: parts } : {}) });
         setOfflineSold(s => { const n = { ...s }; for (const l of lines) { const p = byId.get(l.product_id)!; n[p.id] = (n[p.id] || 0) + baseQty(p, l); } return n; });
         clearCart();
         toast('info', 'Saved on this device', 'No internet. The sale will sync automatically when you are back online.');
         return;
       }
-      const receiptNo = await rpc<string>('record_sale_cart_v48', { p_items: items, p_payment: payment, p_discount: totals.discount, p_customer_id: null, p_customer_name: null, p_client_ref: clientRef });
+      // Split sales go through record_sale_cart_v60, which checks the parts against the server total.
+      const receiptNo = parts.length
+        ? await rpc<string>('record_sale_cart_v60', { p_items: items, p_payments: parts, p_discount: totals.discount, p_client_ref: clientRef })
+        : await rpc<string>('record_sale_cart_v48', { p_items: items, p_payment: payment, p_discount: totals.discount, p_customer_id: null, p_customer_name: null, p_client_ref: clientRef });
       const saleRows = await rows<Sale>(supabase.from('sales').select('*').eq('shop_id', shop.id).eq('receipt_no', receiptNo).order('created_at'));
       clearCart();
+      setReceiptBills(parts.length ? addSalePayments(new Map(), parts.map(p => ({ ...p, receipt_no: receiptNo }))) : undefined);
       setReceipt(saleRows);
+      void qc.invalidateQueries({ queryKey: ['sale_payments'] });
       void qc.invalidateQueries({ queryKey: ['products'] });
       void qc.invalidateQueries({ queryKey: ['sales'] });
     } catch (err) {
-      toast('error', 'Sale not recorded', (err as Error).message);
+      const e = err as Error & { code?: string };
+      if (method === 'Split' && (e.code === 'PGRST202' || /could not find the function/i.test(e.message))) toast('error', 'Split payments need a database update', 'Run supabase/migrations/002_split_payments.sql in Supabase. Nothing was recorded.');
+      else toast('error', 'Sale not recorded', e.message);
     } finally {
       setBusy(false);
     }
@@ -177,7 +192,7 @@ export default function Sell() {
   const needsShift = hasFeature('shifts') && role === 'cashier' && !myShift.isLoading && !myShift.data;
 
   return (
-    <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_400px] xl:grid-cols-[minmax(0,1fr)_440px]">
+    <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_400px] xl:grid-cols-[minmax(0,1fr)_440px]">
       <div className="min-w-0 space-y-4">
         {!online && <Notice tone="warn"><WifiOff className="mr-1.5 inline size-4" />You are offline. Sales are saved on this device and sync when the internet returns.</Notice>}
         {queued.length > 0 && <Notice tone={queued.some(q => q.status === 'failed') ? 'bad' : 'info'}>{queued.length} sale{queued.length === 1 ? '' : 's'} waiting to sync{queued.some(q => q.status === 'failed') ? ` — ${queued.filter(q => q.status === 'failed').length} rejected by the server (${queued.find(q => q.last_error)?.last_error})` : ''}.</Notice>}
@@ -227,7 +242,7 @@ export default function Sell() {
       </div>
 
       {/* Cart */}
-      <div ref={cartRef} className="lg:sticky lg:top-[88px] lg:self-start">
+      <div ref={cartRef} className="min-w-0 lg:sticky lg:top-[88px] lg:self-start">
         <Card
           title={<span className="flex items-center gap-2"><ShoppingBag className="size-4" /> Current sale</span>}
           actions={<>
@@ -266,9 +281,9 @@ export default function Sell() {
           )}
 
           <div className="space-y-4 border-t border-zinc-100 px-5 py-4">
-            <div className="grid grid-cols-3 gap-1.5" role="radiogroup" aria-label="Payment method">
+            <div className="grid grid-cols-4 gap-1.5" role="radiogroup" aria-label="Payment method">
               {PAY_OPTIONS.map(o => (
-                <button key={o.value} type="button" role="radio" aria-checked={method === o.value} onClick={() => setMethod(o.value)}
+                <button key={o.value} type="button" role="radio" aria-checked={method === o.value} onClick={() => { setMethod(o.value); if (o.value === 'Split' && !splitSum) setSplit({ cash: totals.total, momo: 0, bank: 0 }); }}
                   className={cx('flex flex-col items-center gap-1 rounded-lg border py-2 text-xs font-medium transition', method === o.value ? 'border-ink bg-ink text-white' : 'border-zinc-200 text-zinc-700 hover:border-zinc-300')}>
                   <o.icon className="size-4" />{o.label}
                 </button>
@@ -276,6 +291,16 @@ export default function Sell() {
             </div>
 
             <div className="grid grid-cols-2 gap-3">
+              {method === 'Split' && (
+                <div className="col-span-2 grid gap-2 sm:grid-cols-3">
+                  <Field label="Cash"><MoneyInput value={split.cash || ''} onChange={v => setSplit(s => ({ ...s, cash: v }))} placeholder="0" /></Field>
+                  <Field label="MoMo"><MoneyInput value={split.momo || ''} onChange={v => setSplit(s => ({ ...s, momo: v }))} placeholder="0" /></Field>
+                  <Field label="Bank"><MoneyInput value={split.bank || ''} onChange={v => setSplit(s => ({ ...s, bank: v }))} placeholder="0" /></Field>
+                  <p className={cx('text-xs sm:col-span-3', splitSum === totals.total ? 'text-emerald-600' : 'text-amber-700')}>
+                    {splitSum === totals.total ? 'Parts add up to the total.' : splitSum < totals.total ? `${money(totals.total - splitSum)} still to allocate` : `${money(splitSum - totals.total)} more than the total`}
+                  </p>
+                </div>
+              )}
               {canDiscount && <Field label="Discount"><MoneyInput value={discount || ''} onChange={setDiscount} placeholder="0" /></Field>}
               {cashDue > 0 && <Field label="Cash received"><MoneyInput value={tendered || ''} onChange={setTendered} placeholder="0" /></Field>}
             </div>
@@ -338,11 +363,11 @@ export default function Sell() {
         title="Sale complete"
         description={receipt?.[0]?.receipt_no ? `Receipt ${receipt[0].receipt_no}` : undefined}
         footer={<>
-          <Button icon={<Printer />} onClick={() => receipt && print(<Receipt shop={shop} rows={receipt} />)}>Print receipt</Button>
+          <Button icon={<Printer />} onClick={() => receipt && print(<Receipt shop={shop} rows={receipt} bills={receiptBills} />)}>Print receipt</Button>
           <Button variant="money" onClick={() => setReceipt(null)} data-autofocus>New sale</Button>
         </>}
       >
-        {receipt && <div className="rounded-xl border border-zinc-200 bg-zinc-50 py-4"><Receipt shop={shop} rows={receipt} /></div>}
+        {receipt && <div className="rounded-xl border border-zinc-200 bg-zinc-50 py-4"><Receipt shop={shop} rows={receipt} bills={receiptBills} /></div>}
       </Dialog>
       {lines.length > 0 && <div className="h-16 lg:hidden" aria-hidden />}
       <span className="sr-only" aria-live="polite">{lines.length ? `${itemCount} items, total ${money(totals.total)}` : ''}</span>

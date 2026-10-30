@@ -77,7 +77,9 @@ function OfflineSync() {
         for (const q of queued) {
           if (q.user_id !== session.user.id) continue;
           await offlineQueue.update(q.client_ref, { status: 'syncing' });
-          const { error } = await supabase.rpc('record_sale_cart_v48', { p_items: q.items, p_payment: q.payment, p_discount: q.discount, p_customer_id: null, p_customer_name: null, p_client_ref: q.client_ref });
+          const { error } = q.payments?.length
+            ? await supabase.rpc('record_sale_cart_v60', { p_items: q.items, p_payments: q.payments, p_discount: q.discount, p_client_ref: q.client_ref })
+            : await supabase.rpc('record_sale_cart_v48', { p_items: q.items, p_payment: q.payment, p_discount: q.discount, p_customer_id: null, p_customer_name: null, p_client_ref: q.client_ref });
           if (error) await offlineQueue.update(q.client_ref, { status: 'failed', last_error: error.message });
           else { await offlineQueue.remove(q.client_ref); synced++; }
         }
@@ -85,6 +87,7 @@ function OfflineSync() {
           toast('success', `${synced} offline sale${synced === 1 ? '' : 's'} synced`);
           void qc.invalidateQueries({ queryKey: ['sales'] });
           void qc.invalidateQueries({ queryKey: ['products'] });
+          void qc.invalidateQueries({ queryKey: ['sale_payments'] });
         }
       } finally {
         running = false;

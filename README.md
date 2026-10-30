@@ -12,7 +12,7 @@ The owner sees every movement of stock and money; staff sign in with their own r
 | Area | Pages | Who |
 |---|---|---|
 | Overview | Dashboard — today's sales, profit, expenses and receipts vs this time yesterday, 7-day trend, payment channels, stock alerts, recent receipts, approvals waiting | Owner, manager |
-| Sell | Point of sale (search / barcode / camera scan, base & bulk units, discounts (not for cashiers), Cash / MoMo / Bank, change due, parked sales, offline selling, receipts) · Sales history (filters, receipts, voids, CSV) · Tables & orders (bars and restaurants only) | Owner, manager, cashier · waiter & kitchen for tables |
+| Sell | Point of sale (search / barcode / camera scan, base & bulk units, discounts (not for cashiers), Cash / MoMo / Bank / Split (part cash, part MoMo or bank — needs migration 002), change due, parked sales, offline selling, receipts) · Sales history (filters, receipts, voids, CSV) · Tables & orders (bars and restaurants only) | Owner, manager, cashier · waiter & kitchen for tables |
 | Stock | Products · **Stock movements** (one ledger of sales, voids, deliveries, adjustments and wastage) · Suppliers & purchases (supplier debts and payments) | Owner, manager · stock clerk for products & movements |
 | Money | Expenses · Cash shifts (float, blind count for cashiers, pay-outs, Z-reports) · Reports (profit, products, staff, payment methods, accountant export) | Owner, manager · cashiers run their own shift |
 | Team | Staff & roles (invites, enable / disable) · Approvals & activity (void / adjustment requests, exceptions, audit log) | Owner (invites), manager |

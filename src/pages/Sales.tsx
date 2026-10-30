@@ -140,8 +140,13 @@ export default function Sales() {
         title={`Receipt ${open?.rows[0].receipt_no || ''}`}
         description={open ? formatDateTime(open.createdAt) : undefined}
         size="lg"
-        footer={open && <Button variant="primary" icon={<Printer />} onClick={() => print(<Receipt shop={shop} rows={open.rows} />)}>Print receipt</Button>}
+        footer={open && <Button variant="primary" icon={<Printer />} onClick={() => print(<Receipt shop={shop} rows={open.rows} bills={bills} />)}>Print receipt</Button>}
       >
+        {open && open.rows[0].receipt_no && bills.get(open.rows[0].receipt_no) && (() => {
+          const b = bills.get(open.rows[0].receipt_no!)!;
+          const parts = [['Cash', b.cash], ['Mobile Money', b.momo], ['Bank', b.bank], ['Other', b.other]].filter(([, v]) => Number(v) > 0);
+          return <p className="mb-2 rounded-lg bg-zinc-50 px-3 py-2 text-[13px] text-zinc-600">Paid by {parts.map(([m, v]) => `${m} ${money(v)}`).join(' + ')}</p>;
+        })()}
         {open && (
           <ul className="divide-y divide-zinc-100">
             {open.rows.map(line => (

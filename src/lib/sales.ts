@@ -1,8 +1,8 @@
 import type { Product, Sale } from './types';
 
-/** Methods record_sale_cart accepts for counter sales (Credit was removed with customer credit). */
-export type PaymentMethod = 'Cash' | 'Mobile Money' | 'Bank';
-export const PAYMENT_METHODS: PaymentMethod[] = ['Cash', 'Mobile Money', 'Bank'];
+/** Counter-sale payment methods. Split is recorded through record_sale_cart_v60 (migration 002). */
+export type PaymentMethod = 'Cash' | 'Mobile Money' | 'Bank' | 'Split';
+export type PaymentPart = { method: 'Cash' | 'Mobile Money' | 'Bank'; amount: number };
 
 export interface CartLine { product_id: string; entered_qty: number; unit_mode: 'base' | 'bulk' }
 
@@ -43,6 +43,17 @@ export interface Breakdown { cash: number; momo: number; bank: number; other: nu
 /** Payments of closed bar / restaurant bills, keyed by receipt number. hospitality_close_tab()
  *  stores those sales with payment "Split" and keeps the real methods in hospitality_payments. */
 export type BillPayments = Map<string, Breakdown>;
+
+/** Adds the parts of split sales (sale_payments) to a receipt → payments map. */
+export function addSalePayments(map: BillPayments, parts: { receipt_no: string; method: string; amount: number }[]): BillPayments {
+  for (const p of parts) {
+    const b = map.get(p.receipt_no) ?? { cash: 0, momo: 0, bank: 0, other: 0 };
+    const amt = Number(p.amount || 0);
+    if (p.method === 'Cash') b.cash += amt; else if (p.method === 'Mobile Money') b.momo += amt; else if (p.method === 'Bank') b.bank += amt; else b.other += amt;
+    map.set(p.receipt_no, b);
+  }
+  return map;
+}
 
 export function billPaymentsByReceipt(tabs: { id: string; receipt_no?: string | null }[], payments: { tab_id: string; method: string; amount: number }[]): BillPayments {
   const receiptOf = new Map(tabs.filter(t => t.receipt_no).map(t => [t.id, t.receipt_no as string]));

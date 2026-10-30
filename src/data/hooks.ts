@@ -1,13 +1,13 @@
 import { useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { isHospitality } from '@/lib/access';
-import { billPaymentsByReceipt, type BillPayments } from '@/lib/sales';
+import { addSalePayments, billPaymentsByReceipt, type BillPayments } from '@/lib/sales';
 import type { PostgrestError } from '@supabase/supabase-js';
 import { rows, supabase } from '@/lib/supabase';
 import { useShop } from '@/auth/AuthProvider';
 import { useFeedback } from '@/components/feedback';
 import type {
-  ApprovalRequest, AppDevice, AuditLog, Employee, Expense, HospitalityItem, HospitalityPayment, HospitalityTab, HospitalityTable,
+  ApprovalRequest, AppDevice, AuditLog, Employee, Expense, HospitalityItem, HospitalityPayment, SalePayment, HospitalityTab, HospitalityTable,
   Product, Sale, Shift, StaffInvite, StockAdjustment, StockPurchase, Supplier, SupplierPayment, SupplierPurchase
 } from '@/lib/types';
 
@@ -79,13 +79,19 @@ export const useTabItems = (enabled = true) =>
 export const useHospitalityPayments = (enabled = true) =>
   useShopQuery<HospitalityPayment>('hospitality_payments', enabled, id => supabase.from('hospitality_payments').select('*').eq('shop_id', id).gte('created_at', sinceDays(35)).order('created_at', { ascending: false }).limit(3000));
 
-/** How closed bar / restaurant bills were really paid, keyed by receipt (empty for shops). */
-export function useBillPayments(): BillPayments {
+/** Parts of split sales. Empty until supabase/migrations/002 has been run (the table is missing). */
+export const useSalePayments = (days = 35) =>
+  useShopQuery<SalePayment>('sale_payments', true, id => supabase.from('sale_payments').select('*').eq('shop_id', id).gte('created_at', sinceDays(days)).order('created_at', { ascending: false }).limit(5000), [days]);
+
+/** How receipts paid several ways were really paid — split sales and bar / restaurant bills —
+ *  keyed by receipt number. */
+export function useBillPayments(days = 95): BillPayments {
   const { shop } = useShop();
   const on = isHospitality(shop.business_type);
   const tabs = useTabs(on);
   const payments = useHospitalityPayments(on);
-  return useMemo(() => billPaymentsByReceipt(tabs.data ?? [], payments.data ?? []), [tabs.data, payments.data]);
+  const parts = useSalePayments(days);
+  return useMemo(() => addSalePayments(billPaymentsByReceipt(tabs.data ?? [], payments.data ?? []), parts.data ?? []), [tabs.data, payments.data, parts.data]);
 }
 
 /** The current user's open cash shift, if any. */
