@@ -12,7 +12,7 @@ The owner sees every movement of stock and money; staff sign in with their own r
 | Area | Pages | Who |
 |---|---|---|
 | Overview | Dashboard — today's sales, profit, expenses and receipts vs this time yesterday, 7-day trend, payment channels, stock alerts, recent receipts, approvals waiting | Owner, manager |
-| Sell | Point of sale (search / barcode / camera scan, base & bulk units, discounts, Cash / MoMo / Bank / Split, change due, parked sales, offline selling, receipts) · Sales history (filters, receipts, voids, CSV) · Tables & orders (bars and restaurants only) | Owner, manager, cashier · waiter & kitchen for tables |
+| Sell | Point of sale (search / barcode / camera scan, base & bulk units, discounts (not for cashiers), Cash / MoMo / Bank, change due, parked sales, offline selling, receipts) · Sales history (filters, receipts, voids, CSV) · Tables & orders (bars and restaurants only) | Owner, manager, cashier · waiter & kitchen for tables |
 | Stock | Products · **Stock movements** (one ledger of sales, voids, deliveries, adjustments and wastage) · Suppliers & purchases (supplier debts and payments) | Owner, manager · stock clerk for products & movements |
 | Money | Expenses · Cash shifts (float, blind count for cashiers, pay-outs, Z-reports) · Reports (profit, products, staff, payment methods, accountant export) | Owner, manager · cashiers run their own shift |
 | Team | Staff & roles (invites, enable / disable) · Approvals & activity (void / adjustment requests, exceptions, audit log) | Owner (invites), manager |
@@ -71,8 +71,21 @@ so existing shops keep all their data. SQL for database work lives in `supabase/
 - `supabase/export-schema.sql` — read-only export of tables, policies and key functions. Run it in the
   Supabase SQL Editor and share the result so database fixes are written against the real schema.
 
-Staff sign in with phone + 6-digit PIN (stored as a Supabase password on a `staff.<phone>@auth.duka.local`
-login). **Supabase → Authentication → "Confirm email" must be off** for staff sign-up to work.
+- `supabase/migrations/` — run each file once, in order, in the SQL Editor.
+- `supabase/functions/staff-signup` — Edge Function that creates staff logins.
+
+### Staff sign-up and email confirmation
+Owners sign up with email and keep Supabase's **"Confirm email"** on. Staff sign in with phone + 6-digit
+PIN; their login is a placeholder address (`staff.<phone>@auth.duka.local`) that cannot receive mail, so
+the `staff-signup` Edge Function creates it already confirmed — only for someone holding a valid, unused
+invite for that exact phone number. Deploy it once with the Supabase CLI:
+
+```bash
+npx supabase login
+npx supabase functions deploy staff-signup --no-verify-jwt --project-ref frduolsneevyndnebxvy
+```
+
+`--no-verify-jwt` is needed because the employee is not signed in yet; the invite is the credential.
 
 ## Project layout
 

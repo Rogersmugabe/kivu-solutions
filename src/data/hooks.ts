@@ -1,4 +1,7 @@
+import { useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { isHospitality } from '@/lib/access';
+import { billPaymentsByReceipt, type BillPayments } from '@/lib/sales';
 import type { PostgrestError } from '@supabase/supabase-js';
 import { rows, supabase } from '@/lib/supabase';
 import { useShop } from '@/auth/AuthProvider';
@@ -75,6 +78,15 @@ export const useTabItems = (enabled = true) =>
 
 export const useHospitalityPayments = (enabled = true) =>
   useShopQuery<HospitalityPayment>('hospitality_payments', enabled, id => supabase.from('hospitality_payments').select('*').eq('shop_id', id).gte('created_at', sinceDays(35)).order('created_at', { ascending: false }).limit(3000));
+
+/** How closed bar / restaurant bills were really paid, keyed by receipt (empty for shops). */
+export function useBillPayments(): BillPayments {
+  const { shop } = useShop();
+  const on = isHospitality(shop.business_type);
+  const tabs = useTabs(on);
+  const payments = useHospitalityPayments(on);
+  return useMemo(() => billPaymentsByReceipt(tabs.data ?? [], payments.data ?? []), [tabs.data, payments.data]);
+}
 
 /** The current user's open cash shift, if any. */
 export function useMyOpenShift(enabled = true) {

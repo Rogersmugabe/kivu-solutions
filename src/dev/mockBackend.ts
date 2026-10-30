@@ -22,7 +22,9 @@ const db: Record<string, Record<string, unknown>[]> = {
     // The real employees.role column stores labels like 'Cashier' and 'Stock Clerk'.
     { id: 'e1', shop_id: shopId, user_id: 'u-cash', name: 'Eric Cashier', phone: '+250788555666', role: 'Cashier', active: true },
     { id: 'e2', shop_id: shopId, user_id: 'u-mgr', name: 'Grace Manager', phone: '+250788777888', role: 'Manager', active: true },
-    { id: 'e4', shop_id: shopId, user_id: 'u-clerk', name: 'Jean Stock', phone: '+250788444333', role: 'Stock Clerk', active: false }
+    { id: 'e4', shop_id: shopId, user_id: 'u-clerk', name: 'Jean Stock', phone: '+250788444333', role: 'Stock Clerk', active: false },
+    // The signed-in demo user (staff roles must have an active employee row to sign in).
+    { id: 'e3', shop_id: shopId, user_id: uid, name: 'Demo user', phone: '+250788111000', role: ({ manager: 'Manager', cashier: 'Cashier', stock_clerk: 'Stock Clerk', waiter: 'Waiter', kitchen: 'Kitchen' } as Record<string, string>)[role] ?? 'Owner', active: true }
   ],
   staff_invites: [{ id: 'i1', shop_id: shopId, employee_name: 'New Hire', phone: '+250788123123', role: 'cashier', code: 'KV7M9X', expires_at: iso(now + 10 * D), created_at: iso(now - D) }],
   products: [

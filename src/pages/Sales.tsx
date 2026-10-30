@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Download, Printer, ReceiptText, Ban } from 'lucide-react';
 import { useShop } from '@/auth/AuthProvider';
-import { useAction, useSales } from '@/data/hooks';
+import { useAction, useBillPayments, useSales } from '@/data/hooks';
 import { useFeedback } from '@/components/feedback';
 import { Receipt, usePrint } from '@/components/print';
 import { Badge, Button, Card, Dialog, EmptyState, PageHeader, SearchInput, Select, Spinner, Stat } from '@/components/ui';
@@ -26,6 +26,7 @@ export default function Sales() {
   const [page, setPage] = useState(1);
   const [openKey, setOpenKey] = useState<string | null>(null);
   const sales = useSales(days);
+  const bills = useBillPayments();
 
   const voidLine = useAction(
     async ({ sale, reason }: { sale: Sale; reason: string }) => rpc<string>('request_or_void_sale', { p_sale_id: sale.id, p_reason: reason }),
@@ -49,9 +50,9 @@ export default function Sales() {
     const live = (sales.data ?? []).filter(s => s.status !== 'voided');
     const t = { total: 0, cash: 0, momo: 0, bank: 0 };
     const groups = new Map(receipts.map(r => [r.key, r.rows]));
-    for (const s of live) { const b = paymentBreakdown(s, groups.get(s.receipt_no || s.id)); t.total += Number(s.total || 0); t.cash += b.cash; t.momo += b.momo; t.bank += b.bank; }
+    for (const s of live) { const b = paymentBreakdown(s, groups.get(s.receipt_no || s.id), bills); t.total += Number(s.total || 0); t.cash += b.cash; t.momo += b.momo; t.bank += b.bank; }
     return t;
-  }, [sales.data, receipts]);
+  }, [sales.data, receipts, bills]);
 
   const pages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const current = Math.min(page, pages);

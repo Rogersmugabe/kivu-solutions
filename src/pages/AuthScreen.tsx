@@ -5,6 +5,26 @@ import { isValidRwPhone, normalizeRwPhone } from '@/lib/format';
 import { Button, Field, Input, Notice, Segmented, cx } from '@/components/ui';
 
 type Mode = 'signin' | 'signup';
+
+/** Creates a confirmed staff login through the staff-signup Edge Function (an invite for this
+ *  phone is required). Falls back to plain sign-up only if the function is not deployed yet —
+ *  that path works only while "Confirm email" is off in Supabase. */
+async function createStaffAccount({ code, fullName, phone, pin }: { code: string; fullName: string; phone: string; pin: string }) {
+  const { error } = await supabase.functions.invoke('staff-signup', { body: { code, full_name: fullName, phone, pin } });
+  if (!error) return;
+  const status = (error as { context?: Response }).context?.status;
+  if (status && status !== 404) {
+    let message = error.message;
+    try { message = ((await (error as { context: Response }).context.json()) as { error?: string }).error || message; } catch { /* keep generic */ }
+    throw new Error(message);
+  }
+  const { data, error: signUpError } = await supabase.auth.signUp({
+    email: staffAuthEmail(phone), password: pin,
+    options: { data: { full_name: fullName, staff_invite_code: code, staff_phone: phone, login_method: 'phone_pin' } }
+  });
+  if (signUpError) throw new Error(/already/i.test(signUpError.message) ? 'This phone number already has a staff account. Sign in instead.' : signUpError.message);
+  if (!data.session) throw new Error('Your account was created but cannot be confirmed yet. Ask the owner to deploy the staff sign-up function (see the README).');
+}
 type Who = 'owner' | 'staff';
 
 function PasswordInput({ value, onChange, placeholder, autoComplete, numeric }: { value: string; onChange: (v: string) => void; placeholder?: string; autoComplete?: string; numeric?: boolean }) {
@@ -74,13 +94,10 @@ export function AuthScreen({ blockedMessage }: { blockedMessage?: string }) {
           if (err) throw new Error(/invalid login/i.test(err.message) ? 'Phone number or PIN is incorrect.' : err.message);
         } else {
           if (!fullName.trim() || !inviteCode.trim()) throw new Error('Enter your full name and the invite code from your manager.');
-          const { data, error: err } = await supabase.auth.signUp({
-            email: staffAuthEmail(p),
-            password: pin,
-            options: { data: { full_name: fullName.trim(), staff_invite_code: inviteCode.trim().toUpperCase(), staff_phone: p, login_method: 'phone_pin' } }
-          });
-          if (err) throw new Error(/already/i.test(err.message) ? 'This phone number already has a staff account. Sign in instead.' : err.message);
-          if (!data.session) setInfo('Account created, but this Supabase project requires email confirmation. Ask the owner to turn off "Confirm email" for staff sign-up.');
+          await createStaffAccount({ code: inviteCode.trim().toUpperCase(), fullName: fullName.trim(), phone: p, pin });
+          // The login is created already confirmed; signing in triggers claim_staff_invite().
+          const { error: err } = await supabase.auth.signInWithPassword({ email: staffAuthEmail(p), password: pin });
+          if (err) throw err;
         }
       } else if (mode === 'signin') {
         const { error: err } = await supabase.auth.signInWithPassword({ email: email.trim(), password });

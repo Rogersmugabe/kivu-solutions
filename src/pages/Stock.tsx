@@ -73,7 +73,11 @@ export default function Stock() {
   const receive = useAction(async () => {
     if (!selected) throw new Error('Choose a product.');
     if (!(baseQtyValue > 0)) throw new Error('Enter a quantity above zero.');
-    await rpc('receive_stock', { p_product_id: selected.id, p_qty: baseQtyValue, p_total_cost: form.totalCost });
+    // receive_stock() sets the product's cost price to total cost ÷ quantity, so a missing cost would
+    // wipe it. Staff who cannot see money send the current cost; owners and managers enter what they paid.
+    const total = can('see_money') ? form.totalCost : Math.round(baseQtyValue * Number(selected.cost || 0));
+    if (can('see_money') && !(total > 0)) throw new Error("Enter what you paid in total. It becomes this product's cost price.");
+    await rpc('receive_stock', { p_product_id: selected.id, p_qty: baseQtyValue, p_total_cost: total });
   }, { invalidate: ['products', 'stock_purchases'], success: () => `${baseQtyValue} ${selected ? baseUnit(selected).toLowerCase() : ''} received` });
 
   const adjust = useAction(async () => {
@@ -191,7 +195,11 @@ export default function Stock() {
             </Field>
           </div>
           {selected && unitFactor > 1 && <p className="-mt-2 text-xs text-zinc-500">= {baseQtyValue} {baseUnit(selected).toLowerCase()}</p>}
-          {dialog === 'receive' && can('see_money') && <Field label="Total cost paid" hint="Optional. Updates your stock value."><MoneyInput value={form.totalCost || ''} onChange={v => setForm(f => ({ ...f, totalCost: v }))} placeholder="0" /></Field>}
+          {dialog === 'receive' && can('see_money') && (
+            <Field label="Total cost paid" hint={selected ? <>Sets the cost price to {money(baseQtyValue > 0 ? Math.round((form.totalCost || 0) / baseQtyValue) : 0)} per {baseUnit(selected).toLowerCase()}. <button type="button" className="font-medium text-brand-600 hover:underline" onClick={() => setForm(f => ({ ...f, totalCost: Math.round(baseQtyValue * Number(selected.cost || 0)) }))}>Use current cost ({money(selected.cost)} each)</button></> : 'Becomes the product cost price.'}>
+              <MoneyInput value={form.totalCost || ''} onChange={v => setForm(f => ({ ...f, totalCost: v }))} placeholder="0" />
+            </Field>
+          )}
           {dialog === 'adjust' && <>
             <Field label="Reason"><Select value={form.reason} onChange={e => setForm(f => ({ ...f, reason: e.target.value }))}>{ADJUST_REASONS.map(r => <option key={r}>{r}</option>)}</Select></Field>
             <Field label="Note"><Input value={form.note} onChange={e => setForm(f => ({ ...f, note: e.target.value }))} placeholder="Optional details" /></Field>

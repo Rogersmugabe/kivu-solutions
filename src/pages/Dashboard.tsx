@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { TrendingUp, TrendingDown, ReceiptText, Wallet, Coins, AlertTriangle, ShieldCheck, Package } from 'lucide-react';
 import { useShop } from '@/auth/AuthProvider';
-import { useApprovals, useExpenses, useProducts, useSales } from '@/data/hooks';
+import { useApprovals, useBillPayments, useExpenses, useProducts, useSales } from '@/data/hooks';
 import { BarChart, ShareBars } from '@/components/charts';
 import { Badge, Card, EmptyState, PageHeader, Spinner, cx } from '@/components/ui';
 import { businessDay, daysAgo, formatTime, minuteOfDay, money } from '@/lib/format';
@@ -44,6 +44,7 @@ export default function Dashboard() {
   const expenses = useExpenses(8, hasFeature('expenses'));
   const products = useProducts();
   const approvals = useApprovals(hasFeature('approvals'));
+  const bills = useBillPayments();
 
   const data = useMemo(() => {
     const s = (sales.data ?? []).filter(x => x.status !== 'voided');
@@ -61,10 +62,10 @@ export default function Dashboard() {
     const receiptsToday = new Set(todaySales.map(r => r.receipt_no || r.id)).size;
     const receiptsY = new Set(ySales.map(r => r.receipt_no || r.id)).size;
 
-    const channels = { cash: 0, momo: 0, bank: 0 };
+    const channels = { cash: 0, momo: 0, bank: 0, other: 0 };
     const groups = new Map<string, Sale[]>();
     for (const r of todaySales) { const k = r.receipt_no || r.id; groups.set(k, [...(groups.get(k) ?? []), r]); }
-    for (const r of todaySales) { const b = paymentBreakdown(r, groups.get(r.receipt_no || r.id)); channels.cash += b.cash; channels.momo += b.momo; channels.bank += b.bank; }
+    for (const r of todaySales) { const b = paymentBreakdown(r, groups.get(r.receipt_no || r.id), bills); channels.cash += b.cash; channels.momo += b.momo; channels.bank += b.bank; channels.other += b.other; }
 
     const week = Array.from({ length: 7 }, (_, i) => {
       const d = daysAgo(6 - i);
@@ -86,7 +87,7 @@ export default function Dashboard() {
       top: [...top.values()].sort((a, b) => b.total - a.total).slice(0, 5),
       recent: groupReceipts(sales.data ?? []).slice(0, 6)
     };
-  }, [sales.data, expenses.data]);
+  }, [sales.data, expenses.data, bills]);
 
   const lowStock = (products.data ?? []).filter(p => stockStatus(p) !== 'ok').sort((a, b) => Number(a.qty) - Number(b.qty));
   const stockValue = (products.data ?? []).reduce((a, p) => a + Math.max(0, Number(p.qty)) * Number(p.cost || 0), 0);
@@ -124,7 +125,8 @@ export default function Dashboard() {
             <ShareBars items={[
               { label: 'Cash', value: data.channels.cash, color: '#0b0d12' },
               { label: 'Mobile Money', value: data.channels.momo, color: '#f5b400' },
-              { label: 'Bank', value: data.channels.bank, color: '#3b6cf6' }
+              { label: 'Bank', value: data.channels.bank, color: '#3b6cf6' },
+              ...(data.channels.other ? [{ label: 'Credit / other', value: data.channels.other, color: '#a1a1aa' }] : [])
             ]} />
           ) : <EmptyState title="No sales yet today" />}
         </Card>

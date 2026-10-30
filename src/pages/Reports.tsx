@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Download } from 'lucide-react';
 import { useShop } from '@/auth/AuthProvider';
-import { useExpenses, useSales } from '@/data/hooks';
+import { useBillPayments, useExpenses, useSales } from '@/data/hooks';
 import { BarChart, ShareBars } from '@/components/charts';
 import { Button, Card, EmptyState, Notice, PageHeader, Segmented, Spinner, Stat } from '@/components/ui';
 import { businessDay, daysAgo, formatDateTime, money } from '@/lib/format';
@@ -16,6 +16,7 @@ export default function Reports() {
   const [period, setPeriod] = useState<Period>('30');
   const days = Number(period);
   const sales = useSales(days);
+  const bills = useBillPayments();
   const expenses = useExpenses(days, hasFeature('expenses'));
 
   const r = useMemo(() => {
@@ -30,8 +31,8 @@ export default function Reports() {
 
     const groups = new Map<string, Sale[]>();
     for (const x of s) { const k = x.receipt_no || x.id; groups.set(k, [...(groups.get(k) ?? []), x]); }
-    const pay = { cash: 0, momo: 0, bank: 0 };
-    for (const x of s) { const b = paymentBreakdown(x, groups.get(x.receipt_no || x.id)); pay.cash += b.cash; pay.momo += b.momo; pay.bank += b.bank; }
+    const pay = { cash: 0, momo: 0, bank: 0, other: 0 };
+    for (const x of s) { const b = paymentBreakdown(x, groups.get(x.receipt_no || x.id), bills); pay.cash += b.cash; pay.momo += b.momo; pay.bank += b.bank; pay.other += b.other; }
 
     const products = new Map<string, { name: string; qty: number; revenue: number; cost: number }>();
     const staff = new Map<string, { name: string; receipts: Set<string>; revenue: number }>();
@@ -62,7 +63,7 @@ export default function Reports() {
       products: [...products.values()].sort((a, b) => b.revenue - a.revenue),
       staff: [...staff.values()].sort((a, b) => b.revenue - a.revenue)
     };
-  }, [sales.data, expenses.data, days]);
+  }, [sales.data, expenses.data, days, bills]);
 
   function exportAccountant() {
     const rate = Math.max(0, Number(shop.tax_rate || 0));
@@ -99,7 +100,7 @@ export default function Reports() {
           {r.chart.length ? <BarChart data={r.chart} /> : <p className="text-sm text-zinc-500">Choose 7 days or longer to see a trend.</p>}
         </Card>
         <Card title="How customers paid">
-          {r.revenue ? <ShareBars items={[{ label: 'Cash', value: r.pay.cash, color: '#0b0d12' }, { label: 'Mobile Money', value: r.pay.momo, color: '#f5b400' }, { label: 'Bank', value: r.pay.bank, color: '#3b6cf6' }]} /> : <EmptyState title="No sales in this period" />}
+          {r.revenue ? <ShareBars items={[{ label: 'Cash', value: r.pay.cash, color: '#0b0d12' }, { label: 'Mobile Money', value: r.pay.momo, color: '#f5b400' }, { label: 'Bank', value: r.pay.bank, color: '#3b6cf6' }, ...(r.pay.other ? [{ label: 'Credit / other', value: r.pay.other, color: '#a1a1aa' }] : [])]} /> : <EmptyState title="No sales in this period" />}
           {r.discounts > 0 && <p className="mt-4 text-xs text-zinc-500">Discounts given: {money(r.discounts)}</p>}
         </Card>
       </div>

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { businessDay, minuteOfDay, money, normalizeRwPhone, parseMoney, isValidRwPhone } from './format';
 import { ROLE_PAGES, employeeRole, enabledFeatures, roleCan, subscriptionStatus, visiblePages } from './access';
-import { bulkPrice, cartTotals, groupReceipts, lineTotal, paymentBreakdown, paymentLabel, unitsInCart } from './sales';
+import { billPaymentsByReceipt, bulkPrice, cartTotals, groupReceipts, lineTotal, paymentBreakdown, unitsInCart } from './sales';
 import { parseCsv } from './csv';
 import { shiftTotals } from './shifts';
 import type { Expense, HospitalityPayment, Product, Sale, Shift, Shop } from './types';
@@ -79,12 +79,23 @@ describe('cart and payments', () => {
   it('counts stock in the cart in base units', () => {
     expect(unitsInCart([{ product_id: 'p1', entered_qty: 1, unit_mode: 'bulk' }, { product_id: 'p1', entered_qty: 3, unit_mode: 'base' }], product())).toBe(15);
   });
-  it('stores and reads split payments, apportioned across receipt lines', () => {
-    const label = paymentLabel('Split', { cash: 600, momo: 400, bank: 0 });
-    expect(label).toBe('Split (Cash 600, MoMo 400)');
+  it('reads older split receipts, apportioned across the receipt lines', () => {
+    const label = 'Split (Cash 600, MoMo 400)';
     const a = sale({ receipt_no: 'R1', total: 750, payment: label }), b = sale({ receipt_no: 'R1', total: 250, payment: label });
-    expect(paymentBreakdown(a, [a, b])).toEqual({ cash: 450, momo: 300, bank: 0 });
-    expect(paymentBreakdown(sale({ payment: 'Mobile Money', total: 900 }))).toEqual({ cash: 0, momo: 900, bank: 0 });
+    expect(paymentBreakdown(a, [a, b])).toEqual({ cash: 450, momo: 300, bank: 0, other: 0 });
+    expect(paymentBreakdown(sale({ payment: 'Mobile Money', total: 900 }))).toEqual({ cash: 0, momo: 900, bank: 0, other: 0 });
+  });
+  it('never counts credit or unknown methods as cash', () => {
+    expect(paymentBreakdown(sale({ payment: 'Credit', total: 500 }))).toEqual({ cash: 0, momo: 0, bank: 0, other: 500 });
+    expect(paymentBreakdown(sale({ payment: 'Split', total: 500, receipt_no: 'KV-H-1' }))).toEqual({ cash: 0, momo: 0, bank: 0, other: 500 });
+  });
+  it('uses the real payments of bar / restaurant bills', () => {
+    const bills = billPaymentsByReceipt([{ id: 'tab1', receipt_no: 'KV-H-9' }], [
+      { tab_id: 'tab1', method: 'Cash', amount: 3000 }, { tab_id: 'tab1', method: 'Mobile Money', amount: 1000 }
+    ]);
+    const a = sale({ receipt_no: 'KV-H-9', total: 3000, payment: 'Split' }), b = sale({ receipt_no: 'KV-H-9', total: 1000, payment: 'Split' });
+    expect(paymentBreakdown(a, [a, b], bills)).toEqual({ cash: 2250, momo: 750, bank: 0, other: 0 });
+    expect(paymentBreakdown(b, [a, b], bills)).toEqual({ cash: 750, momo: 250, bank: 0, other: 0 });
   });
   it('groups sale lines into receipts and flags fully voided ones', () => {
     const g = groupReceipts([sale({ receipt_no: 'R1' }), sale({ receipt_no: 'R1', total: 500 }), sale({ receipt_no: 'R2', status: 'voided' })]);

@@ -1,7 +1,8 @@
 import type { Product, Sale } from './types';
 
-export type PaymentMethod = 'Cash' | 'Mobile Money' | 'Bank' | 'Split';
-export const PAYMENT_METHODS: PaymentMethod[] = ['Cash', 'Mobile Money', 'Bank', 'Split'];
+/** Methods record_sale_cart accepts for counter sales (Credit was removed with customer credit). */
+export type PaymentMethod = 'Cash' | 'Mobile Money' | 'Bank';
+export const PAYMENT_METHODS: PaymentMethod[] = ['Cash', 'Mobile Money', 'Bank'];
 
 export interface CartLine { product_id: string; entered_qty: number; unit_mode: 'base' | 'bulk' }
 
@@ -37,38 +38,51 @@ export function unitsInCart(lines: CartLine[], product: Product): number {
   return lines.filter(l => l.product_id === product.id).reduce((sum, l) => sum + baseQty(product, l), 0);
 }
 
-export interface Split { cash: number; momo: number; bank: number }
+export interface Breakdown { cash: number; momo: number; bank: number; other: number }
 
-/** The payment string stored on each sale row (the database keeps one text column). */
-export function paymentLabel(method: PaymentMethod, split?: Split): string {
-  if (method !== 'Split' || !split) return method;
-  const parts = [`Cash ${split.cash}`, `MoMo ${split.momo}`];
-  if (split.bank) parts.push(`Bank ${split.bank}`);
-  return `Split (${parts.join(', ')})`;
+/** Payments of closed bar / restaurant bills, keyed by receipt number. hospitality_close_tab()
+ *  stores those sales with payment "Split" and keeps the real methods in hospitality_payments. */
+export type BillPayments = Map<string, Breakdown>;
+
+export function billPaymentsByReceipt(tabs: { id: string; receipt_no?: string | null }[], payments: { tab_id: string; method: string; amount: number }[]): BillPayments {
+  const receiptOf = new Map(tabs.filter(t => t.receipt_no).map(t => [t.id, t.receipt_no as string]));
+  const out: BillPayments = new Map();
+  for (const p of payments) {
+    const r = receiptOf.get(p.tab_id);
+    if (!r) continue;
+    const b = out.get(r) ?? { cash: 0, momo: 0, bank: 0, other: 0 };
+    const amt = Number(p.amount || 0);
+    if (p.method === 'Cash') b.cash += amt; else if (p.method === 'Mobile Money') b.momo += amt; else if (p.method === 'Bank') b.bank += amt; else b.other += amt;
+    out.set(r, b);
+  }
+  return out;
 }
 
-export interface Breakdown { cash: number; momo: number; bank: number }
-
-/** How much of a sale row was paid by each channel. Split sales are apportioned across the
- *  rows of the same receipt in proportion to each row's total. */
-export function paymentBreakdown(sale: Sale, receiptRows?: Sale[]): Breakdown {
+/** How much of a sale row was paid by each channel. Receipts paid several ways (bar bills, and
+ *  older split sales written as "Split (Cash 600, MoMo 400)") are apportioned across the receipt's
+ *  lines in proportion to each line's total. Credit and other methods count as "other". */
+export function paymentBreakdown(sale: Sale, receiptRows?: Sale[], bills?: BillPayments): Breakdown {
   const total = Number(sale.total) || 0;
   const pay = String(sale.payment || 'Cash');
+  const rows = (receiptRows ?? []).filter(r => r.status !== 'voided');
+  const share = (b: Breakdown): Breakdown => {
+    const sum = rows.length > 1 ? rows.reduce((a, r) => a + (Number(r.total) || 0), 0) : (b.cash + b.momo + b.bank + b.other) || total;
+    const ratio = sum > 0 ? total / sum : rows.length ? 1 / rows.length : 1;
+    return { cash: Math.round(b.cash * ratio), momo: Math.round(b.momo * ratio), bank: Math.round(b.bank * ratio), other: Math.round(b.other * ratio) };
+  };
+  const bill = sale.receipt_no ? bills?.get(sale.receipt_no) : undefined;
+  if (bill) return share(bill);
   if (!/split/i.test(pay)) {
-    if (/mobile|momo/i.test(pay)) return { cash: 0, momo: total, bank: 0 };
-    if (/bank|card/i.test(pay)) return { cash: 0, momo: 0, bank: total };
-    return { cash: total, momo: 0, bank: 0 };
+    if (pay === 'Cash') return { cash: total, momo: 0, bank: 0, other: 0 };
+    if (/mobile|momo/i.test(pay)) return { cash: 0, momo: total, bank: 0, other: 0 };
+    if (/bank|card/i.test(pay)) return { cash: 0, momo: 0, bank: total, other: 0 };
+    return { cash: 0, momo: 0, bank: 0, other: total };
   }
   const read = (re: RegExp) => Number((pay.match(re)?.[1] || '0').replace(/,/g, '')) || 0;
-  let cash = read(/Cash\s*([0-9.,]+)/i), momo = read(/(?:MoMo|Mobile Money)\s*([0-9.,]+)/i), bank = read(/Bank\s*([0-9.,]+)/i);
-  if (cash + momo + bank === 0) cash = total;
-  const rows = (receiptRows ?? []).filter(r => r.status !== 'voided');
-  if (rows.length > 1) {
-    const sum = rows.reduce((a, r) => a + (Number(r.total) || 0), 0);
-    const ratio = sum > 0 ? total / sum : 1 / rows.length;
-    return { cash: Math.round(cash * ratio), momo: Math.round(momo * ratio), bank: Math.round(bank * ratio) };
-  }
-  return { cash, momo, bank };
+  const parsed = { cash: read(/Cash\s*([0-9.,]+)/i), momo: read(/(?:MoMo|Mobile Money)\s*([0-9.,]+)/i), bank: read(/Bank\s*([0-9.,]+)/i), other: 0 };
+  // A plain "Split" with no amounts and no bill payments loaded: the method is unknown.
+  if (parsed.cash + parsed.momo + parsed.bank === 0) return { cash: 0, momo: 0, bank: 0, other: total };
+  return share(parsed);
 }
 
 /** Groups sale rows (one per product line) into receipts. */

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { Minus, Plus, Trash2, PauseCircle, PlayCircle, ShoppingBag, Package, WifiOff, Printer, Banknote, Smartphone, Landmark, SplitSquareHorizontal } from 'lucide-react';
+import { Minus, Plus, Trash2, PauseCircle, PlayCircle, ShoppingBag, Package, WifiOff, Printer, Banknote, Smartphone, Landmark } from 'lucide-react';
 import { useShop } from '@/auth/AuthProvider';
 import { useMyOpenShift, useProducts } from '@/data/hooks';
 import { useFeedback } from '@/components/feedback';
@@ -9,7 +9,7 @@ import { Receipt, usePrint } from '@/components/print';
 import { BarcodeScannerButton } from '@/components/BarcodeScanner';
 import { Button, Card, Dialog, EmptyState, Field, MoneyInput, Notice, SearchInput, Spinner, cx } from '@/components/ui';
 import { formatAmount, money } from '@/lib/format';
-import { baseQty, baseUnit, bulkUnit, cartTotals, lineTotal, paymentLabel, stockStatus, unitPrice, unitsInCart, unitsPerBulk, type CartLine, type PaymentMethod, type Split } from '@/lib/sales';
+import { baseQty, baseUnit, bulkUnit, cartTotals, lineTotal, stockStatus, unitPrice, unitsInCart, unitsPerBulk, type CartLine, type PaymentMethod } from '@/lib/sales';
 import { loadCatalogue, newClientRef, offlineQueue, saveCatalogue, useOnlineStatus, useQueuedSales } from '@/lib/offline';
 import { rpc, rows, supabase } from '@/lib/supabase';
 import type { Product, Sale } from '@/lib/types';
@@ -22,8 +22,7 @@ const writeParked = (shopId: string, list: ParkedSale[]) => { try { localStorage
 const PAY_OPTIONS: { value: PaymentMethod; label: string; icon: typeof Banknote }[] = [
   { value: 'Cash', label: 'Cash', icon: Banknote },
   { value: 'Mobile Money', label: 'MoMo', icon: Smartphone },
-  { value: 'Bank', label: 'Bank', icon: Landmark },
-  { value: 'Split', label: 'Split', icon: SplitSquareHorizontal }
+  { value: 'Bank', label: 'Bank', icon: Landmark }
 ];
 
 export default function Sell() {
@@ -49,7 +48,6 @@ export default function Sell() {
   const [discount, setDiscount] = useState(0);
   const [method, setMethod] = useState<PaymentMethod>('Cash');
   const [tendered, setTendered] = useState(0);
-  const [split, setSplit] = useState<Split>({ cash: 0, momo: 0, bank: 0 });
   const [busy, setBusy] = useState(false);
   const [receipt, setReceipt] = useState<Sale[] | null>(null);
   const [parked, setParked] = useState<ParkedSale[]>(() => readParked(shop.id));
@@ -64,8 +62,9 @@ export default function Sell() {
 
   const totals = cartTotals(lines, byId, discount);
   const itemCount = lines.reduce((a, l) => a + l.entered_qty, 0);
-  const splitSum = split.cash + split.momo + split.bank;
-  const cashDue = method === 'Cash' ? totals.total : method === 'Split' ? split.cash : 0;
+  const cashDue = method === 'Cash' ? totals.total : 0;
+  // The database refuses discounts from cashiers, so they are not offered one.
+  const canDiscount = role !== 'cashier';
   const change = tendered > 0 ? tendered - cashDue : 0;
 
   function add(p: Product, mode: CartLine['unit_mode'] = 'base') {
@@ -102,7 +101,7 @@ export default function Sell() {
   }
 
   function clearCart() {
-    setLines([]); setDiscount(0); setTendered(0); setSplit({ cash: 0, momo: 0, bank: 0 }); setMethod('Cash');
+    setLines([]); setDiscount(0); setTendered(0); setMethod('Cash');
   }
 
   function onSearchEnter() {
@@ -135,14 +134,13 @@ export default function Sell() {
 
   async function checkout() {
     if (!lines.length || busy) return;
-    if (method === 'Split' && splitSum !== totals.total) { toast('warning', 'Split amounts must add up to the total', `${money(splitSum)} entered, ${money(totals.total)} due.`); return; }
     if (cashDue > 0 && tendered > 0 && tendered < cashDue && !(await confirm({ title: 'Cash received is less than due', message: `Received ${money(tendered)}, due ${money(cashDue)}. Record the sale anyway?`, confirmLabel: 'Record sale' }))) return;
     for (const l of lines) {
       const p = byId.get(l.product_id);
       if (p && unitsInCart(lines, p) > available(p)) { toast('warning', `Not enough ${p.name} in stock`); return; }
     }
     const items = lines.map(l => { const p = byId.get(l.product_id)!; return { ...l, unit_price: unitPrice(p, l.unit_mode), line_total: lineTotal(p, l) }; });
-    const payment = paymentLabel(method, method === 'Split' ? split : undefined);
+    const payment: PaymentMethod = method;
     const clientRef = newClientRef();
     setBusy(true);
     try {
@@ -160,10 +158,7 @@ export default function Sell() {
       void qc.invalidateQueries({ queryKey: ['products'] });
       void qc.invalidateQueries({ queryKey: ['sales'] });
     } catch (err) {
-      const msg = (err as Error).message;
-      // Never re-record a refused split as cash (that would falsify the drawer); say what happened instead.
-      if (method === 'Split' && /payment|check constraint/i.test(msg)) toast('error', 'Split payments are not enabled for this shop yet', 'Nothing was recorded. Take the payment with one method for now.');
-      else toast('error', 'Sale not recorded', msg);
+      toast('error', 'Sale not recorded', (err as Error).message);
     } finally {
       setBusy(false);
     }
@@ -271,28 +266,17 @@ export default function Sell() {
           )}
 
           <div className="space-y-4 border-t border-zinc-100 px-5 py-4">
-            <div className="grid grid-cols-4 gap-1.5" role="radiogroup" aria-label="Payment method">
+            <div className="grid grid-cols-3 gap-1.5" role="radiogroup" aria-label="Payment method">
               {PAY_OPTIONS.map(o => (
-                <button key={o.value} type="button" role="radio" aria-checked={method === o.value} onClick={() => { setMethod(o.value); if (o.value === 'Split') setSplit({ cash: Math.round(totals.total / 2), momo: totals.total - Math.round(totals.total / 2), bank: 0 }); }}
+                <button key={o.value} type="button" role="radio" aria-checked={method === o.value} onClick={() => setMethod(o.value)}
                   className={cx('flex flex-col items-center gap-1 rounded-lg border py-2 text-xs font-medium transition', method === o.value ? 'border-ink bg-ink text-white' : 'border-zinc-200 text-zinc-700 hover:border-zinc-300')}>
                   <o.icon className="size-4" />{o.label}
                 </button>
               ))}
             </div>
 
-            {method === 'Split' && (
-              <div className="grid grid-cols-3 gap-2">
-                <Field label="Cash"><MoneyInput value={split.cash} onChange={v => setSplit(s => ({ ...s, cash: v }))} /></Field>
-                <Field label="MoMo"><MoneyInput value={split.momo} onChange={v => setSplit(s => ({ ...s, momo: v }))} /></Field>
-                <Field label="Bank"><MoneyInput value={split.bank} onChange={v => setSplit(s => ({ ...s, bank: v }))} /></Field>
-                <p className={cx('col-span-3 text-xs', splitSum === totals.total ? 'text-emerald-600' : 'text-red-600')}>
-                  {splitSum === totals.total ? 'Split matches the total.' : `${money(Math.abs(totals.total - splitSum))} ${splitSum < totals.total ? 'still to allocate' : 'over the total'}`}
-                </p>
-              </div>
-            )}
-
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Discount"><MoneyInput value={discount || ''} onChange={setDiscount} placeholder="0" /></Field>
+              {canDiscount && <Field label="Discount"><MoneyInput value={discount || ''} onChange={setDiscount} placeholder="0" /></Field>}
               {cashDue > 0 && <Field label="Cash received"><MoneyInput value={tendered || ''} onChange={setTendered} placeholder="0" /></Field>}
             </div>
             {cashDue > 0 && (
