@@ -5,10 +5,21 @@ import { useAction, useApprovals, useAuditLogs, useSales, useShifts, useStockAdj
 import { Badge, Button, Card, EmptyState, PageHeader, Spinner, Stat } from '@/components/ui';
 import { businessDay, formatDateTime, money } from '@/lib/format';
 import { rpc } from '@/lib/supabase';
+import type { ApprovalRequest } from '@/lib/types';
 
 const TYPE_LABEL: Record<string, string> = {
-  void_sale: 'Void a sale', stock_adjustment: 'Stock adjustment', hospitality_complimentary: 'Complimentary item'
+  sale_void: 'Void a sale', stock_adjustment: 'Stock adjustment', cash_variance_review: 'Cash difference at shift close', hospitality_complimentary: 'Complimentary item'
 };
+
+/** One line describing what the request would change, from the payload the database stored. */
+function requestDetail(a: ApprovalRequest): string {
+  const p = (a.payload ?? {}) as Record<string, unknown>;
+  if (a.request_type === 'sale_void') return [p.product, p.receipt_no, p.amount != null ? money(p.amount) : null].filter(Boolean).join(' · ');
+  if (a.request_type === 'stock_adjustment') return `${p.product ?? 'Product'} · ${Number(p.qty_delta) > 0 ? '+' : ''}${p.qty_delta} (was ${p.qty_before})`;
+  if (a.request_type === 'cash_variance_review') return `Expected ${money(p.expected_cash)} · counted ${money(p.actual_cash)} · difference ${money(p.difference)}`;
+  if (a.request_type === 'hospitality_complimentary') return `${p.qty ?? ''} × ${p.product_name ?? p.product ?? 'item'}`;
+  return '';
+}
 
 export default function Approvals() {
   const { can, hasFeature } = useShop();
@@ -27,7 +38,7 @@ export default function Approvals() {
   const exceptions = useMemo(() => {
     const list: { at: string; title: string; detail: string; tone: 'bad' | 'warn' | 'info' }[] = [];
     for (const s of sales.data ?? []) if (s.status === 'voided') list.push({ at: s.voided_at || s.created_at, title: `Voided · ${s.product_name}`, detail: `${money(s.total)} · ${s.receipt_no || ''} · ${s.void_reason || 'No reason'}`, tone: 'bad' });
-    for (const a of adjustments.data ?? []) if (Number(a.qty_delta) < 0) list.push({ at: a.created_at, title: `Stock removed · ${a.product_name || 'product'}`, detail: `${a.qty_delta} · ${a.reason || 'No reason'}${a.status ? ` · ${a.status}` : ''}`, tone: 'warn' });
+    for (const a of adjustments.data ?? []) if (Number(a.qty_delta) < 0) list.push({ at: a.created_at, title: `Stock removed · ${a.product_name || 'product'}`, detail: `${a.qty_delta} · ${a.reason || 'No reason'}${a.applied_by_name ? ` · by ${a.applied_by_name}` : ''}`, tone: 'warn' });
     for (const s of shifts.data ?? []) if (s.status === 'closed' && Number(s.difference || 0) !== 0) list.push({ at: s.closed_at || s.opened_at, title: `Cash ${Number(s.difference) < 0 ? 'short' : 'over'} · ${s.employee_name || 'Staff'}`, detail: `${money(s.difference)} · ${s.variance_reason || 'No reason given'}`, tone: Number(s.difference) < 0 ? 'bad' : 'info' });
     return list.sort((a, b) => (a.at < b.at ? 1 : -1)).slice(0, 40);
   }, [sales.data, adjustments.data, shifts.data]);
@@ -51,7 +62,7 @@ export default function Approvals() {
             {pending.map(a => (
               <li key={a.id} className="flex flex-wrap items-center gap-3 px-5 py-3.5">
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium">{TYPE_LABEL[a.request_type] ?? a.request_type.replaceAll('_', ' ')}</p>
+                  <p className="text-sm font-medium">{TYPE_LABEL[a.request_type] ?? a.request_type.replaceAll('_', ' ')}{requestDetail(a) && <span className="font-normal text-zinc-600"> — {requestDetail(a)}</span>}</p>
                   <p className="text-xs text-zinc-500">{a.requested_by_name || 'Staff'} · {formatDateTime(a.created_at)}{a.reason ? ` · ${a.reason}` : ''}</p>
                 </div>
                 {can('approve') && (

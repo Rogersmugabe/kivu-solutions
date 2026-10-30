@@ -12,10 +12,9 @@ export const unitsPerBulk = (p?: Product | null) => {
 export const baseUnit = (p?: Product | null) => (p?.base_unit || 'Piece').trim() || 'Piece';
 export const bulkUnit = (p?: Product | null) => (p?.bulk_unit || 'Carton').trim() || 'Carton';
 
-/** Selling price of one bulk unit: the explicit bulk price, or unit price × units per bulk. */
+/** Selling price of one bulk unit: unit price × units per bulk. */
 export function bulkPrice(p: Product): number {
-  const explicit = Number(p.bulk_price || 0);
-  return explicit > 0 ? Math.round(explicit) : Math.round(Number(p.price || 0) * unitsPerBulk(p));
+  return Math.round(Number(p.price || 0) * unitsPerBulk(p));
 }
 
 export const unitPrice = (p: Product, mode: CartLine['unit_mode']) => (mode === 'bulk' ? bulkPrice(p) : Math.round(Number(p.price || 0)));

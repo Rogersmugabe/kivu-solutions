@@ -53,6 +53,12 @@ const ROLE_ACTIONS: Record<Role, Action[]> = {
   kitchen: []
 };
 
+/** Maps employees.role labels ('Stock Clerk', 'Kitchen') to role keys ('stock_clerk', 'kitchen'). */
+export function employeeRole(raw: string | null | undefined): Role {
+  const k = String(raw || '').trim().toLowerCase().replace(/\s+/g, '_');
+  return (k in ROLE_LABELS ? k : 'cashier') as Role;
+}
+
 export const roleCan = (role: Role | undefined, action: Action) => !!role && ROLE_ACTIONS[role].includes(action);
 
 /* ------------------------------------------------------------------ */

@@ -12,12 +12,12 @@ import type { Product } from '@/lib/types';
 
 interface Draft {
   name: string; category: string; barcode: string; base_unit: string; bulk_unit: string; units_per_bulk: number;
-  cost: number; price: number; bulk_price: number; low_stock: number; qty: number; expiry_date: string; preferred_supplier_id: string;
+  cost: number; price: number; low_stock: number; qty: number; expiry_date: string; preferred_supplier_id: string;
 }
-const emptyDraft: Draft = { name: '', category: '', barcode: '', base_unit: 'Piece', bulk_unit: 'Carton', units_per_bulk: 1, cost: 0, price: 0, bulk_price: 0, low_stock: 5, qty: 0, expiry_date: '', preferred_supplier_id: '' };
+const emptyDraft: Draft = { name: '', category: '', barcode: '', base_unit: 'Piece', bulk_unit: 'Carton', units_per_bulk: 1, cost: 0, price: 0, low_stock: 5, qty: 0, expiry_date: '', preferred_supplier_id: '' };
 const toDraft = (p: Product): Draft => ({
   name: p.name, category: p.category || '', barcode: p.barcode || '', base_unit: baseUnit(p), bulk_unit: bulkUnit(p), units_per_bulk: unitsPerBulk(p),
-  cost: Number(p.cost || 0), price: Number(p.price || 0), bulk_price: Number(p.bulk_price || 0), low_stock: Number(p.low_stock || 0), qty: Number(p.qty || 0),
+  cost: Number(p.cost || 0), price: Number(p.price || 0), low_stock: Number(p.low_stock || 0), qty: Number(p.qty || 0),
   expiry_date: p.expiry_date || '', preferred_supplier_id: p.preferred_supplier_id || ''
 });
 
@@ -51,7 +51,7 @@ export default function Products() {
   const save = useAction(async ({ d, product }: { d: Draft; product: Product | null }) => {
     if (!d.name.trim()) throw new Error('Enter a product name.');
     if (d.price <= 0) throw new Error('Enter a selling price.');
-    const extras = { category: d.category.trim() || null, bulk_price: d.bulk_price || null };
+    const extras = { category: d.category.trim() || null };
     if (!product) {
       const row = {
         shop_id: shop.id, name: d.name.trim(), qty: Math.max(0, d.qty), cost: d.cost, price: d.price, low_stock: d.low_stock,
@@ -59,7 +59,7 @@ export default function Products() {
         expiry_date: d.expiry_date || null, barcode: d.barcode.trim() || null, preferred_supplier_id: d.preferred_supplier_id || null
       };
       let res = await supabase.from('products').insert({ ...row, ...extras });
-      // Older databases may not have category / bulk_price columns yet.
+      // The category column is added by supabase/migrations/001; before that, save without it.
       if (res.error && /column/i.test(res.error.message)) res = await supabase.from('products').insert(row);
       if (res.error) throw new Error(res.error.message);
       await writeAudit(shop.id, session.user.id, profile.full_name || 'Owner', 'created product', 'product', { name: row.name, opening_qty: row.qty });
@@ -187,7 +187,6 @@ export default function Products() {
           <Field label="Base unit" hint="How you sell one item."><Input value={draft.base_unit} onChange={e => set('base_unit', e.target.value)} placeholder="Piece, Bottle, Kg" /></Field>
           <Field label="Bulk unit" hint="How you buy in bulk."><Input value={draft.bulk_unit} onChange={e => set('bulk_unit', e.target.value)} placeholder="Carton, Crate" /></Field>
           <Field label="Base units per bulk unit"><Input type="number" min={1} value={draft.units_per_bulk} onChange={e => set('units_per_bulk', Math.max(1, Math.floor(Number(e.target.value) || 1)))} /></Field>
-          <Field label="Bulk selling price" hint="Optional. Leave empty to use price × units."><MoneyInput value={draft.bulk_price || ''} onChange={v => set('bulk_price', v)} placeholder="Optional" /></Field>
           <Field label="Low-stock alert at" hint="In base units."><Input type="number" min={0} value={draft.low_stock} onChange={e => set('low_stock', Math.max(0, Number(e.target.value) || 0))} /></Field>
           <Field label="Expiry date"><Input type="date" value={draft.expiry_date} onChange={e => set('expiry_date', e.target.value)} /></Field>
           {editing === 'new' && <Field label="Opening stock" hint="Units you already have. Later changes go through Stock movements."><Input type="number" min={0} value={draft.qty} onChange={e => set('qty', Math.max(0, Number(e.target.value) || 0))} /></Field>}

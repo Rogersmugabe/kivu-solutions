@@ -4,7 +4,7 @@ import { rows, supabase } from '@/lib/supabase';
 import { useShop } from '@/auth/AuthProvider';
 import { useFeedback } from '@/components/feedback';
 import type {
-  ApprovalRequest, AppDevice, AuditLog, Employee, Expense, HospitalityItem, HospitalityTab, HospitalityTable,
+  ApprovalRequest, AppDevice, AuditLog, Employee, Expense, HospitalityItem, HospitalityPayment, HospitalityTab, HospitalityTable,
   Product, Sale, Shift, StaffInvite, StockAdjustment, StockPurchase, Supplier, SupplierPayment, SupplierPurchase
 } from '@/lib/types';
 
@@ -72,6 +72,9 @@ export const useTabs = (enabled = true) =>
 
 export const useTabItems = (enabled = true) =>
   useShopQuery<HospitalityItem>('hospitality_tab_items', enabled, id => supabase.from('hospitality_tab_items').select('*').eq('shop_id', id).gte('created_at', sinceDays(7)).order('created_at').limit(3000));
+
+export const useHospitalityPayments = (enabled = true) =>
+  useShopQuery<HospitalityPayment>('hospitality_payments', enabled, id => supabase.from('hospitality_payments').select('*').eq('shop_id', id).gte('created_at', sinceDays(35)).order('created_at', { ascending: false }).limit(3000));
 
 /** The current user's open cash shift, if any. */
 export function useMyOpenShift(enabled = true) {

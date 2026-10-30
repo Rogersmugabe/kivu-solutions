@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { businessDay, minuteOfDay, money, normalizeRwPhone, parseMoney, isValidRwPhone } from './format';
-import { ROLE_PAGES, enabledFeatures, roleCan, subscriptionStatus, visiblePages } from './access';
+import { ROLE_PAGES, employeeRole, enabledFeatures, roleCan, subscriptionStatus, visiblePages } from './access';
 import { bulkPrice, cartTotals, groupReceipts, lineTotal, paymentBreakdown, paymentLabel, unitsInCart } from './sales';
 import { parseCsv } from './csv';
 import { shiftTotals } from './shifts';
-import type { Expense, Product, Sale, Shift, Shop } from './types';
+import type { Expense, HospitalityPayment, Product, Sale, Shift, Shop } from './types';
 
 const product = (over: Partial<Product> = {}): Product => ({ id: 'p1', shop_id: 's', name: 'Primus', qty: 48, cost: 700, price: 1000, low_stock: 10, units_per_bulk: 12, ...over });
 const sale = (over: Partial<Sale> = {}): Sale => ({ id: Math.random().toString(36), shop_id: 's', product_name: 'Primus', qty: 1, total: 1000, created_at: '2026-10-30T10:00:00Z', ...over });
@@ -67,9 +67,8 @@ describe('role-based access', () => {
 });
 
 describe('cart and payments', () => {
-  it('prices bulk units from the explicit bulk price or units × price', () => {
+  it('prices bulk units as units × price', () => {
     expect(bulkPrice(product())).toBe(12_000);
-    expect(bulkPrice(product({ bulk_price: 11_000 }))).toBe(11_000);
     expect(lineTotal(product(), { product_id: 'p1', entered_qty: 2, unit_mode: 'bulk' })).toBe(24_000);
   });
   it('caps the discount at the subtotal', () => {
@@ -101,19 +100,39 @@ describe('csv import', () => {
   });
 });
 
-describe('cash shift maths', () => {
-  it('expects float + cash sales − petty cash paid out by the same person', () => {
+describe('cash shift maths (mirrors close_shift_controlled)', () => {
+  it('expects float + plain Cash sales + cash table payments − expenses linked to the shift', () => {
     const shift: Shift = { id: 'sh', user_id: 'u1', opening_cash: 20_000, status: 'open', opened_at: '2026-10-30T06:00:00Z' };
-    const sales = [sale({ shift_id: 'sh', total: 5000, payment: 'Cash' }), sale({ shift_id: 'sh', total: 3000, payment: 'Mobile Money' }), sale({ shift_id: 'sh', total: 9999, status: 'voided' }), sale({ shift_id: 'other', total: 7777 })];
-    const expenses: Expense[] = [
-      { id: 'e1', description: 'Paid out', amount: 1500, category: 'Petty cash', user_id: 'u1', created_at: '2026-10-30T08:00:00Z' },
-      { id: 'e2', description: 'Rent', amount: 90_000, category: 'Rent', user_id: 'u1', created_at: '2026-10-30T08:00:00Z' },
-      { id: 'e3', description: 'Other cashier', amount: 999, category: 'Petty cash', user_id: 'u2', created_at: '2026-10-30T08:00:00Z' }
+    const sales = [
+      sale({ shift_id: 'sh', total: 5000, payment: 'Cash' }),
+      sale({ shift_id: 'sh', total: 3000, payment: 'Mobile Money' }),
+      sale({ shift_id: 'sh', total: 1000, payment: 'Split (Cash 600, MoMo 400)', receipt_no: 'R9' }),
+      sale({ shift_id: 'sh', total: 9999, payment: 'Cash', status: 'voided' }),
+      sale({ shift_id: 'other', total: 7777, payment: 'Cash' })
     ];
-    const t = shiftTotals(shift, sales, expenses);
-    expect(t.cash).toBe(5000);
-    expect(t.momo).toBe(3000);
+    const expenses: Expense[] = [
+      { id: 'e1', description: 'Paid out', amount: 1500, category: 'Petty cash', user_id: 'u1', shift_id: 'sh', created_at: '2026-10-30T08:00:00Z' },
+      { id: 'e2', description: 'Rent', amount: 90_000, category: 'Rent', user_id: 'u1', shift_id: null, created_at: '2026-10-30T08:00:00Z' },
+      { id: 'e3', description: 'Rejected', amount: 999, category: 'Petty cash', shift_id: 'sh', approval_status: 'rejected', created_at: '2026-10-30T08:00:00Z' }
+    ];
+    const payments: HospitalityPayment[] = [
+      { id: 'h1', tab_id: 't', method: 'Cash', amount: 4000, shift_id: 'sh', created_at: '2026-10-30T09:00:00Z' },
+      { id: 'h2', tab_id: 't', method: 'Mobile Money', amount: 2000, shift_id: 'sh', created_at: '2026-10-30T09:00:00Z' }
+    ];
+    const t = shiftTotals(shift, sales, expenses, payments);
+    // Split sales are not counted as drawer cash by the database, so the app must not count them either.
+    expect(t.cash).toBe(9000);
     expect(t.expenses).toBe(1500);
-    expect(t.expected).toBe(23_500);
+    expect(t.expected).toBe(20_000 + 5000 + 4000 - 1500);
+    expect(t.sales).toBe(9000);
+  });
+});
+
+describe('employee roles', () => {
+  it('maps the labels stored in employees.role to role keys', () => {
+    expect(employeeRole('Stock Clerk')).toBe('stock_clerk');
+    expect(employeeRole('Cashier')).toBe('cashier');
+    expect(employeeRole('Kitchen')).toBe('kitchen');
+    expect(employeeRole('manager')).toBe('manager');
   });
 });

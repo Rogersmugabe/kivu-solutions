@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from 'react';
 import { Clock, Printer, LogIn, LogOut, HandCoins } from 'lucide-react';
 import { useShop } from '@/auth/AuthProvider';
-import { useAction, useExpenses, useSales, useShifts, writeAudit } from '@/data/hooks';
+import { useAction, useExpenses, useHospitalityPayments, useSales, useShifts, writeAudit } from '@/data/hooks';
+import { isHospitality } from '@/lib/access';
 import { usePrint, ZReport } from '@/components/print';
 import { Badge, Button, Card, Dialog, EmptyState, Field, Input, MoneyInput, Notice, PageHeader, Spinner, Stat } from '@/components/ui';
 import { formatDateTime, money } from '@/lib/format';
@@ -9,14 +10,15 @@ import { shiftTotals } from '@/lib/shifts';
 import { rpc, supabase } from '@/lib/supabase';
 import type { Shift } from '@/lib/types';
 
-const PETTY_CASH_LIMIT = 20000;
 
 export default function Shifts() {
   const { shop, session, profile, role, can } = useShop();
   const print = usePrint();
   const shifts = useShifts();
   const sales = useSales(35);
-  const expenses = useExpenses(35);
+  // Expenses are readable by owners and managers only (and only they can record pay-outs).
+  const expenses = useExpenses(35, can('record_expense'));
+  const tablePayments = useHospitalityPayments(isHospitality(shop.business_type));
   const [dialog, setDialog] = useState<'open' | 'close' | 'payout' | null>(null);
   const [opening, setOpening] = useState(0);
   const [counted, setCounted] = useState(0);
@@ -25,7 +27,7 @@ export default function Shifts() {
 
   const mine = (shifts.data ?? []).find(s => s.status === 'open' && s.user_id === session.user.id) ?? null;
   const seeExpected = can('see_money');
-  const totals = (s: Shift) => shiftTotals(s, sales.data ?? [], expenses.data ?? []);
+  const totals = (s: Shift) => shiftTotals(s, sales.data ?? [], expenses.data ?? [], tablePayments.data ?? []);
   const current = mine ? totals(mine) : null;
   const history = (shifts.data ?? []).filter(s => seeExpected || s.user_id === session.user.id);
 
@@ -47,7 +49,6 @@ export default function Shifts() {
 
   const payOut = useAction(async () => {
     if (!(payout.amount > 0) || !payout.description.trim()) throw new Error('Enter the amount and what it was for.');
-    if (payout.amount > PETTY_CASH_LIMIT && !can('record_expense')) throw new Error(`Pay-outs above ${money(PETTY_CASH_LIMIT)} must be recorded by a manager.`);
     await rpc('record_expense', { p_description: `Paid out from drawer: ${payout.description.trim()}`, p_amount: payout.amount, p_category: 'Petty cash' });
   }, { invalidate: ['expenses'], success: 'Pay-out recorded' });
 
@@ -61,7 +62,7 @@ export default function Shifts() {
         title="Cash shifts"
         description="Open a shift with your float, sell, then count the drawer when you close."
         actions={mine ? <>
-          <Button icon={<HandCoins />} onClick={() => { setPayout({ amount: 0, description: '' }); setDialog('payout'); }}>Pay out cash</Button>
+          {can('record_expense') && <Button icon={<HandCoins />} onClick={() => { setPayout({ amount: 0, description: '' }); setDialog('payout'); }}>Pay out cash</Button>}
           <Button icon={<Printer />} onClick={() => printZ(mine)}>Print X-report</Button>
           <Button variant="primary" icon={<LogOut />} onClick={() => { setCounted(0); setReason(''); setDialog('close'); }}>Close shift</Button>
         </> : <Button variant="primary" icon={<LogIn />} onClick={() => { setOpening(0); setDialog('open'); }}>Open shift</Button>}
@@ -74,7 +75,7 @@ export default function Shifts() {
             <Stat label="Sales this shift" value={money(current.sales)} hint={`${current.count} receipt${current.count === 1 ? '' : 's'}`} />
             <Stat label="Cash" value={money(current.cash)} />
             <Stat label="Mobile Money + Bank" value={money(current.momo + current.bank)} />
-            {seeExpected ? <Stat label="Expected in drawer" value={money(current.expected)} hint={current.expenses ? `after ${money(current.expenses)} paid out` : 'float + cash sales'} /> : <Stat label="Paid out" value={money(current.expenses)} />}
+            {seeExpected ? <Stat label="Expected in drawer" value={money(current.expected)} hint={current.expenses ? `after ${money(current.expenses)} paid out` : 'float + cash sales'} /> : <Stat label="Receipts" value={current.count} />}
           </div>
         </>
       ) : (
@@ -125,7 +126,7 @@ export default function Shifts() {
         </form>
       </Dialog>
 
-      <Dialog open={dialog === 'payout'} onClose={() => setDialog(null)} title="Pay out cash from the drawer" description="Recorded as a petty-cash expense and taken off your expected cash."
+      <Dialog open={dialog === 'payout'} onClose={() => setDialog(null)} title="Pay out cash from the drawer" description="Recorded as a petty-cash expense linked to your open shift, so it comes off the expected cash."
         footer={<><Button onClick={() => setDialog(null)}>Cancel</Button><Button variant="primary" type="submit" form="payout-form" loading={payOut.isPending}>Record pay-out</Button></>}>
         <form id="payout-form" className="grid gap-4" onSubmit={(e: FormEvent) => { e.preventDefault(); payOut.mutate(undefined as never, { onSuccess: () => setDialog(null) }); }}>
           <Field label="Amount"><MoneyInput value={payout.amount || ''} onChange={v => setPayout(p => ({ ...p, amount: v }))} placeholder="0" autoFocus /></Field>

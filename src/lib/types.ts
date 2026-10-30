@@ -29,7 +29,8 @@ export interface Shop {
 
 export interface Profile { id: string; shop_id: string; role: Role; full_name?: string | null }
 
-export interface Employee { id: string; shop_id: string; user_id: string | null; name: string; phone?: string | null; role: Role; active: boolean }
+/** employees.role holds a display label ('Cashier', 'Stock Clerk'…); use employeeRole() for the key. */
+export interface Employee { id: string; shop_id: string; user_id: string | null; name: string; phone?: string | null; role: string; active: boolean }
 
 export interface StaffInvite { id: string; employee_name: string; phone: string; role: Role; code: string; expires_at: string; used_at?: string | null; created_at: string }
 
@@ -45,7 +46,6 @@ export interface Product {
   base_unit?: string | null;
   bulk_unit?: string | null;
   units_per_bulk?: number | null;
-  bulk_price?: number | null;
   barcode?: string | null;
   preferred_supplier_id?: string | null;
   expiry_date?: string | null;
@@ -76,13 +76,15 @@ export interface Sale {
   client_ref?: string | null;
 }
 
-export interface Expense { id: string; description: string; amount: number; category?: string | null; created_at: string; user_id?: string | null; shift_id?: string | null; approval_status?: string | null }
+export interface Expense { id: string; description: string; amount: number; category?: string | null; created_at: string; user_id?: string | null; shift_id?: string | null; approval_status?: string | null; employee_name?: string | null }
+
+export interface HospitalityPayment { id: string; tab_id: string; method: string; amount: number; shift_id?: string | null; created_at: string }
 
 export interface StockPurchase { id: string; product_id: string; product_name?: string | null; qty: number; total_cost?: number | null; created_at: string; user_name?: string | null }
 
-export interface StockAdjustment { id: string; product_id: string; product_name?: string | null; qty_delta: number; reason?: string | null; status?: string | null; created_at: string; requested_by_name?: string | null }
+export interface StockAdjustment { id: string; product_id: string; product_name?: string | null; qty_before?: number | null; qty_delta: number; qty_after?: number | null; reason?: string | null; created_at: string; requested_by_name?: string | null; applied_by_name?: string | null }
 
-export interface ApprovalRequest { id: string; request_type: string; status: string; reason?: string | null; requested_by_name?: string | null; created_at: string }
+export interface ApprovalRequest { id: string; request_type: string; entity_id?: string | null; status: string; reason?: string | null; payload?: Record<string, unknown> | null; requested_by_name?: string | null; reviewed_by_name?: string | null; created_at: string }
 
 export interface Supplier { id: string; name: string; phone?: string | null; address?: string | null; notes?: string | null; active?: boolean | null }
 

@@ -5,12 +5,14 @@ import { useAction, useEmployees, useStaffInvites } from '@/data/hooks';
 import { useFeedback } from '@/components/feedback';
 import { Badge, Button, Card, Dialog, EmptyState, Field, Input, Notice, PageHeader, Select, Spinner } from '@/components/ui';
 import { formatDate, isValidRwPhone, normalizeRwPhone } from '@/lib/format';
-import { INVITABLE_ROLES, ROLE_DESCRIPTIONS, ROLE_LABELS } from '@/lib/access';
+import { INVITABLE_ROLES, ROLE_DESCRIPTIONS, ROLE_LABELS, employeeRole, isHospitality } from '@/lib/access';
 import { rpc } from '@/lib/supabase';
 import type { Employee, Role } from '@/lib/types';
 
 export default function Staff() {
-  const { session, can } = useShop();
+  const { session, can, shop, hasFeature } = useShop();
+  // The database only lets waiters and kitchen staff join bars and restaurants.
+  const roleOptions = INVITABLE_ROLES.filter(r => isHospitality(shop.business_type) || (r !== 'waiter' && r !== 'kitchen'));
   const { confirm, toast } = useFeedback();
   const employees = useEmployees();
   const invites = useStaffInvites(can('invite_staff'));
@@ -40,7 +42,7 @@ export default function Staff() {
   }, { invalidate: ['staff_invites'] });
 
   const setActive = useAction(async ({ emp, active }: { emp: Employee; active: boolean }) => rpc('set_employee_active', { p_employee_id: emp.id, p_active: active }),
-    { invalidate: ['employees'], success: (_r) => 'Staff access updated' });
+    { invalidate: ['employees'], success: 'Staff access updated' });
 
   function submit(e: FormEvent) {
     e.preventDefault();
@@ -90,7 +92,7 @@ export default function Staff() {
                 {(employees.data ?? []).map(emp => (
                   <tr key={emp.id}>
                     <td className="td font-medium">{emp.name}</td>
-                    <td className="td">{ROLE_LABELS[emp.role] ?? emp.role}</td>
+                    <td className="td">{ROLE_LABELS[employeeRole(emp.role)]}</td>
                     <td className="td text-zinc-600">{emp.phone || '—'}</td>
                     <td className="td">{emp.active ? <Badge tone="good">Active</Badge> : <Badge>Disabled</Badge>}</td>
                     <td className="td text-right">
@@ -129,8 +131,9 @@ export default function Staff() {
           <Field label="Full name"><Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} autoFocus required /></Field>
           <Field label="Phone number" hint="They will sign in with this number."><Input type="tel" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="0788 123 456" required /></Field>
           <Field label="Role" hint={ROLE_DESCRIPTIONS[form.role]}>
-            <Select value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value as Role }))}>{INVITABLE_ROLES.map(r => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}</Select>
+            <Select value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value as Role }))}>{roleOptions.map(r => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}</Select>
           </Field>
+          {!hasFeature('staff') && <Notice tone="warn">Staff accounts need Kivu Business or higher. Upgrade your plan first, or the employee will not be able to join.</Notice>}
           {inviteError && <Notice tone="bad"><b>The database refused the invite.</b><br /><span className="break-words font-mono text-xs">{inviteError}</span></Notice>}
         </form>
       </Dialog>

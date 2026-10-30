@@ -160,7 +160,10 @@ export default function Sell() {
       void qc.invalidateQueries({ queryKey: ['products'] });
       void qc.invalidateQueries({ queryKey: ['sales'] });
     } catch (err) {
-      toast('error', 'Sale not recorded', (err as Error).message);
+      const msg = (err as Error).message;
+      // Never re-record a refused split as cash (that would falsify the drawer); say what happened instead.
+      if (method === 'Split' && /payment|check constraint/i.test(msg)) toast('error', 'Split payments are not enabled for this shop yet', 'Nothing was recorded. Take the payment with one method for now.');
+      else toast('error', 'Sale not recorded', msg);
     } finally {
       setBusy(false);
     }

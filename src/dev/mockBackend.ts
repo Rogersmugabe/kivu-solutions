@@ -19,9 +19,10 @@ const db: Record<string, Record<string, unknown>[]> = {
   shops: [{ id: shopId, name: 'Demo Mini Market', plan: 'control', subscription_status: 'active', current_period_end: iso(now + 20 * D), business_type: businessType, phone: '+250788000000', receipt_footer: 'Murakoze!', tax_rate: 18, tax_label: 'VAT', tax_number: '100200300' }],
   profiles: [{ id: uid, shop_id: shopId, role, full_name: role === 'owner' ? 'Aline Uwase' : `Demo ${role}` }],
   employees: [
-    { id: 'e1', shop_id: shopId, user_id: 'u-cash', name: 'Eric Cashier', phone: '+250788555666', role: 'cashier', active: true },
-    { id: 'e2', shop_id: shopId, user_id: 'u-mgr', name: 'Grace Manager', phone: '+250788777888', role: 'manager', active: true },
-    { id: 'e3', shop_id: shopId, user_id: uid, name: 'Demo user', phone: '+250788111000', role, active: true }
+    // The real employees.role column stores labels like 'Cashier' and 'Stock Clerk'.
+    { id: 'e1', shop_id: shopId, user_id: 'u-cash', name: 'Eric Cashier', phone: '+250788555666', role: 'Cashier', active: true },
+    { id: 'e2', shop_id: shopId, user_id: 'u-mgr', name: 'Grace Manager', phone: '+250788777888', role: 'Manager', active: true },
+    { id: 'e4', shop_id: shopId, user_id: 'u-clerk', name: 'Jean Stock', phone: '+250788444333', role: 'Stock Clerk', active: false }
   ],
   staff_invites: [{ id: 'i1', shop_id: shopId, employee_name: 'New Hire', phone: '+250788123123', role: 'cashier', code: 'KV7M9X', expires_at: iso(now + 10 * D), created_at: iso(now - D) }],
   products: [
@@ -35,8 +36,11 @@ const db: Record<string, Record<string, unknown>[]> = {
     { id: 'x2', shop_id: shopId, description: 'Transport', amount: 4000, category: 'Transport', created_at: iso(now - D), user_id: uid }
   ],
   stock_purchases: [{ id: 'sp1', shop_id: shopId, product_id: 'p-001', qty: 48, total_cost: 33600, created_at: iso(now - 3 * D), user_name: 'Aline Uwase' }],
-  stock_adjustments: [{ id: 'sa1', shop_id: shopId, product_id: 'p-005', product_name: 'Sugar 1kg', qty_delta: -2, reason: 'Damaged: bag torn', status: 'approved', created_at: iso(now - 2 * D), requested_by_name: 'Eric Cashier' }],
-  approval_requests: [{ id: 'ar1', shop_id: shopId, request_type: 'void_sale', status: 'pending', reason: 'Wrong item scanned', requested_by_name: 'Eric Cashier', created_at: iso(now - H) }],
+  stock_adjustments: [{ id: 'sa1', shop_id: shopId, product_id: 'p-005', product_name: 'Sugar 1kg', qty_before: 10, qty_delta: -2, qty_after: 8, reason: 'Damaged: bag torn', created_at: iso(now - 2 * D), requested_by_name: 'Jean Stock', applied_by_name: 'Aline Uwase' }],
+  approval_requests: [
+    { id: 'ar1', shop_id: shopId, request_type: 'sale_void', entity_id: 's-0-1', status: 'pending', reason: 'Wrong item scanned', payload: { product: 'Mutzig 50cl', receipt_no: 'KV-1002', amount: 2400 }, requested_by_name: 'Eric Cashier', created_at: iso(now - H) },
+    { id: 'ar2', shop_id: shopId, request_type: 'stock_adjustment', entity_id: 'p-002', status: 'pending', reason: 'Stock count correction: 2 missing', payload: { product: 'Mutzig 50cl', qty_delta: -2, qty_before: 12 }, requested_by_name: 'Jean Stock', created_at: iso(now - 3 * H) }
+  ],
   suppliers: [{ id: 'su1', shop_id: shopId, name: 'Bralirwa Depot', phone: '+250788000111', address: 'Kicukiro', active: true }],
   supplier_purchases: [{ id: 'pu1', shop_id: shopId, supplier_id: 'su1', total_amount: 168000, paid_amount: 100000, balance_due: 68000, invoice_no: 'INV-22', due_date: iso(now + 7 * D).slice(0, 10), created_at: iso(now - 4 * D) }],
   supplier_payments: [],
@@ -53,7 +57,7 @@ const db: Record<string, Record<string, unknown>[]> = {
     { id: 'hi1', shop_id: shopId, tab_id: 'tab1', product_name: 'Brochette', qty: 2, unit_price: 1500, sent_at: iso(now - H), created_at: iso(now - H) },
     { id: 'hi2', shop_id: shopId, tab_id: 'tab1', product_name: 'Primus 72cl', qty: 3, unit_price: 1000, created_at: iso(now - H) }
   ],
-  recipe_components: [], hospitality_wastage: []
+  recipe_components: [], hospitality_wastage: [], hospitality_payments: []
 };
 
 const pays = ['Cash', 'Mobile Money', 'Cash', 'Bank', 'Split (Cash 1000, MoMo 800)'];

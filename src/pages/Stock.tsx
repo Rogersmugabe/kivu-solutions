@@ -2,7 +2,7 @@ import { useMemo, useState, type FormEvent } from 'react';
 import { ArrowDownLeft, ArrowUpRight, PackagePlus, SlidersHorizontal, ArrowLeftRight } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { useShop } from '@/auth/AuthProvider';
-import { useAction, useProducts, useSales, useStockAdjustments, useStockPurchases } from '@/data/hooks';
+import { useAction, useApprovals, useProducts, useSales, useStockAdjustments, useStockPurchases } from '@/data/hooks';
 import { BarcodeScannerButton } from '@/components/BarcodeScanner';
 import { Badge, Button, Card, Dialog, EmptyState, Field, Input, MoneyInput, Notice, PageHeader, Select, Spinner, Stat, cx } from '@/components/ui';
 import { formatDateTime, money } from '@/lib/format';
@@ -17,14 +17,18 @@ const KIND_LABEL: Record<Kind, string> = { sale: 'Sold', void: 'Void returned', 
 const ADJUST_REASONS = ['Stock count correction', 'Damaged', 'Expired', 'Theft / missing', 'Own use', 'Returned to supplier', 'Other'];
 
 export default function Stock() {
-  const { shop, can } = useShop();
+  const { shop, can, hasFeature } = useShop();
+  // Stock adjustments (and requests for them) are a Kivu Control feature in the database.
+  const canAdjust = can('adjust_stock') && hasFeature('approvals');
   const products = useProducts();
   const purchases = useStockPurchases();
-  const adjustments = useStockAdjustments();
+  const adjustments = useStockAdjustments(can('approve'));
+  // Adjustments waiting for approval live in approval_requests until a manager approves them.
+  const approvals = useApprovals(can('approve') && hasFeature('approvals'));
   const sales = useSales(30);
   const wastage = useQuery({
     queryKey: ['hospitality_wastage', shop.id],
-    queryFn: () => rows<{ id: string; product_id: string; product_name?: string; qty: number; reason?: string; created_at: string; recorded_by_name?: string }>(
+    queryFn: () => rows<{ id: string; product_id: string; product_name?: string; qty: number; reason?: string; created_at: string; created_by_name?: string }>(
       supabase.from('hospitality_wastage').select('*').eq('shop_id', shop.id).order('created_at', { ascending: false }).limit(300)
     ).catch(() => []),
     enabled: can('see_money')
@@ -45,10 +49,15 @@ export default function Stock() {
       if (s.status === 'voided') list.push({ id: `v-${s.id}`, at: s.voided_at || s.created_at, kind: 'void', productId: s.product_id, product: s.product_name, qty: Number(s.qty || 0), note: s.void_reason || s.receipt_no });
     }
     for (const p of purchases.data ?? []) list.push({ id: `p-${p.id}`, at: p.created_at, kind: 'received', productId: p.product_id, product: name(p.product_id, p.product_name), qty: Number(p.qty || 0), by: p.user_name, value: p.total_cost });
-    for (const a of adjustments.data ?? []) list.push({ id: `a-${a.id}`, at: a.created_at, kind: 'adjustment', productId: a.product_id, product: name(a.product_id, a.product_name), qty: Number(a.qty_delta || 0), by: a.requested_by_name, note: a.reason, pending: a.status === 'pending', rejected: a.status === 'rejected' });
-    for (const w of wastage.data ?? []) list.push({ id: `w-${w.id}`, at: w.created_at, kind: 'wastage', productId: w.product_id, product: name(w.product_id, w.product_name), qty: -Number(w.qty || 0), by: w.recorded_by_name, note: w.reason });
+    for (const a of adjustments.data ?? []) list.push({ id: `a-${a.id}`, at: a.created_at, kind: 'adjustment', productId: a.product_id, product: name(a.product_id, a.product_name), qty: Number(a.qty_delta || 0), by: a.applied_by_name && a.applied_by_name !== a.requested_by_name ? `${a.requested_by_name || 'Staff'} (approved by ${a.applied_by_name})` : a.requested_by_name || a.applied_by_name, note: a.reason });
+    for (const r of approvals.data ?? []) {
+      if (r.request_type !== 'stock_adjustment' || r.status === 'approved') continue;
+      const p = (r.payload ?? {}) as { product?: string; qty_delta?: number };
+      list.push({ id: `r-${r.id}`, at: r.created_at, kind: 'adjustment', productId: r.entity_id, product: name(r.entity_id, p.product), qty: Number(p.qty_delta || 0), by: r.requested_by_name, note: r.reason, pending: r.status === 'pending', rejected: r.status === 'rejected' });
+    }
+    for (const w of wastage.data ?? []) list.push({ id: `w-${w.id}`, at: w.created_at, kind: 'wastage', productId: w.product_id, product: name(w.product_id, w.product_name), qty: -Number(w.qty || 0), by: w.created_by_name, note: w.reason });
     return list.sort((a, b) => (a.at < b.at ? 1 : -1));
-  }, [sales.data, purchases.data, adjustments.data, wastage.data, byId]);
+  }, [sales.data, purchases.data, adjustments.data, approvals.data, wastage.data, byId]);
 
   const filtered = movements.filter(m => (kind === 'all' || m.kind === kind) && (productFilter === 'all' || m.productId === productFilter));
   const since7 = Date.now() - 7 * 86_400_000;
@@ -94,7 +103,7 @@ export default function Stock() {
         title="Stock movements"
         description="Every unit in and out: sales, deliveries, corrections and losses."
         actions={<>
-          {can('adjust_stock') && <Button icon={<SlidersHorizontal />} onClick={() => open('adjust')}>{can('approve') ? 'Adjust stock' : 'Request adjustment'}</Button>}
+          {canAdjust && <Button icon={<SlidersHorizontal />} onClick={() => open('adjust')}>{can('approve') ? 'Adjust stock' : 'Request adjustment'}</Button>}
           {can('receive_stock') && <Button variant="primary" icon={<PackagePlus />} onClick={() => open('receive')}>Receive stock</Button>}
         </>}
       />

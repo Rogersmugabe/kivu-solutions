@@ -14,7 +14,9 @@ import type { Sale } from '@/lib/types';
 const PAGE_SIZE = 25;
 
 export default function Sales() {
-  const { shop, can } = useShop();
+  const { shop, can, hasFeature } = useShop();
+  // The database only allows voids (and void requests) on Kivu Control or higher.
+  const canVoid = can('void_sale') && hasFeature('approvals');
   const { prompt } = useFeedback();
   const print = usePrint();
   const [days, setDays] = useState(7);
@@ -148,7 +150,7 @@ export default function Sales() {
                   <p className="text-xs text-zinc-500">{line.entered_qty ?? line.qty} {line.sold_unit || ''} · {line.payment || 'Cash'}{line.void_reason ? ` · Void reason: ${line.void_reason}` : ''}</p>
                 </div>
                 <span className="text-sm font-semibold tabular">{money(line.total)}</span>
-                {line.status === 'voided' ? <Badge tone="bad">Voided</Badge> : can('void_sale') && (
+                {line.status === 'voided' ? <Badge tone="bad">Voided</Badge> : canVoid && (
                   <Button size="sm" variant="subtle-danger" icon={<Ban />} loading={voidLine.isPending && voidLine.variables?.sale.id === line.id} onClick={() => requestVoid(line)}>
                     {can('approve') ? 'Void' : 'Request void'}
                   </Button>
