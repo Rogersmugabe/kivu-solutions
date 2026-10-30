@@ -855,6 +855,7 @@ function applyPermissions(){
 
   const current=$('.page.active')?.id?.replace('page-','')||'dashboard';
   if(!allowed.includes(current)) showPage(allowed[0]||'dashboard');
+  if(typeof syncMobileNav==='function') syncMobileNav();
 }
 
 /* ROLE SIMULATOR & PREVIEW SYSTEM */
@@ -3489,7 +3490,7 @@ function renderEmployees(){
   auditPanel?.classList.toggle('hidden',!hasFeature('audit'));
   if(hasFeature('audit')) $('#auditList').innerHTML=audits.length?audits.slice(0,20).map(a=>`<div class="item"><div><b>${esc(a.user_name||'User')} · ${esc(a.action)}</b><small>${esc(a.entity)} · ${fmt(a.created_at)}</small></div></div>`).join(''):'No audit activity yet.';
   if($('#staffInvitesList')){
-    $('#staffInvitesList').innerHTML=pending.length?pending.map(i=>`<div class="item"><div><b>${esc(i.employee_name)} · ${esc(roleLabel(i.role))}</b><small>Code: <strong>${esc(i.code)}</strong> · expires ${new Date(i.expires_at).toLocaleDateString()}</small></div></div>`).join(''):'No pending staff invites.';
+    $('#staffInvitesList').innerHTML=pending.length?pending.map(i=>`<div class="item"><div><b>${esc(i.employee_name)} · ${esc(roleLabel(i.role))}</b><small>Code: <strong>${esc(i.code)}</strong> · expires ${new Date(i.expires_at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric',timeZone:KIVU_TZ})}</small></div></div>`).join(''):'No pending staff invites.';
   }
 }
 function renderShifts(){
@@ -3681,11 +3682,11 @@ function renderSubscriptionStatus(){
   else if(status==='grace'){end=toDate(shop.grace_ends_at);label='Grace ends';}
   else if(status==='cancelled'){end=toDate(shop.cancelled_at);label='Cancelled';}
   if($('#subscriptionDateLabel')) $('#subscriptionDateLabel').textContent=label||'Access';
-  if($('#subscriptionDateValue')) $('#subscriptionDateValue').textContent=shop?.plan==='one_time'?'No monthly renewal':(end?end.toLocaleDateString():(status==='active'?'No expiry set':'—'));
+  if($('#subscriptionDateValue')) $('#subscriptionDateValue').textContent=shop?.plan==='one_time'?'No monthly renewal':(end?end.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric',timeZone:KIVU_TZ}):(status==='active'?'No expiry set':'—'));
   const banner=$('#subscriptionBanner');
   if(!banner)return;
-  if(status==='trial'){banner.innerHTML=`<b>Free trial:</b> ${planLabel()} features are available until ${end?end.toLocaleDateString():'the trial end date'}. Choose a plan before the trial expires.`;banner.className='subscription-banner trial';}
-  else if(status==='grace'){banner.innerHTML=`<b>Payment grace period:</b> Your plan is still working temporarily. Renew before ${end?end.toLocaleDateString():'the grace deadline'} to avoid interruption.`;banner.className='subscription-banner grace';}
+  if(status==='trial'){banner.innerHTML=`<b>Free trial:</b> ${planLabel()} features are available until ${end?end.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric',timeZone:KIVU_TZ}):'the trial end date'}. Choose a plan before the trial expires.`;banner.className='subscription-banner trial';}
+  else if(status==='grace'){banner.innerHTML=`<b>Payment grace period:</b> Your plan is still working temporarily. Renew before ${end?end.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric',timeZone:KIVU_TZ}):'the grace deadline'} to avoid interruption.`;banner.className='subscription-banner grace';}
   else if(['expired','suspended','cancelled'].includes(status)){banner.innerHTML=`<b>Subscription ${status}:</b> Business data is preserved, but operational features are locked until the owner activates a plan.`;banner.className='subscription-banner blocked';}
   else {banner.innerHTML=shop?.plan==='one_time'?`<b>${planLabel()} is active.</b> This account has the limited one-time package with no monthly renewal.`:`<b>${planLabel()} is active.</b> Your Kivu Solutions subscription is in good standing.`;banner.className='subscription-banner active';}
 }
@@ -4245,17 +4246,31 @@ $('#generateExpiryAlertsBtn')?.addEventListener('click',async()=>{const {data,er
 
 /* V4.6 market-ready mobile navigation */
 $$('.mobile-nav[data-mobile-page]').forEach(b=>b.addEventListener('click',()=>{
-  const page=b.dataset.mobilePage;
-  showPage(page);
-  $$('.mobile-nav').forEach(x=>x.classList.toggle('active',x===b));
+  showPage(b.dataset.mobilePage);
 }));
 $('.mobile-nav[data-mobile-more]')?.addEventListener('click',()=>$('.sidebar')?.classList.add('open'));
+
+/* The bottom bar reflects the page actually shown (showPage may refuse a page) and only offers
+   pages the current role can open; "More" is highlighted for pages that live in the sidebar. */
+function syncMobileNav(){
+  const current=$('.page.active')?.id?.replace('page-','')||'';
+  const allowed=rolePages[currentEffectiveRole()]||[];
+  let inBar=false;
+  $$('.mobile-nav[data-mobile-page]').forEach(b=>{
+    b.classList.toggle('hidden',!allowed.includes(b.dataset.mobilePage));
+    const act=b.dataset.mobilePage===current;
+    if(act)inBar=true;
+    b.classList.toggle('active',act);
+    if(act)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');
+  });
+  $('.mobile-nav[data-mobile-more]')?.classList.toggle('active',!!current&&!inBar);
+}
 
 // Keep the mobile bottom navigation in sync when desktop/sidebar navigation is used.
 const _v46ShowPage=showPage;
 showPage=function(name,bypassSubscription=false){
   const result=_v46ShowPage(name,bypassSubscription);
-  $$('.mobile-nav[data-mobile-page]').forEach(b=>b.classList.toggle('active',b.dataset.mobilePage===name));
+  syncMobileNav();
   return result;
 };
 
@@ -4564,7 +4579,7 @@ async function runOfflineSalesSync(){
 window.addEventListener('online',()=>{updateConnectivityUI();syncOfflineSales().catch(console.warn);});
 window.addEventListener('offline',()=>updateConnectivityUI());
 $('#offlineQueueBtn')?.addEventListener('click',async()=>{const rows=await window.KivuOffline.listSales(shop.id);const errors=rows.filter(x=>x.status==='needs_attention');kivuNotify(rows.length?`${rows.length} offline sale(s) waiting. ${errors.length?errors.length+' need attention because server validation failed. Reconnect and retry after correcting stock/customer data.':'They will sync automatically when online.'}`:'No offline sales waiting.');if(navigator.onLine)syncOfflineSales().catch(console.warn);});
-if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('./sw.js?v=5.3.7',{updateViaCache:'none'}).then(reg=>{reg.update().catch(()=>{});reg.addEventListener('updatefound',()=>{const newWorker=reg.installing;if(!newWorker)return;newWorker.addEventListener('statechange',()=>{if(newWorker.state==='installed'&&navigator.serviceWorker.controller){newWorker.postMessage({type:'SKIP_WAITING'});}});});}).catch(e=>console.warn('Service worker:',e.message));let refreshing=false;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(refreshing)return;refreshing=true;window.location.reload();});});}
+if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('./sw.js?v=5.4.0',{updateViaCache:'none'}).then(reg=>{reg.update().catch(()=>{});reg.addEventListener('updatefound',()=>{const newWorker=reg.installing;if(!newWorker)return;newWorker.addEventListener('statechange',()=>{if(newWorker.state==='installed'&&navigator.serviceWorker.controller){newWorker.postMessage({type:'SKIP_WAITING'});}});});}).catch(e=>console.warn('Service worker:',e.message));let refreshing=false;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(refreshing)return;refreshing=true;window.location.reload();});});}
 
 function findProductByBarcode(code){const clean=String(code||'').trim();return products.find(x=>String(x.barcode||'').trim()===clean);}
 function chooseProductFromBarcode(code,{autoAdd=false,formSelector='#saleForm'}={}){const p=findProductByBarcode(code);if(!p){kivuNotify('No product matches that barcode. Register the barcode in Inventory first.');return null;}const f=$(formSelector);if(f?.elements?.productId){f.elements.productId.value=p.id;if(formSelector==='#saleForm')refreshSaleUnitOptions();if(f.elements.qty)f.elements.qty.value='1';}if(autoAdd)$('#addSaleItemBtn')?.click();return p;}

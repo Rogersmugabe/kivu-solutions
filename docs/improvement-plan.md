@@ -64,7 +64,7 @@ Status legend: ☐ to do · ◐ in progress · ☑ done · ⛔ blocked (needs ba
 | ☑ | B10 Stop double-escaping text written with `textContent` |
 | ☑ | B11 Skip full reloads on token refresh for the same signed-in user |
 
-### Phase B — Design system (priority 2)
+### Phase B — Design system (priority 2) ☑
 One token set and one component layer appended as the last section of `css/style.css`
 ("Kivu Design System v6"), so it overrides the drifted legacy layers without deleting baseline selectors:
 - Tokens: colour (neutral slate, single brand blue, semantic success / warning / danger / info), radius,
@@ -73,20 +73,20 @@ One token set and one component layer appended as the last section of `css/style
   loading), inputs / selects / textareas, cards & panels, KPI tiles, tables, badges / pills, tabs / filter
   bars, dialogs, toasts, empty states, sidebar nav, top bar, auth screen.
 
-### Phase C — Page-by-page application (priority 2)
+### Phase C — Page-by-page application (priority 2) ◐
 Overview, Sales, POS dialog, Tables & Orders, Inventory, Customers, Suppliers, Expenses, Employees, Shifts,
 Reports, Controls, Subscription, Settings, Platform admin, auth screens, receipts / Z-report (print).
 
-### Phase D — Dashboard usefulness (priority 3, real data only)
+### Phase D — Dashboard usefulness (priority 3, real data only) ☑
 - Today vs yesterday comparison on KPI tiles (from loaded sales / expenses).
 - Recent transactions list (latest receipts) with link to the receipt.
 - Keep existing trend chart, payment channels, fast movers, credit watchlist, stock alerts.
 
-### Phase E — Responsive & accessibility (priority 3)
+### Phase E — Responsive & accessibility (priority 3) ☑
 Tables scroll inside their card on small screens, filter bars wrap, dialogs fit phones, touch-size targets,
 visible focus, labelled controls, reduced motion respected.
 
-### Phase F — QA
+### Phase F — QA ☑ (automated + stubbed browser checks; live Supabase flows still manual)
 `node tools/check.js`, `node --test tools/tests/*.test.js`, browser checks of every page at desktop / tablet /
 phone sizes with Supabase stubbed (no production calls), console error check. Live end-to-end flows against
 Supabase require a test account and remain **manual verification**.
@@ -97,3 +97,23 @@ Supabase require a test account and remain **manual verification**.
 - CSS overrides can collide with legacy rules that use `!important` → verify each page visually.
 - No access to the database: server-side behaviour (RLS, RPC internals) is unverified.
 - Large single-file app.js: each change kept small and covered by `check.js` baselines.
+
+---
+
+## 4. Status after v5.4.0 (2026-10-30)
+
+Done and verified locally:
+- Phase A repairs B1–B11; Phase B design system; Phase D dashboard insights; Phase E responsive / a11y fixes.
+- `node tools/check.js` passes; `node --test tools/tests/*.test.js` passes (also under UTC / US time zones).
+- Browser (Supabase stubbed): every page renders with no runtime errors and no sideways overflow at phone,
+  tablet and desktop widths; 144 buttons clicked across 13 pages with zero errors; sale / expense /
+  customer / open-shift submissions send the expected RPC / table payloads.
+
+Still open:
+- ◐ Phase C: pages inherit the new design system, but page-specific markup (inline styles in the Sales
+  filter bar, the separately styled Subscription page) has not been rewritten.
+- ☐ Service worker registration could not be exercised in the test browser (environment limitation); verify
+  offline install on a real device after deploy.
+- ⛔ Backend items from section 1 (multi-device repayments / petty cash / split tenders, server-side shift
+  maths, PIN verification RPC, RLS audit, report aggregates beyond 1,000 rows).
+- ☐ Live end-to-end flows against Supabase with a test shop (manual).

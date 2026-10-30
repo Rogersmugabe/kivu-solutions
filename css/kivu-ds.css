@@ -127,6 +127,11 @@ a { color: var(--ds-accent); }
   border-bottom: 1px solid var(--ds-border);
 }
 
+/* Page title in the top bar stays on one line at every width */
+.topbar > div:first-child { min-width: 0; }
+.topbar-breadcrumbs { min-width: 0; }
+#pageTitle { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
 /* Sidebar: keep the dark rail, refine the active state */
 .sidebar .nav { border-radius: var(--ds-radius-sm); transition: background var(--ds-ease), color var(--ds-ease); }
 .sidebar .nav.active,
@@ -481,6 +486,9 @@ dialog > form > h3:first-child, dialog > h3:first-child, dialog h3[id$="Title"] 
 
 /* The phone bottom bar lives outside #appShell; never show app navigation on the sign-in screen. */
 #appShell.hidden ~ .mobile-bottom-nav { display: none !important; }
+/* Items hidden for the current role must not leave empty slots */
+.mobile-bottom-nav { grid-template-columns: none !important; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
+.mobile-nav.active { color: var(--ds-accent); }
 
 /* ---------- POS checkout fixes ---------- */
 /* The cart list is a scrolling flex child; without this it collapses to 0px when the pane scrolls (phones). */
