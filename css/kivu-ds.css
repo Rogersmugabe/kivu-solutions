@@ -605,4 +605,42 @@ dialog > form > h3:first-child, dialog > h3:first-child, dialog h3[id$="Title"] 
 @media print {
   dialog { box-shadow: none; border: 0; animation: none; }
   dialog::backdrop { display: none; }
+
+  /* Print exactly one document (set by kivuPrintDialog / beforeprint), at full length.
+     A modal dialog is fixed to the screen with a capped, scrolling height; left like that the
+     printer only receives the part that fits on screen. Unclip it and let it flow over pages. */
+  html, body.kivu-printing { height: auto !important; min-height: 0 !important; overflow: visible !important; background: #fff !important; }
+  body.kivu-printing > *:not(dialog.print-target) { display: none !important; }
+  body.kivu-printing dialog.print-target {
+    position: absolute !important;
+    inset: 0 auto auto 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    transform: none !important;
+    box-shadow: none !important;
+    animation: none !important;
+    visibility: visible !important;
+  }
+  body.kivu-printing dialog.print-target .modal-actions,
+  body.kivu-printing dialog.print-target .cancel-btn,
+  body.kivu-printing dialog.print-target button { display: none !important; }
+  /* The legacy rules pin the slips with position:absolute, which collapses the dialog to 0px.
+     Keep them in normal flow so the dialog is exactly as tall as the document. */
+  body.kivu-printing dialog.print-target #receiptContent,
+  body.kivu-printing dialog.print-target .z-report,
+  body.kivu-printing dialog.print-target .z-report-slip,
+  body.kivu-printing dialog.print-target .ledger-card {
+    position: static !important;
+    overflow: visible !important;
+    max-height: none !important;
+  }
+  body.kivu-printing dialog.print-target .table-wrap { overflow: visible !important; }
+  body.kivu-printing dialog.print-target .receipt-row,
+  body.kivu-printing dialog.print-target tr { break-inside: avoid; page-break-inside: avoid; }
 }

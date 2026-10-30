@@ -99,3 +99,17 @@ test('V10: multi-line card buttons are exempt from the single-line button rule',
   assert.ok(dsCss.includes('.btn.btn-role-sim, .btn.quick-action-card'));
   assert.match(dsCss, /\.btn\.btn-role-sim[^{]*\{[^}]*white-space: normal/);
 });
+
+test('V11: print buttons print one full-length document instead of a screen-sized slice', () => {
+  for (const [btn, id] of [["#printReceiptBtn').onclick", 'receiptModal'], ["#printZReportBtn')?.addEventListener('click'", 'zReportModal'], ["#printLedgerBtn'); if(prBtn) prBtn.onclick", 'customerLedgerModal']]) {
+    const at = appJs.indexOf(btn);
+    assert.ok(at > 0, `${btn} handler present`);
+    assert.ok(appJs.slice(at, at + 120).includes(`kivuPrintDialog('${id}')`), `${btn} must print ${id} via kivuPrintDialog`);
+  }
+  assert.ok(appJs.includes("window.addEventListener('beforeprint'"), 'Ctrl+P picks the open document');
+  assert.ok(appJs.includes("$$('dialog.print-target').forEach"), 'clearing must iterate all marked dialogs');
+  const print = dsCss.slice(dsCss.lastIndexOf('@media print'));
+  assert.ok(print.includes('body.kivu-printing > *:not(dialog.print-target) { display: none !important; }'));
+  assert.match(print, /dialog\.print-target \{[^}]*max-height: none !important;[^}]*overflow: visible !important;/);
+  assert.match(print, /#receiptContent,[\s\S]*?position: static !important;/);
+});
