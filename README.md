@@ -43,6 +43,7 @@ Every feature, enhancement, and bug fix implemented on Kivu Solutions is logged 
                                                                        └── [16] Terminal & Client Security Hardening (v5.3.7)
                                                                             └── [17] Functional Repairs, Design System v6 & Dashboard Insights (v5.4.0)
                                                                                  └── [18] Page Cleanup: Inline Styles & Subscription Alignment (v5.4.1)
+                                                                                      └── [19] Full-Length Receipt, Z-Report & Statement Printing (v5.4.2)
 ```
 
 ---
@@ -274,6 +275,18 @@ Every feature, enhancement, and bug fix implemented on Kivu Solutions is logged 
 
 ---
 
+### [19] Full-Length Receipt, Z-Report & Statement Printing (v5.4.2)
+- **Date**: 2026-10-30
+- **Commit**: _(uncommitted)_
+- **Scope & Problem**: Long receipts sometimes printed cut off. Receipts, Z-reports and customer statements are shown in modal dialogs, which the browser keeps fixed to the screen with a capped, scrolling height; printing captured only the part that fit on screen (a 40-item receipt printed about 8% of its content).
+- **Implementation**:
+  - Print buttons call `kivuPrintDialog()`, which marks that dialog as the print target. Pressing Ctrl+P while one of these documents is open does the same (`beforeprint`).
+  - The print stylesheet hides everything else and releases the target from its screen box (no fixed position, height cap or scroll clipping), so the document flows over as many pages as it needs. Buttons are left off the paper; the target is cleared after printing.
+  - A receipt printed on top of the open POS no longer includes the POS behind it.
+  - Test V11 guards the print path.
+
+---
+
 ## 🧪 Verification & Test Suite
 
 The repository includes a comprehensive automated test and compliance harness:
@@ -286,8 +299,8 @@ The repository includes a comprehensive automated test and compliance harness:
 | **Role Simulator & Invites** | `tools/tests/role-simulator-and-invites.test.js` | 6 | Invite codes, role simulation restrictions, DB error fallback |
 | **Square Auth Layout** | `tools/tests/square-auth-layout.test.js` | 3 | Split-screen DOM structure, baseline IDs, input mapping |
 | **Security Hardening** | `tools/tests/security-hardening.test.js` | 7 | Delegated actions, isolated PIN checks, lock persistence, PIN throttling, F2 guard |
-| **Product v6** | `tools/tests/product-v6.test.js` | 10 | Design-system wiring, CSV parsing, Kigali time, KPI comparison, dialogs, settings |
-| **Total** | | **40** | **100% Passing** |
+| **Product v6** | `tools/tests/product-v6.test.js` | 11 | Design-system wiring, CSV parsing, Kigali time, KPI comparison, dialogs, settings |
+| **Total** | | **41** | **100% Passing** |
 
 ### Running Quality Checks & Tests
 ```powershell

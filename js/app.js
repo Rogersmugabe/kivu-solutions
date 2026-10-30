@@ -1433,7 +1433,7 @@ function renderCustomerLedgerModal(c){
   $('#ledgerCustomerBalance').textContent=money(openBalance);
   $('#ledgerTableBody').innerHTML=rows.length?rows.join(''):'<tr><td colspan="6">No ledger transactions found.</td></tr>';
   const waBtn=$('#whatsappReminderBtn'); if(waBtn) waBtn.onclick=()=>sendWhatsappDebtReminderForCustomer(c,openBalance);
-  const prBtn=$('#printLedgerBtn'); if(prBtn) prBtn.onclick=()=>window.print();
+  const prBtn=$('#printLedgerBtn'); if(prBtn) prBtn.onclick=()=>kivuPrintDialog('customerLedgerModal');
   $('#customerLedgerModal').showModal();
 }
 window.openCustomerLedger=id=>{const c=customers.find(x=>x.id===id); if(c)renderCustomerLedgerModal(c);};
@@ -2235,7 +2235,7 @@ window.openShiftZReport=function(shiftId){
   $('#zReportModal').showModal();
 };
 $('#printCurrentShiftZBtn')?.addEventListener('click',()=>{if(!currentShift)return kivuNotify('No shift open.');openShiftZReport(currentShift.id);});
-$('#printZReportBtn')?.addEventListener('click',()=>window.print());
+$('#printZReportBtn')?.addEventListener('click',()=>kivuPrintDialog('zReportModal'));
 
 /* RECEIPTS */
 window.viewReceipt=id=>{const s=sales.find(x=>x.id===id);if(!s)return;const lines=sales.filter(x=>x.receipt_no&&x.receipt_no===s.receipt_no);showReceiptGroup(lines.length?lines:[s], getReceiptTendered(s.receipt_no));};
@@ -2263,7 +2263,40 @@ function showReceiptGroup(lines, optTendered){
   $('#receiptContent').innerHTML=`<div class="receipt-center"><h2>${esc(shop.name)}</h2>${esc(shop.phone||'')}${shop.tax_number?`<br>${esc(taxLabel)} No: ${esc(shop.tax_number)}`:''}<br>${esc(shop.receipt_footer||'Thank you for your business')}</div><div class="receipt-line"></div><div>Receipt: <b>${esc(s.receipt_no||'—')}</b></div><div>Date: ${fmt(s.created_at)}</div><div>Cashier: ${esc(s.employee_name||'Owner')}</div><div class="receipt-line"></div>${items}${discount?`<div class="receipt-row"><span>Subtotal</span><span>${money(gross)}</span></div><div class="receipt-row"><span>Discount</span><span>-${money(discount)}</span></div>`:''}<div class="receipt-line"></div><div class="receipt-row"><b>TOTAL</b><b>${money(total)}</b></div>${rate>0?`<div class="receipt-row"><span>${esc(taxLabel)} included (${rate}%)</span><span>${money(tax)}</span></div>`:''}${paymentHtml}${changeHtml}<div class="receipt-line"></div><div class="receipt-center">Kivu Solutions digital receipt</div><div class="receipt-center"><small>Powered by Platinum Tech</small></div><div class="receipt-center"><small>This is a Kivu sales receipt, not an RRA EBM fiscal receipt unless a separately approved EBM integration is active.</small></div>`;
   $('#receiptModal').showModal();
 }
-$('#printReceiptBtn').onclick=()=>window.print();
+$('#printReceiptBtn').onclick=()=>kivuPrintDialog('receiptModal');
+
+/* PRINTING
+   Receipts, Z-reports and customer statements live inside modal dialogs, which the browser keeps
+   fixed to the screen with a capped, scrolling height. Printing such a dialog as-is only captures
+   the part that fits on screen, so long receipts came out cut off. The dialog being printed is
+   marked as the print target; the print stylesheet hides everything else and lets the target
+   grow to its full height across as many pages as it needs. */
+const PRINTABLE_DIALOGS=['receiptModal','zReportModal','customerLedgerModal'];
+function setPrintTarget(dialog){
+  clearPrintTarget();
+  if(!dialog)return;
+  dialog.classList.add('print-target');
+  document.body.classList.add('kivu-printing');
+}
+function clearPrintTarget(){
+  document.body.classList.remove('kivu-printing');
+  $$('dialog.print-target').forEach(d=>d.classList.remove('print-target'));
+}
+function kivuPrintDialog(id){
+  const dialog=document.getElementById(id);
+  if(!dialog?.open)return;
+  setPrintTarget(dialog);
+  window.print();
+}
+window.kivuPrintDialog=kivuPrintDialog;
+// Ctrl+P while a receipt / report is open prints that document, not a blank page.
+window.addEventListener('beforeprint',()=>{
+  if(document.body.classList.contains('kivu-printing'))return;
+  const open=PRINTABLE_DIALOGS.map(id=>document.getElementById(id)).filter(d=>d?.open);
+  if(open.length)setPrintTarget(open[0]);
+});
+window.addEventListener('afterprint',clearPrintTarget);
+PRINTABLE_DIALOGS.forEach(id=>document.getElementById(id)?.addEventListener('close',clearPrintTarget));
 
 
 /* OWNER SETTINGS + PLAN TESTING */
@@ -4579,7 +4612,7 @@ async function runOfflineSalesSync(){
 window.addEventListener('online',()=>{updateConnectivityUI();syncOfflineSales().catch(console.warn);});
 window.addEventListener('offline',()=>updateConnectivityUI());
 $('#offlineQueueBtn')?.addEventListener('click',async()=>{const rows=await window.KivuOffline.listSales(shop.id);const errors=rows.filter(x=>x.status==='needs_attention');kivuNotify(rows.length?`${rows.length} offline sale(s) waiting. ${errors.length?errors.length+' need attention because server validation failed. Reconnect and retry after correcting stock/customer data.':'They will sync automatically when online.'}`:'No offline sales waiting.');if(navigator.onLine)syncOfflineSales().catch(console.warn);});
-if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('./sw.js?v=5.4.1',{updateViaCache:'none'}).then(reg=>{reg.update().catch(()=>{});reg.addEventListener('updatefound',()=>{const newWorker=reg.installing;if(!newWorker)return;newWorker.addEventListener('statechange',()=>{if(newWorker.state==='installed'&&navigator.serviceWorker.controller){newWorker.postMessage({type:'SKIP_WAITING'});}});});}).catch(e=>console.warn('Service worker:',e.message));let refreshing=false;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(refreshing)return;refreshing=true;window.location.reload();});});}
+if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('./sw.js?v=5.4.2',{updateViaCache:'none'}).then(reg=>{reg.update().catch(()=>{});reg.addEventListener('updatefound',()=>{const newWorker=reg.installing;if(!newWorker)return;newWorker.addEventListener('statechange',()=>{if(newWorker.state==='installed'&&navigator.serviceWorker.controller){newWorker.postMessage({type:'SKIP_WAITING'});}});});}).catch(e=>console.warn('Service worker:',e.message));let refreshing=false;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(refreshing)return;refreshing=true;window.location.reload();});});}
 
 function findProductByBarcode(code){const clean=String(code||'').trim();return products.find(x=>String(x.barcode||'').trim()===clean);}
 function chooseProductFromBarcode(code,{autoAdd=false,formSelector='#saleForm'}={}){const p=findProductByBarcode(code);if(!p){kivuNotify('No product matches that barcode. Register the barcode in Inventory first.');return null;}const f=$(formSelector);if(f?.elements?.productId){f.elements.productId.value=p.id;if(formSelector==='#saleForm')refreshSaleUnitOptions();if(f.elements.qty)f.elements.qty.value='1';}if(autoAdd)$('#addSaleItemBtn')?.click();return p;}
