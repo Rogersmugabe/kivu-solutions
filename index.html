@@ -13,6 +13,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
 <link rel="stylesheet" href="css/style.css?v=5.3.7"/>
+<link rel="stylesheet" href="css/kivu-ds.css?v=5.3.7"/>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 (function(){
@@ -555,6 +556,7 @@
       </div>
       <strong id="salesToday" class="kpi-value-text">0 RWF</strong>
       <p id="kpiSalesSubtext" class="kpi-subtext">0 transactions today</p>
+      <span id="kpiSalesDelta" class="kpi-delta flat hidden" title="Compared with yesterday up to the same time"></span>
     </div>
     <div class="kpi-card" onclick="showPage('expenses')" role="button" tabindex="0" title="View expenses">
       <div class="kpi-top-row">
@@ -563,6 +565,7 @@
       </div>
       <strong id="expensesToday" class="kpi-value-text">0 RWF</strong>
       <p id="kpiExpensesSubtext" class="kpi-subtext">Operating outflows</p>
+      <span id="kpiExpensesDelta" class="kpi-delta flat hidden" title="Compared with yesterday up to the same time"></span>
     </div>
     <div class="kpi-card" onclick="showPage('reports')" role="button" tabindex="0" title="View estimated profit report">
       <div class="kpi-top-row">
@@ -722,6 +725,13 @@
   </div>
 
   <!-- Card 5: Critical Stock & Reorder Alerts -->
+  <section class="panel overview-panel" id="panelRecentSales">
+    <div class="panel-head">
+      <div><p class="eyebrow">Latest activity</p><h2>Recent transactions</h2></div>
+      <button type="button" class="btn ghost btn-sm" onclick="showPage('sales')">All sales →</button>
+    </div>
+    <div id="recentSalesList" class="recent-tx-list"><div class="notice mini">No sales recorded yet.</div></div>
+  </section>
   <section class="panel overview-panel" id="panelStockAlerts">
     <div class="panel-head">
       <div>

@@ -362,7 +362,7 @@ window.kivuPrompt = kivuPrompt;
 const KIVU_SAFE_ACTIONS = new Set([
   'selectSaleCategory', 'filterSalesCategory', 'filterInventoryCategory', 'filterExpensesCategory',
   'openCustomerLedger', 'openCustomerLedgerByName', 'sendWhatsappDebtReminder', 'sendWhatsappDebtReminderByName',
-  'startRoleSimulation', 'resumeParkedCart', 'discardParkedCart'
+  'startRoleSimulation', 'resumeParkedCart', 'discardParkedCart', 'viewReceipt'
 ]);
 document.addEventListener('click', e => {
   const el = e.target?.closest?.('[data-kivu-action]');
@@ -370,6 +370,14 @@ document.addEventListener('click', e => {
   const name = el.dataset.kivuAction;
   if (!KIVU_SAFE_ACTIONS.has(name) || typeof window[name] !== 'function') return;
   window[name](el.dataset.kivuArg ?? '');
+});
+// Clickable cards marked role="button" respond to Enter / Space like real buttons.
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  const el = e.target;
+  if (!el?.matches?.('[role="button"]:not(button):not(a):not(input):not(select):not(textarea)')) return;
+  e.preventDefault();
+  el.click();
 });
 
 /* GLOBAL KEYBOARD ACCESSIBILITY & SHORTCUTS (F2, ESC, CTRL+ENTER) */
@@ -2767,7 +2775,62 @@ function renderDashboard(){
       `;
     }
   }
+  renderDashboardInsights();
 }
+
+/* DASHBOARD INSIGHTS (v6): same-time-yesterday comparison and recent receipts, from loaded data only. */
+const kigaliTimeFmt=(()=>{try{return new Intl.DateTimeFormat('en-GB',{timeZone:KIVU_TZ,hour:'2-digit',minute:'2-digit',hourCycle:'h23'});}catch(_e){return null;}})();
+function kigaliMinuteOfDay(d){
+  const x=new Date(d);
+  if(kigaliTimeFmt){const p={};kigaliTimeFmt.formatToParts(x).forEach(o=>{p[o.type]=o.value;});return Number(p.hour)*60+Number(p.minute);}
+  return x.getHours()*60+x.getMinutes();
+}
+function setKpiDelta(el,today,yesterday,{higherIsGood=true}={}){
+  if(!el)return;
+  if(!today&&!yesterday){el.classList.add('hidden');return;}
+  el.classList.remove('hidden','up','down','flat');
+  if(!yesterday){el.classList.add(higherIsGood?'up':'down');el.textContent='▲ New vs yesterday';return;}
+  const pct=Math.round(((today-yesterday)/yesterday)*100);
+  if(pct===0){el.classList.add('flat');el.textContent='— Same as yesterday';return;}
+  const rising=pct>0;
+  el.classList.add(rising===higherIsGood?'up':'down');
+  el.textContent=`${rising?'▲':'▼'} ${Math.abs(pct)}% vs yesterday`;
+}
+function renderDashboardInsights(){
+  const now=new Date(),today=day(now),yesterday=day(now.getTime()-864e5),cutoff=kigaliMinuteOfDay(now);
+  const upToNowYesterday=x=>day(x.created_at)===yesterday&&kigaliMinuteOfDay(x.created_at)<=cutoff;
+  const live=sales.filter(x=>x.status!=='voided');
+  const salesToday=live.filter(x=>day(x.created_at)===today).reduce((a,x)=>a+Number(x.total||0),0);
+  const salesYest=live.filter(upToNowYesterday).reduce((a,x)=>a+Number(x.total||0),0);
+  setKpiDelta($('#kpiSalesDelta'),salesToday,salesYest);
+  const ex=expenses.filter(x=>x.approval_status!=='rejected');
+  const expToday=ex.filter(x=>day(x.created_at)===today).reduce((a,x)=>a+Number(x.amount||0),0);
+  const expYest=ex.filter(upToNowYesterday).reduce((a,x)=>a+Number(x.amount||0),0);
+  setKpiDelta($('#kpiExpensesDelta'),expToday,expYest,{higherIsGood:false});
+
+  const panel=$('#panelRecentSales'),list=$('#recentSalesList');
+  if(!panel||!list)return;
+  const canSeeSales=can('owner','manager','cashier');
+  panel.classList.toggle('hidden',!canSeeSales);
+  if(!canSeeSales)return;
+  const groups=new Map();
+  sales.forEach(s=>{const k=s.receipt_no||s.id;if(!groups.has(k))groups.set(k,[]);groups.get(k).push(s);});
+  const receipts=[...groups.values()].map(lines=>{
+    const kept=lines.filter(x=>x.status!=='voided');
+    return{lines,first:lines[0],voided:!kept.length,total:(kept.length?kept:lines).reduce((a,x)=>a+Number(x.total||0),0),at:lines.reduce((m,x)=>Math.max(m,new Date(x.created_at).getTime()),0)};
+  }).sort((a,b)=>b.at-a.at).slice(0,6);
+  if(!receipts.length){list.innerHTML='<div class="notice mini">No sales recorded yet. Sales appear here as soon as they are completed.</div>';return;}
+  list.innerHTML=receipts.map(r=>{
+    const more=r.lines.length>1?` + ${r.lines.length-1} more`:'';
+    const when=new Date(r.at).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:KIVU_TZ});
+    const whenDay=day(r.at)===today?'Today':day(r.at)===yesterday?'Yesterday':new Date(r.at).toLocaleDateString('en-GB',{day:'2-digit',month:'short',timeZone:KIVU_TZ});
+    return `<button type="button" class="recent-tx-row" data-kivu-action="viewReceipt" data-kivu-arg="${esc(r.first.id)}" aria-label="Open receipt ${esc(r.first.receipt_no||'')}">
+      <span class="recent-tx-main"><b>${esc(r.first.product_name||'Sale')}${esc(more)}</b><small>${esc(r.first.receipt_no||'—')} · ${esc(whenDay)} ${esc(when)} · ${esc(r.first.payment||'Cash')}${r.first.customer?` · ${esc(r.first.customer)}`:''}</small></span>
+      <span class="recent-tx-amount">${r.voided?'<span class="badge danger-badge">Voided</span>':money(r.total)}<small>${esc(r.first.employee_name||'')}</small></span>
+    </button>`;
+  }).join('');
+}
+
 window.openDrawerPettyCash=function(){
   const activeShift=currentShift||shifts.find(x=>x.status==='open');
   if(!activeShift) return kivuNotify('An active open shift is required to record a drawer petty cash payout.');

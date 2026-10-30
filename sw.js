@@ -3,6 +3,7 @@ const SHELL=[
   './',
   './index.html',
   './css/style.css?v=5.3.7',
+  './css/kivu-ds.css?v=5.3.7',
   './js/config.js?v=5.3.7',
   './js/offline-queue.js?v=5.3.7',
   './js/camera-scanner.js?v=5.3.7',
