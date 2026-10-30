@@ -355,10 +355,38 @@ function kivuPrompt(msg, { title='Please enter', defaultValue='', multiline=fals
 }
 window.kivuPrompt = kivuPrompt;
 
+/* SAFE DELEGATED ACTIONS
+   User-entered text (customer names, categories, held-cart ids) travels in data attributes and is
+   passed as a plain string argument, never spliced into inline JavaScript where HTML entity
+   decoding would let a quote break out. Only allow-listed window handlers can be invoked. */
+const KIVU_SAFE_ACTIONS = new Set([
+  'selectSaleCategory', 'filterSalesCategory', 'filterInventoryCategory', 'filterExpensesCategory',
+  'openCustomerLedger', 'openCustomerLedgerByName', 'sendWhatsappDebtReminder', 'sendWhatsappDebtReminderByName',
+  'startRoleSimulation', 'resumeParkedCart', 'discardParkedCart'
+]);
+document.addEventListener('click', e => {
+  const el = e.target?.closest?.('[data-kivu-action]');
+  if (!el) return;
+  const name = el.dataset.kivuAction;
+  if (!KIVU_SAFE_ACTIONS.has(name) || typeof window[name] !== 'function') return;
+  window[name](el.dataset.kivuArg ?? '');
+});
+
 /* GLOBAL KEYBOARD ACCESSIBILITY & SHORTCUTS (F2, ESC, CTRL+ENTER) */
 window.addEventListener('keydown', e => {
+  // While the register is locked, no shortcut may open, close or submit anything beneath the lock screen.
+  if (typeof isTerminalLocked === 'function' && isTerminalLocked()) {
+    if (e.key === 'F2' || e.key === 'Escape' || ((e.ctrlKey || e.metaKey) && e.key === 'Enter')) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+    }
+    return;
+  }
   if (e.key === 'F2') {
     e.preventDefault();
+    if (!session || !profile) return;
+    if (!can('owner', 'manager', 'cashier')) return;
+    if (!ensureSubscriptionAccess()) return;
     const modal = $('#saleModal');
     if (modal && !modal.open) {
       if (typeof initSaleModal === 'function') initSaleModal();
@@ -687,6 +715,7 @@ sb.auth.onAuthStateChange(async(_event,s)=>{session=s;if(s)await enter();else sh
 (async()=>{const {data}=await sb.auth.getSession();session=data.session;if(session)await enter();else showAuth()})();
 
 function showAuth(){try{localStorage.removeItem('kivu_offline_snapshot_v1');}catch(_e){}document.documentElement.classList.remove('has-cached-session');hideAppInitLoader();
+  if(typeof clearTerminalLock==='function') clearTerminalLock();
   $('#authScreen').classList.remove('hidden');
   $('#appShell').classList.add('hidden');
 }
@@ -951,7 +980,7 @@ $$('[data-open]').forEach(b=>b.addEventListener('click',()=>{
 }));
 $('#upgradeGoBtn')?.addEventListener('click',()=>{ $('#upgradeModal')?.close(); showPage('subscription',true); });
 $$('.cancel-btn').forEach(b=>b.onclick=()=>{const d=b.closest('dialog');d?.querySelector('form')?.reset();d?.close();$('#saleCustomerWrap')?.classList.add('hidden')});
-$$('dialog').forEach(d=>d.addEventListener('click',e=>{if(e.target===d)d.close()}));
+$$('dialog').forEach(d=>d.addEventListener('click',e=>{if(e.target===d&&d.id!=='terminalLockModal')d.close()}));
 
 /* DATA */
 async function safeQuery(promise){const r=await promise;if(r.error)throw r.error;return r.data||[]}
@@ -1521,7 +1550,7 @@ function renderSaleCategoryPills(){
   const cats=['All',...new Set(products.map(p=>p.category).filter(Boolean))];
   box.innerHTML=cats.map(c=>{
     const active=c===selectedSaleCategory;
-    return `<button type="button" class="pill-btn ${active?'active':''}" onclick="selectSaleCategory('${esc(c)}')">${esc(c)}</button>`;
+    return `<button type="button" class="pill-btn ${active?'active':''}" data-kivu-action="selectSaleCategory" data-kivu-arg="${esc(c)}">${esc(c)}</button>`;
   }).join('');
 }
 window.selectSaleCategory=function(cat){
@@ -1710,7 +1739,7 @@ $('#viewParkedCartsBtn')?.addEventListener('click',()=>{renderParkedCartsModal()
 function renderParkedCartsModal(){
   const list=getHeldCarts(),box=$('#parkedCartsList'); if(!box)return;
   box.innerHTML=list.length?list.map(c=>`
-    <div class="parked-cart-item"><div><b>${esc(c.note)}</b><small>${fmt(c.savedAt)} · ${c.items.length} item(s)</small><strong>${money(c.total)}</strong></div><div class="parked-cart-actions"><button type="button" class="btn primary" onclick="resumeParkedCart('${c.id}')">Resume</button><button type="button" class="btn danger" onclick="discardParkedCart('${c.id}')">Discard</button></div></div>
+    <div class="parked-cart-item"><div><b>${esc(c.note)}</b><small>${fmt(c.savedAt)} · ${c.items.length} item(s)</small><strong>${money(c.total)}</strong></div><div class="parked-cart-actions"><button type="button" class="btn primary" data-kivu-action="resumeParkedCart" data-kivu-arg="${esc(c.id)}">Resume</button><button type="button" class="btn danger" data-kivu-action="discardParkedCart" data-kivu-arg="${esc(c.id)}">Discard</button></div></div>
   `).join(''):'<div class="notice mini">No held carts currently.</div>';
 }
 window.resumeParkedCart=async function(id){
@@ -2613,9 +2642,8 @@ function renderDashboard(){
       const todayStr=day(new Date());
       creditWatchlist.innerHTML=topDebtors.map(d=>{
         const isOverdue=d.earliestDue&&d.earliestDue<todayStr;
-        const safeJsName=String(d.name||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-        const ledgerCall=d.id?`openCustomerLedger('${d.id}')`:`openCustomerLedgerByName('${safeJsName}')`;
-        const waCall=d.id?`sendWhatsappDebtReminder('${d.id}')`:`sendWhatsappDebtReminderByName('${safeJsName}')`;
+        const ledgerCall=d.id?`data-kivu-action="openCustomerLedger" data-kivu-arg="${esc(d.id)}"`:`data-kivu-action="openCustomerLedgerByName" data-kivu-arg="${esc(d.name||'')}"`;
+        const waCall=d.id?`data-kivu-action="sendWhatsappDebtReminder" data-kivu-arg="${esc(d.id)}"`:`data-kivu-action="sendWhatsappDebtReminderByName" data-kivu-arg="${esc(d.name||'')}"`;
         return `
           <div class="debtor-row">
             <div class="debtor-main">
@@ -2633,10 +2661,10 @@ function renderDashboard(){
             <div class="debtor-actions">
               <strong class="debt-amount">${money(d.totalDebt)}</strong>
               <div class="debtor-btns">
-                <button type="button" class="btn-wa-reminder" onclick="${waCall}" title="Send WhatsApp debt reminder">
+                <button type="button" class="btn-wa-reminder" ${waCall} title="Send WhatsApp debt reminder">
                   ${kivuIcon("whatsapp")} WhatsApp
                 </button>
-                <button type="button" class="btn ghost btn-xs" onclick="${ledgerCall}" title="Open customer ledger">
+                <button type="button" class="btn ghost btn-xs" ${ledgerCall} title="Open customer ledger">
                   ${kivuIcon("statement")} Statement
                 </button>
               </div>
@@ -2747,7 +2775,7 @@ function renderSales(){
         const prod=products.find(p=>p.id===s.product_id||p.name===s.product_name);
         return prod?.category===c;
       }).length;
-      return `<button type="button" class="pill-btn ${active?'active':''}" onclick="filterSalesCategory('${esc(c)}')">${esc(c)} <small>(${count})</small></button>`;
+      return `<button type="button" class="pill-btn ${active?'active':''}" data-kivu-action="filterSalesCategory" data-kivu-arg="${esc(c)}">${esc(c)} <small>(${count})</small></button>`;
     }).join('');
   }
 
@@ -3000,7 +3028,7 @@ function renderInventory(){
     pillsBox.innerHTML=cats.map(c=>{
       const active=(c==='All'&&(!selectedInventoryCategory||selectedInventoryCategory==='All'))||selectedInventoryCategory===c;
       const count=c==='All'?products.length:products.filter(p=>p.category===c).length;
-      return `<button type="button" class="pill-btn ${active?'active':''}" onclick="filterInventoryCategory('${esc(c)}')">${esc(c)} <small>(${count})</small></button>`;
+      return `<button type="button" class="pill-btn ${active?'active':''}" data-kivu-action="filterInventoryCategory" data-kivu-arg="${esc(c)}">${esc(c)} <small>(${count})</small></button>`;
     }).join('');
   }
   const dl=$('#categoryDatalist');
@@ -3183,7 +3211,7 @@ function renderExpenses(){
     pillsBox.innerHTML=cats.map(c=>{
       const active=(c==='All'&&(!selectedExpensesCategory||selectedExpensesCategory==='All'))||selectedExpensesCategory===c;
       const count=c==='All'?expenses.length:expenses.filter(e=>e.category===c).length;
-      return `<button type="button" class="pill-btn ${active?'active':''}" onclick="filterExpensesCategory('${esc(c)}')">${esc(c)} <small>(${count})</small></button>`;
+      return `<button type="button" class="pill-btn ${active?'active':''}" data-kivu-action="filterExpensesCategory" data-kivu-arg="${esc(c)}">${esc(c)} <small>(${count})</small></button>`;
     }).join('');
   }
 
@@ -3271,7 +3299,7 @@ function renderCustomers(){
       <div class="credit-actions">
         <b>${money(c.amount)}</b>
         <button class="btn secondary" onclick="openRepayCredit('${c.id}')">Repay</button>
-        <button class="btn ghost" onclick="openCustomerLedgerByName('${esc(c.customer)}')">Statement</button>
+        <button class="btn ghost" data-kivu-action="openCustomerLedgerByName" data-kivu-arg="${esc(c.customer)}">Statement</button>
         <button class="btn ghost whatsapp-btn" onclick="sendWhatsappReminderForCredit('${c.id}')">${kivuIcon("whatsapp")} <span>WA</span></button>
       </div>
     </div>
@@ -3364,7 +3392,7 @@ function renderEmployees(){
   if($('#empKpiActive')) $('#empKpiActive').textContent=employees.filter(e=>e.active!==false).length;
   if($('#empKpiInvites')) $('#empKpiInvites').textContent=pending.length;
 
-  $('#employeesBody').innerHTML=employees.length?employees.map(e=>`<tr><td><b>${esc(e.name)}</b></td><td>${esc(roleLabel(e.role))}</td><td>${esc(e.phone||'—')}</td><td><span class="badge">${e.active?'Active':'Disabled'}</span></td><td>${sales.filter(s=>s.user_id===e.user_id&&day(s.created_at)===t).length}</td><td><div style="display:flex; gap:6px; align-items:center;">${profile.role==='owner'?`<button class="btn secondary btn-sm" onclick="startRoleSimulation('${e.role}')" title="Preview interface as this role">👁️ Preview</button>`:''}${can('owner','manager')?`<button class="btn ${e.active?'danger':'secondary'} btn-sm" onclick="setEmployeeActive('${e.id}',${!e.active})">${e.active?'Disable':'Reactivate'}</button>`:'—'}</div></td></tr>`).join(''):`<tr><td colspan="6"><div class="empty-table-state"><span class="empty-icon">${kivuIcon("staff")}</span><p>No staff team members have joined yet.</p>${profile.role==='owner'?'<div style="display:flex; gap:8px; justify-content:center; flex-wrap:wrap; margin-top:8px;"><button class="btn primary btn-sm" onclick="$(\'#staffInviteModal\')?.showModal()">+ Invite Staff</button><button class="btn secondary btn-sm" onclick="startRoleSimulation(\'cashier\')">👁️ Preview Cashier View</button></div>':''}</div></td></tr>`;
+  $('#employeesBody').innerHTML=employees.length?employees.map(e=>`<tr><td><b>${esc(e.name)}</b></td><td>${esc(roleLabel(e.role))}</td><td>${esc(e.phone||'—')}</td><td><span class="badge">${e.active?'Active':'Disabled'}</span></td><td>${sales.filter(s=>s.user_id===e.user_id&&day(s.created_at)===t).length}</td><td><div style="display:flex; gap:6px; align-items:center;">${profile.role==='owner'?`<button class="btn secondary btn-sm" data-kivu-action="startRoleSimulation" data-kivu-arg="${esc(e.role)}" title="Preview interface as this role">👁️ Preview</button>`:''}${can('owner','manager')?`<button class="btn ${e.active?'danger':'secondary'} btn-sm" onclick="setEmployeeActive('${e.id}',${!e.active})">${e.active?'Disable':'Reactivate'}</button>`:'—'}</div></td></tr>`).join(''):`<tr><td colspan="6"><div class="empty-table-state"><span class="empty-icon">${kivuIcon("staff")}</span><p>No staff team members have joined yet.</p>${profile.role==='owner'?'<div style="display:flex; gap:8px; justify-content:center; flex-wrap:wrap; margin-top:8px;"><button class="btn primary btn-sm" onclick="$(\'#staffInviteModal\')?.showModal()">+ Invite Staff</button><button class="btn secondary btn-sm" onclick="startRoleSimulation(\'cashier\')">👁️ Preview Cashier View</button></div>':''}</div></td></tr>`;
   const auditPanel=$('#auditList')?.closest('.panel');
   auditPanel?.classList.toggle('hidden',!hasFeature('audit'));
   if(hasFeature('audit')) $('#auditList').innerHTML=audits.length?audits.slice(0,20).map(a=>`<div class="item"><div><b>${esc(a.user_name||'User')} · ${esc(a.action)}</b><small>${esc(a.entity)} · ${fmt(a.created_at)}</small></div></div>`).join(''):'No audit activity yet.';
@@ -4332,6 +4360,7 @@ function hydrateFromCache(){
     applyPermissions();
     render();
   }catch(_e){}
+  restoreTerminalLock();
   return true;
 }
 
@@ -4371,6 +4400,7 @@ enter=function(){
       hideAppInitLoader();
       $('#authScreen')?.classList.add('hidden');
       $('#appShell')?.classList.remove('hidden');
+      restoreTerminalLock();
       enterInFlight=null;
     }
   })();
@@ -4442,7 +4472,7 @@ async function runOfflineSalesSync(){
 window.addEventListener('online',()=>{updateConnectivityUI();syncOfflineSales().catch(console.warn);});
 window.addEventListener('offline',()=>updateConnectivityUI());
 $('#offlineQueueBtn')?.addEventListener('click',async()=>{const rows=await window.KivuOffline.listSales(shop.id);const errors=rows.filter(x=>x.status==='needs_attention');kivuNotify(rows.length?`${rows.length} offline sale(s) waiting. ${errors.length?errors.length+' need attention because server validation failed. Reconnect and retry after correcting stock/customer data.':'They will sync automatically when online.'}`:'No offline sales waiting.');if(navigator.onLine)syncOfflineSales().catch(console.warn);});
-if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('./sw.js?v=5.3.6',{updateViaCache:'none'}).then(reg=>{reg.update().catch(()=>{});reg.addEventListener('updatefound',()=>{const newWorker=reg.installing;if(!newWorker)return;newWorker.addEventListener('statechange',()=>{if(newWorker.state==='installed'&&navigator.serviceWorker.controller){newWorker.postMessage({type:'SKIP_WAITING'});}});});}).catch(e=>console.warn('Service worker:',e.message));let refreshing=false;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(refreshing)return;refreshing=true;window.location.reload();});});}
+if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('./sw.js?v=5.3.7',{updateViaCache:'none'}).then(reg=>{reg.update().catch(()=>{});reg.addEventListener('updatefound',()=>{const newWorker=reg.installing;if(!newWorker)return;newWorker.addEventListener('statechange',()=>{if(newWorker.state==='installed'&&navigator.serviceWorker.controller){newWorker.postMessage({type:'SKIP_WAITING'});}});});}).catch(e=>console.warn('Service worker:',e.message));let refreshing=false;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(refreshing)return;refreshing=true;window.location.reload();});});}
 
 function findProductByBarcode(code){const clean=String(code||'').trim();return products.find(x=>String(x.barcode||'').trim()===clean);}
 function chooseProductFromBarcode(code,{autoAdd=false,formSelector='#saleForm'}={}){const p=findProductByBarcode(code);if(!p){kivuNotify('No product matches that barcode. Register the barcode in Inventory first.');return null;}const f=$(formSelector);if(f?.elements?.productId){f.elements.productId.value=p.id;if(formSelector==='#saleForm')refreshSaleUnitOptions();if(f.elements.qty)f.elements.qty.value='1';}if(autoAdd)$('#addSaleItemBtn')?.click();return p;}
@@ -4585,7 +4615,81 @@ $('#salesSortSelect')?.addEventListener('change', () => { salesCurrentPage = 1; 
    TERMINAL POS & ROLE-BASED ACCESS CONTROL SYSTEM
    ========================================================== */
 
+/* Lock state survives reloads and cannot be dismissed by Escape, backdrop clicks or other dialogs.
+   `var` keeps these readable before this section runs (hydrateFromCache executes earlier). */
+var kivuTerminalLocked = false;
+function terminalLockKey() { return 'kivu_terminal_lock_v1'; }
+function isTerminalLocked() {
+  if (kivuTerminalLocked) return true;
+  try { return !!shop?.id && localStorage.getItem(terminalLockKey()) === shop.id; } catch (_e) { return false; }
+}
+function setTerminalLockFlag() {
+  kivuTerminalLocked = true;
+  try { if (shop?.id) localStorage.setItem(terminalLockKey(), shop.id); } catch (_e) {}
+}
+function clearTerminalLock() {
+  kivuTerminalLocked = false;
+  try { localStorage.removeItem(terminalLockKey()); } catch (_e) {}
+}
+function restoreTerminalLock() {
+  if (!isTerminalLocked()) return;
+  kivuTerminalLocked = true;
+  const modal = document.getElementById('terminalLockModal');
+  const shopNameEl = document.getElementById('lockShopName');
+  if (shopNameEl && shop) shopNameEl.textContent = shop.name || 'Kivu POS Terminal';
+  if (modal?.showModal && !modal.open) { try { modal.showModal(); } catch (_e) {} }
+}
+$('#terminalLockModal')?.addEventListener('cancel', e => { if (isTerminalLocked()) e.preventDefault(); });
+$('#terminalLockModal')?.addEventListener('close', () => {
+  if (!isTerminalLocked()) return;
+  const modal = $('#terminalLockModal');
+  try { modal?.showModal(); } catch (_e) { setTimeout(() => { try { modal?.showModal(); } catch (_e2) {} }, 0); }
+});
+
+/* PIN verification runs on a separate, non-persistent Supabase client so a failed or
+   supervisor check never replaces the signed-in operator's session. */
+let kivuPinVerifier = null;
+function getPinVerifierClient() {
+  if (!kivuPinVerifier) {
+    kivuPinVerifier = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false, storageKey: 'kivu-pin-verifier' }
+    });
+  }
+  return kivuPinVerifier;
+}
+async function verifyStaffPin(candidates, pin) {
+  const client = getPinVerifierClient();
+  for (const emp of candidates) {
+    if (!emp?.phone) continue;
+    try {
+      const { data, error } = await client.auth.signInWithPassword({ email: staffAuthEmail(emp.phone), password: pin });
+      if (!error && data?.session) return { employee: emp, session: data.session };
+    } catch (_e) {}
+  }
+  return null;
+}
+
+/* Device-side PIN attempt throttling (Supabase Auth rate limits remain the server-side limit). */
+const PIN_MAX_ATTEMPTS = 5, PIN_LOCKOUT_MS = 60000;
+const pinThrottleKey = kind => `kivu_pin_throttle_${kind}_${shop?.id || 'none'}`;
+function getPinThrottle(kind) {
+  try { return JSON.parse(localStorage.getItem(pinThrottleKey(kind)) || 'null') || { fails: 0, until: 0 }; } catch (_e) { return { fails: 0, until: 0 }; }
+}
+function pinLockoutSeconds(kind) {
+  return Math.ceil(Math.max(0, (getPinThrottle(kind).until || 0) - Date.now()) / 1000);
+}
+function recordPinFailure(kind) {
+  const t = getPinThrottle(kind);
+  t.fails = (t.fails || 0) + 1;
+  if (t.fails >= PIN_MAX_ATTEMPTS) { t.until = Date.now() + PIN_LOCKOUT_MS; t.fails = 0; }
+  try { localStorage.setItem(pinThrottleKey(kind), JSON.stringify(t)); } catch (_e) {}
+}
+function resetPinThrottle(kind) {
+  try { localStorage.removeItem(pinThrottleKey(kind)); } catch (_e) {}
+}
+
 let terminalPinBuffer = '';
+let terminalUnlockInFlight = false;
 function updateTerminalPinUI() {
   const dots = $$('#lockPinDots .pin-dot');
   dots.forEach((dot, idx) => {
@@ -4594,6 +4698,7 @@ function updateTerminalPinUI() {
 }
 
 window.lockTerminal = function() {
+  setTerminalLockFlag();
   terminalPinBuffer = '';
   updateTerminalPinUI();
   if ($('#lockPinMsg')) $('#lockPinMsg').textContent = '';
@@ -4604,32 +4709,47 @@ window.lockTerminal = function() {
 
 window.unlockTerminalWithPin = async function(pin) {
   if (!pin || pin.length !== 6) return;
+  if (terminalUnlockInFlight) return;
   const msg = $('#lockPinMsg');
+  const wait = pinLockoutSeconds('unlock');
+  if (wait > 0) {
+    if (msg) msg.textContent = `Too many incorrect PINs. Try again in ${wait}s.`;
+    terminalPinBuffer = '';
+    updateTerminalPinUI();
+    return;
+  }
   if (msg) msg.textContent = 'Verifying PIN...';
+  terminalUnlockInFlight = true;
 
-  const candidateEmployees = (employees || []).filter(e => e.active);
   let matchedUser = null;
-
-  for (const emp of candidateEmployees) {
-    try {
-      const { data, error } = await sb.auth.signInWithPassword({
-        email: staffAuthEmail(emp.phone),
-        password: pin
+  try {
+    const candidateEmployees = (employees || []).filter(e => e.active);
+    const match = await verifyStaffPin(candidateEmployees, pin);
+    if (match) {
+      // Hand the verified operator's session to the main client. The verifier copy is dropped
+      // without a server sign-out because it is the very same session.
+      const { data: setData, error: setErr } = await sb.auth.setSession({
+        access_token: match.session.access_token,
+        refresh_token: match.session.refresh_token
       });
-      if (!error && data?.session) {
-        matchedUser = emp;
-        session = data.session;
-        break;
+      kivuPinVerifier = null;
+      if (!setErr && setData?.session) {
+        matchedUser = match.employee;
+        session = setData.session;
       }
-    } catch (_e) {}
+    }
+  } finally {
+    terminalUnlockInFlight = false;
   }
 
   if (matchedUser) {
+    resetPinThrottle('unlock');
     const res = await sb.from('profiles').select('*').eq('id', session.user.id).single();
     if (!res.error && res.data) {
       profile = res.data;
     }
     applyPermissions();
+    clearTerminalLock();
     $('#terminalLockModal')?.close();
     terminalPinBuffer = '';
     updateTerminalPinUI();
@@ -4639,7 +4759,9 @@ window.unlockTerminalWithPin = async function(pin) {
       $('#saleModal')?.showModal();
     }
   } else {
-    if (msg) msg.textContent = 'Incorrect PIN. Try again.';
+    recordPinFailure('unlock');
+    const lockedFor = pinLockoutSeconds('unlock');
+    if (msg) msg.textContent = lockedFor > 0 ? `Too many incorrect PINs. Try again in ${lockedFor}s.` : 'Incorrect PIN. Try again.';
     terminalPinBuffer = '';
     updateTerminalPinUI();
     const dotsEl = $('#lockPinDots');
@@ -4679,6 +4801,7 @@ $('#lockTerminalBtn')?.addEventListener('click', () => {
 });
 
 $('#lockSignOutBtn')?.addEventListener('click', () => {
+  clearTerminalLock();
   $('#terminalLockModal')?.close();
   $('#logoutBtn')?.click();
 });
@@ -4706,22 +4829,27 @@ window.authorizeSupervisorOverride = async function() {
     return;
   }
 
+  const wait = profile?.role === 'owner' ? 0 : pinLockoutSeconds('override');
+  if (wait > 0) {
+    if (msg) msg.textContent = `Too many incorrect PINs. Try again in ${wait}s.`;
+    return;
+  }
+
   if (msg) msg.textContent = 'Verifying supervisor authority...';
 
   const managers = (employees || []).filter(e => (e.role === 'manager' || e.role === 'owner') && e.active);
   let authorizedSupervisor = null;
 
-  for (const mgr of managers) {
-    try {
-      const { data, error } = await sb.auth.signInWithPassword({
-        email: staffAuthEmail(mgr.phone),
-        password: pin
-      });
-      if (!error && data?.user) {
-        authorizedSupervisor = mgr;
-        break;
-      }
-    } catch (_e) {}
+  // Verified on the isolated client, then that temporary supervisor session is revoked,
+  // so the operator at the register stays signed in as themselves.
+  const match = await verifyStaffPin(managers, pin);
+  if (match) {
+    authorizedSupervisor = match.employee;
+    try { await getPinVerifierClient().auth.signOut({ scope: 'local' }); } catch (_e) {}
+    kivuPinVerifier = null;
+    resetPinThrottle('override');
+  } else if (profile?.role !== 'owner') {
+    recordPinFailure('override');
   }
 
   if (!authorizedSupervisor && profile?.role === 'owner') {
