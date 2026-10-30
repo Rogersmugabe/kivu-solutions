@@ -40,6 +40,7 @@ Every feature, enhancement, and bug fix implemented on Kivu Solutions is logged 
                                                         └── [13] Cloud POS & Terminal RBAC Architecture (v5.3.4)
                                                              └── [14] Staff Invites Fix & Interactive Role Simulator (v5.3.5)
                                                                   └── [15] Square-Inspired Split-Screen Auth Experience (v5.3.6)
+                                                                       └── [16] Terminal & Client Security Hardening (v5.3.7)
 ```
 
 ---
@@ -225,6 +226,20 @@ Every feature, enhancement, and bug fix implemented on Kivu Solutions is logged 
 
 ---
 
+### [16] Terminal & Client Security Hardening (v5.3.7)
+- **Date**: 2026-10-30
+- **Commit**: _(uncommitted)_
+- **Scope & Problem**: The project investigation found that a supervisor override silently signed the browser in as the manager, the register lock could be dismissed with Escape, a backdrop click or a page reload, PIN pads had no attempt limit, F2 opened the POS for any role, and customer names / categories could inject script through inline `onclick` handlers.
+- **Implementation**:
+  - **Isolated PIN verification**: PINs are checked on a separate non-persistent Supabase client (`persistSession: false`). Supervisor overrides revoke that temporary session immediately, so the cashier stays signed in as themselves; terminal unlock hands the verified operator's session to the main client via `setSession`.
+  - **Tamper-resistant lock screen**: `#terminalLockModal` ignores Escape, backdrop clicks and keyboard shortcuts, re-opens itself if closed while locked, and the lock survives page reloads (`kivu_terminal_lock_v1`). It clears on unlock, "Sign out completely" and sign-out.
+  - **PIN attempt throttling**: 5 wrong PINs lock that PIN pad on the device for 60 seconds (unlock and override tracked separately).
+  - **XSS fix**: User-supplied strings now travel in `data-kivu-action` / `data-kivu-arg` attributes handled by one allow-listed delegated click listener instead of being spliced into inline JavaScript.
+  - **F2 guard**: The F2 POS shortcut now requires a signed-in owner, manager or cashier with an active subscription.
+  - No DOM IDs, RPC names or database calls were removed or renamed. Added automated test suite `tools/tests/security-hardening.test.js`.
+
+---
+
 ## 🧪 Verification & Test Suite
 
 The repository includes a comprehensive automated test and compliance harness:
@@ -236,7 +251,8 @@ The repository includes a comprehensive automated test and compliance harness:
 | **POS & RBAC** | `tools/tests/pos-rbac.test.js` | 4 | SaaS shielding, blind drawer count, continuous register, supervisor override |
 | **Role Simulator & Invites** | `tools/tests/role-simulator-and-invites.test.js` | 6 | Invite codes, role simulation restrictions, DB error fallback |
 | **Square Auth Layout** | `tools/tests/square-auth-layout.test.js` | 3 | Split-screen DOM structure, baseline IDs, input mapping |
-| **Total** | | **23** | **100% Passing** |
+| **Security Hardening** | `tools/tests/security-hardening.test.js` | 7 | Delegated actions, isolated PIN checks, lock persistence, PIN throttling, F2 guard |
+| **Total** | | **30** | **100% Passing** |
 
 ### Running Quality Checks & Tests
 ```powershell
