@@ -1,324 +1,91 @@
-# Kivu Solutions — Cloud-Based POS & SaaS Platform
+# Kivu POS
 
-> **Modern Cloud-Based Point of Sale (POS), Inventory Control & Financial Operations System for Rwanda Businesses.**  
-> Built with Vanilla Web Standards (ES2022+), Supabase (PostgreSQL + Auth + RPC), and Offline-First Progressive Web App (PWA) Architecture.
+Point of sale, stock control and cash control for shops, bars and restaurants in Rwanda.
+The owner sees every movement of stock and money; staff sign in with their own role.
 
----
-
-## 📌 Project Overview & Architectural Principles
-
-Kivu Solutions is a commercial-grade, multi-terminal Cloud POS and retail management platform tailored for Rwandan enterprises (retail stores, supermarkets, bars, restaurants, and wholesale distributors).
-
-### Core Directives & Strict Constraints
-1. **Absolute Non-Disruption (Rule 1)**: All UI modernizations, styling enhancements, and operational features are 100% backward-compatible and additive. All 410 baseline DOM element IDs and 56 Supabase RPC stored procedure signatures are strictly preserved and audited.
-2. **Financial & Accounting Precision**: All monetary values are computed in exact Rwandan Francs (RWF) as integers with zero floating-point rounding drift.
-3. **Offline-First PWA Resilience**: Service Worker (`sw.js`) provides instant caching and background synchronization, allowing counter sales to continue during internet dropouts.
-4. **Accessible, Non-Blocking Interactions**: Zero native browser blocking dialogs (`alert`, `confirm`, `prompt`). All interactions use custom, fully accessible asynchronous modals and toast notifications.
-5. **Role-Based Access Control (RBAC)**: Fine-grained terminal permission tiers for `owner`, `manager`, `cashier`, `waiter`, `kitchen`, and `stock_clerk`.
+**Stack:** React 19 · TypeScript · Vite · Tailwind CSS v4 · TanStack Query · Supabase (Postgres, Auth, RLS) · PWA (works offline) · hosted on GitHub Pages.
 
 ---
 
-## 📜 Sequential Master Changelog
+## What it does
 
-Every feature, enhancement, and bug fix implemented on Kivu Solutions is logged below in strict chronological order, from the initial repository foundation to the latest release.
+| Area | Pages | Who |
+|---|---|---|
+| Overview | Dashboard — today's sales, profit, expenses and receipts vs this time yesterday, 7-day trend, payment channels, stock alerts, recent receipts, approvals waiting | Owner, manager |
+| Sell | Point of sale (search / barcode / camera scan, base & bulk units, discounts, Cash / MoMo / Bank / Split, change due, parked sales, offline selling, receipts) · Sales history (filters, receipts, voids, CSV) · Tables & orders (bars and restaurants only) | Owner, manager, cashier · waiter & kitchen for tables |
+| Stock | Products · **Stock movements** (one ledger of sales, voids, deliveries, adjustments and wastage) · Suppliers & purchases (supplier debts and payments) | Owner, manager · stock clerk for products & movements |
+| Money | Expenses · Cash shifts (float, blind count for cashiers, pay-outs, Z-reports) · Reports (profit, products, staff, payment methods, accountant export) | Owner, manager · cashiers run their own shift |
+| Team | Staff & roles (invites, enable / disable) · Approvals & activity (void / adjustment requests, exceptions, audit log) | Owner (invites), manager |
+| Account | Plan & billing · Settings (business, tax, location, signed-in devices) · Platform admin (Platinum Tech only) | Owner · platform admins |
 
-> **Instruction for Future Updates**: When completing new tasks or features, append them sequentially to the bottom of this list following the numbered format.
+### Roles
+| Role | Can |
+|---|---|
+| Owner | Everything, including billing, settings and staff invites |
+| Manager | Run the shop: stock, suppliers, expenses, approvals, reports, staff access. No billing or settings |
+| Cashier | Sell, run their own cash shift, see sales, request voids |
+| Stock clerk | Receive stock, manage the catalogue view, request adjustments. No money totals |
+| Waiter | Open table bills and send orders |
+| Kitchen / bar prep | See the order queue and mark items served |
 
-```
-[1] Base POS Foundation & Initial Setup (v4.8.8)
- └── [2] UI Modernization & Commercial Plan Overhaul
-      └── [3] Service Worker Auto-Update & Defensive SVGs
-           └── [4] 0ms Pre-Hydration & SWR Background Sync
-                └── [5] Master Architecture Transformation Plan
-                     └── [6] Safety Net Tooling & Kigali Timezone Fix (v5.3.0)
-                          └── [7] Elimination of Native Blocking Dialogs
-                               └── [8] Design Tokens Consolidation & A11y
-                                    └── [9] Sales Filters, Pagination & Stock Safety
-                                         └── [10] Removal of Floating PWA Overlay (v5.3.1)
-                                              └── [11] Removal of Duplicate POS Button Icons (v5.3.2)
-                                                   └── [12] Vector SVG Icons & Notification Persistence (v5.3.3)
-                                                        └── [13] Cloud POS & Terminal RBAC Architecture (v5.3.4)
-                                                             └── [14] Staff Invites Fix & Interactive Role Simulator (v5.3.5)
-                                                                  └── [15] Square-Inspired Split-Screen Auth Experience (v5.3.6)
-                                                                       └── [16] Terminal & Client Security Hardening (v5.3.7)
-                                                                            └── [17] Functional Repairs, Design System v6 & Dashboard Insights (v5.4.0)
-                                                                                 └── [18] Page Cleanup: Inline Styles & Subscription Alignment (v5.4.1)
-                                                                                      └── [19] Full-Length Receipt, Z-Report & Statement Printing (v5.4.2)
+Roles are defined in `src/lib/access.ts`. The database must enforce the same rules (RLS and function checks) — the UI alone is not security.
+
+### Removed in v6 (did not fit a POS)
+- Customer credit ("Amadeni") and the Customers page.
+- Terminal lock and supervisor PIN override (the owner never had a PIN, and the override signed the browser in as the manager). Staff switch by signing out and in with their own PIN.
+- Role simulator, notification centre, local-storage backup / restore, partial language switcher.
+
+---
+
+## Develop
+
+```bash
+npm install
+npm run dev          # http://localhost:5180
 ```
 
----
+Open **http://localhost:5180/?mock** to use built-in sample data instead of the real database
+(development only — it is not included in production builds). Add `&role=cashier` (or `manager`,
+`stock_clerk`, `waiter`, `kitchen`) and `&type=bar` to test other roles and business types.
 
-### [1] Base POS Foundation & Initial Setup (v4.8.8)
-- **Date**: 2026-10-16
-- **Commit**: `98f5d9a`, `4b4127f`, `588126c`
-- **Scope & Problem**: Initial repository setup and baseline upload of the Kivu Solutions web platform.
-- **Implementation**:
-  - Vanilla JS single-page web application communicating with Supabase PostgreSQL.
-  - Core database schema integrations: sales, products, expenses, credits, shifts, and customers.
-  - Initial Service Worker configuration for PWA caching on GitHub Pages.
-
----
-
-### [2] UI Modernization & Commercial Plan Overhaul
-- **Date**: 2026-10-27
-- **Commit**: `b61fa21`, `95506f9`
-- **Scope & Problem**: Outdated UI layouts, unformatted currency inputs, and lack of distinct commercial SaaS tiers.
-- **Implementation**:
-  - Overhauled commercial plans into structured database-compatible tiers: `Kivu Lite` (2,000 RWF/mo), `Kivu One-Time` (50,000 RWF once), `Kivu Business` (5,000 RWF/mo), `Kivu Control` (10,000 RWF/mo), and `Kivu Pro` (20,000 RWF/mo).
-  - Built real-time currency formatting for Rwandan Francs (`money-input` with live comma thousands separators).
-  - Added subscription status lifecycle evaluation (`active`, `trial`, `grace`, `expired`, `suspended`).
-  - Improved POS counter sale drawer and held carts management.
-
----
-
-### [3] Service Worker Auto-Update & Defensive SVGs
-- **Date**: 2026-10-29
-- **Commit**: `b68eca7`
-- **Scope & Problem**: Stale assets remained cached indefinitely on client browsers, and SVG icons without explicit dimensions caused layout reflow jumps.
-- **Implementation**:
-  - Re-architected `sw.js` with network-first strategies for scripts and styles to prevent stale code mismatches.
-  - Introduced automated cache-busting queries (`?v=...`) synchronized with the application release version.
-  - Added defensive dimensions (`width`, `height`, `flex-shrink: 0`) across all SVGs to ensure layout stability on mobile viewports.
-
----
-
-### [4] Instant 0ms Pre-Hydration & SWR Background Sync
-- **Date**: 2026-10-29
-- **Commit**: `a6236ac`
-- **Scope & Problem**: Loading latency on slow mobile networks caused blank loading screens before business dashboards rendered.
-- **Implementation**:
-  - Implemented 0ms instant pre-hydration from `localStorage` snapshot (`kivu_offline_snapshot_v1`).
-  - Injected early execution script in `<head>` adding `has-cached-session` class to paint the cached UI immediately.
-  - Paired pre-hydration with seamless Stale-While-Revalidate (SWR) background data fetching from Supabase.
-  - Built security safeguards verifying that cached user IDs and roles strictly match the active auth session before hydration.
-
----
-
-### [5] Master Architecture Transformation Plan
-- **Date**: 2026-10-29
-- **Commit**: `4ffae6c`
-- **Scope & Problem**: Systematic plan needed to elevate the website into a premier commercial SaaS product without breaking legacy dependencies.
-- **Implementation**:
-  - Established `kivu_master_implementation_plan.md` dividing work into 7 rigorous phases.
-  - Defined strict non-negotiable mandates: preserve all 410 DOM IDs, all 56 RPCs, and exact RWF integer accounting.
-  - Overhauled Executive Command Center, financial analytics cards, and KPI grids.
-
----
-
-### [6] Safety Net Tooling & Kigali Timezone Fix (v5.3.0)
-- **Date**: 2026-10-29
-- **Commit**: `264592e`
-- **Scope & Problem**: Need for automated regression testing; date bucketing bug sliced UTC strings, causing transactions after 10:00 PM in Rwanda (UTC+2) to be recorded on the previous day.
-- **Implementation**:
-  - Built `tools/check.js`: Automated CI gate checking JS syntax, version consistency, DOM ID baseline (410 IDs), Supabase RPC baseline (55 RPCs), and forbidden patterns.
-  - Built `tools/bump-version.js`: Atomic script updating version across `version.json`, `index.html`, `sw.js`, and `app.js`.
-  - Replaced unsafe `.toISOString().slice(0, 10)` with timezone-aware `day()` and `localDay()` helper for `Africa/Kigali` (UTC+2).
-  - Created automated test harness `tools/tests/helpers.test.js` validating currency formatting, rounding, and timezone boundary conditions.
-
----
-
-### [7] Elimination of Native Blocking Dialogs
-- **Date**: 2026-10-29
-- **Commit**: `61ba143`
-- **Scope & Problem**: 174 native browser `alert()`, `confirm()`, and `prompt()` calls froze browser rendering and looked unpolished.
-- **Implementation**:
-  - Replaced all 149 `alert()` calls with accessible `kivuNotify(message, type)` and toast banners (`#toastContainer`).
-  - Replaced all 10 `confirm()` calls with asynchronous promise-based `await kivuConfirm(question, options)`.
-  - Replaced all 15 `prompt()` calls with asynchronous promise-based `await kivuPrompt(message, options)`.
-  - Added accessible screen-reader live region (`#toastRegion` with `aria-live="polite"`).
-
----
-
-### [8] Design Tokens Consolidation & A11y Modernization
-- **Date**: 2026-10-29
-- **Commit**: `ee2d421`
-- **Scope & Problem**: High CSS specificity conflicts (156 `!important` tags) and missing accessibility attributes on interactive controls.
-- **Implementation**:
-  - Consolidated design tokens under CSS variables (`--color-brand`, `--color-text`, `--color-border`).
-  - Added `aria-labelledby` referencing heading IDs across all 38 modal dialogs.
-  - Added descriptive `aria-label` attributes to all icon-only buttons.
-  - Dynamic `aria-current="page"` attribute tracking active desktop and mobile navigation links.
-  - Added `@media (prefers-reduced-motion: reduce)` support and keyboard `:focus-visible` focus rings.
-  - Reduced CSS `!important` occurrences by over 53%.
-
----
-
-### [9] Sales Filters, Pagination & Stock Safety Pre-Checks
-- **Date**: 2026-10-29
-- **Commit**: `ef374f2`
-- **Scope & Problem**: Large sales tables caused DOM sluggishness; checkout lacked client-side stock availability checks.
-- **Implementation**:
-  - Built multi-dimension sales filter bar: Payment channel (Cash, MoMo, Bank, Credit, Split), Date range (`From` - `To`), Sort order (Newest, Oldest, Amount).
-  - Implemented sales table pagination (25 records per page) with `#salesPager`.
-  - Added POS safety stock pre-checks before submitting sales to Supabase to prevent accidental negative inventory.
-  - Added device data backup and restore (`#exportLocalDataBtn`, `#importLocalDataBtn`) for repayments and petty cash logs.
-  - Added `beforeunload` unsaved changes warning guard for business settings.
-  - Created architectural specifications for Tier C backend procedures (`docs/tier-c-proposals.md`).
-
----
-
-### [10] Removal of Floating PWA Overlay (v5.3.1)
-- **Date**: 2026-10-29
-- **Commit**: `630433d`
-- **Scope & Problem**: User reported an intrusive button banner hanging on every screen.
-- **Implementation**:
-  - Identified persistent PWA installation prompt (`#pwaInstallBar`) hovering over the layout.
-  - Hid and suppressed the overlay with `display: none !important`, preserving element ID to avoid null reference exceptions in legacy handlers.
-
----
-
-### [11] Removal of Duplicate POS Button Icons (v5.3.2)
-- **Date**: 2026-10-29
-- **Commit**: `6ab42a9`
-- **Scope & Problem**: User reported an awkward duplicate plus symbol (`+ + New sale`) on POS action buttons.
-- **Implementation**:
-  - Cleaned redundant plus glyphs across the desktop header, quick action buttons, and empty-state triggers.
-  - Streamlined button typography into clean, modern action labels.
-
----
-
-### [12] Vector SVG Icon System & Notification Persistence (v5.3.3)
-- **Date**: 2026-10-29
-- **Commit**: `562ccf1`
-- **Scope & Problem**: User reported that notification modals looked outdated, read notifications reverted to unread on reload, and unicode emojis looked unpolished.
-- **Implementation**:
-  - Replaced all raw unicode emojis with crisp, lightweight inline SVG vector icons across top nav, refresh button, KPI cards, quick actions, payment channels, and alert ribbons.
-  - Modernized notification center modal with tabbed filtering (`All`, `Unread`, `High Priority`), "Mark all as read" button, and empty state illustrations.
-  - Implemented dual-layer read notification persistence (`kivu_read_notifs_v3_${shop.id}`) in `localStorage` so read states survive page reloads and browser refreshes.
-  - Added automated test harness `tools/tests/notifications-persistence.test.js`.
-
----
-
-### [13] Cloud POS & Terminal RBAC Architecture (v5.3.4)
-- **Date**: 2026-10-29
-- **Commit**: `98968c4`
-- **Scope & Problem**: User requested Cloud-Based POS system architecture with Role-Based Access Control, eliminating operational redundancy.
-- **Implementation**:
-  - **Fast PIN Terminal Lock Screen (`#lockTerminalBtn`, `#terminalLockModal`)**: Cashiers and waitstaff can lock the register or switch operators in seconds using a 6-digit PIN without logging out of the session.
-  - **Real-Time Supervisor Override (`#supervisorOverrideModal`)**: Cashiers requesting transaction voids or stock adjustments can summon a manager/owner to authenticate and approve the action on the spot via PIN.
-  - **Blind Cash Drawer Reconciliation (`#closeShiftModal`)**: Cashiers count and enter physical cash blindly without seeing expected totals; cash variance is shielded and revealed only to managers/owners.
-  - **Staff SaaS Shielding**: Hidden SaaS upgrade pricing modals from non-owner roles.
-  - Added automated test suite `tools/tests/pos-rbac.test.js`.
-
----
-
-### [14] Staff Invites Fix & Interactive Role Simulator (v5.3.5)
-- **Date**: 2026-10-29
-- **Commit**: `0230211`
-- **Scope & Problem**: Adding staff threw `Notice: function gen_random_bytes(integer) does not exist`. Store owner needed an easy way to check how each role's screen looks without creating fake accounts.
-- **Implementation**:
-  - **Resilient Fallback for Invites**: Wrapped `create_staff_invite` RPC in client-side fallback generating cryptographically secure 6-character invite codes (`crypto.getRandomValues`) inserted directly into `staff_invites` table.
-  - **Supabase SQL Fix**: Authored `docs/fix-gen-random-bytes.sql` setting `search_path = public, extensions` on PostgreSQL functions.
-  - **Interactive Role Simulator (`#roleSimulatorPanel`, `#rolePreviewBanner`)**: Built a one-click simulation switcher allowing the store owner to instantly preview and test the UI as **Cashier**, **Manager**, **Waiter**, **Kitchen / Bar Prep**, or **Stock Clerk** without creating dummy accounts.
-  - Added persistent top simulation banner with instant exit back to Owner view.
-  - Added automated test suite `tools/tests/role-simulator-and-invites.test.js`.
-
----
-
-### [15] Square-Inspired Split-Screen Auth Experience (v5.3.6)
-- **Date**: 2026-10-29
-- **Commit**: `c922468`
-- **Scope & Problem**: User provided reference screenshots of Square's modern sign-up and sign-in pages, requesting an identical visual overhaul while keeping all functionality intact.
-- **Implementation**:
-  - **Left Form Column**: Clean white container with geometric black Kivu logo, dynamic headers (`Let’s create your account` / `Sign in`), interactive password/PIN show/hide visibility toggles (`👁️`), Square-style Rwanda locale selector, terms and privacy consent checkbox, and solid black pill CTA buttons (`Continue` / `Create account`).
-  - **Right Hero Column**:
-    - For Sign Up: Curated monochrome brand wall (*"Join the 4,000+ businesses running with Kivu."*).
-    - For Sign In: Feature showcase list with *"Increase order speed"* highlighted, paired with a floating counter POS card mockup (*"See what’s possible with Kivu Business"*).
-  - Maintained 100% backward compatibility with all 15 baseline auth DOM IDs and Supabase auth workflows.
-  - Added automated test suite `tools/tests/square-auth-layout.test.js`.
-
----
-
-### [16] Terminal & Client Security Hardening (v5.3.7)
-- **Date**: 2026-10-30
-- **Commit**: _(uncommitted)_
-- **Scope & Problem**: The project investigation found that a supervisor override silently signed the browser in as the manager, the register lock could be dismissed with Escape, a backdrop click or a page reload, PIN pads had no attempt limit, F2 opened the POS for any role, and customer names / categories could inject script through inline `onclick` handlers.
-- **Implementation**:
-  - **Isolated PIN verification**: PINs are checked on a separate non-persistent Supabase client (`persistSession: false`). Supervisor overrides revoke that temporary session immediately, so the cashier stays signed in as themselves; terminal unlock hands the verified operator's session to the main client via `setSession`.
-  - **Tamper-resistant lock screen**: `#terminalLockModal` ignores Escape, backdrop clicks and keyboard shortcuts, re-opens itself if closed while locked, and the lock survives page reloads (`kivu_terminal_lock_v1`). It clears on unlock, "Sign out completely" and sign-out.
-  - **PIN attempt throttling**: 5 wrong PINs lock that PIN pad on the device for 60 seconds (unlock and override tracked separately).
-  - **XSS fix**: User-supplied strings now travel in `data-kivu-action` / `data-kivu-arg` attributes handled by one allow-listed delegated click listener instead of being spliced into inline JavaScript.
-  - **F2 guard**: The F2 POS shortcut now requires a signed-in owner, manager or cashier with an active subscription.
-  - No DOM IDs, RPC names or database calls were removed or renamed. Added automated test suite `tools/tests/security-hardening.test.js`.
-
----
-
-### [17] Functional Repairs, Design System v6 & Dashboard Insights (v5.4.0)
-- **Date**: 2026-10-30
-- **Commit**: _(uncommitted)_
-- **Scope & Problem**: A product-wide audit (static wiring scan, runtime click audit of every page, form-submission checks against a stubbed backend, and desktop / tablet / phone layout sweeps) found features that silently did nothing, phone layouts that were unusable, and a visual language that had drifted across versions. Plan and status: `docs/improvement-plan.md`.
-- **Functional repairs**:
-  - Sales page "Cash / Mobile Money / Bank / Credit today" cards were never filled in — now computed from real sales (split-aware, voids excluded).
-  - Sales category pills called an undefined `filterSalesCategory` — implemented.
-  - Escape closed the first open dialog in page order and reset its form (could wipe the POS under a receipt) — now only the top dialog closes.
-  - Business days and displayed dates/times use Africa/Kigali regardless of the device time zone.
-  - Owner device list in Settings never rendered — restored. Petty-cash expense failures are reported instead of swallowed. CSV import handles Windows line endings. Supervisor void falls back to `request_or_void_sale`. Hourly token refreshes no longer reload every table.
-  - Phone bottom bar respects roles, highlights the page actually shown, and is hidden on the sign-in screen.
-- **Phone fixes (pre-existing)**: POS cart list collapsed to 0px, Scan button covered the product search, top-bar title wrapped over content, credit actions overflowed.
-- **Design System v6** (`css/kivu-ds.css`, loaded after the legacy stylesheet): one token set and shared components — buttons with hover / focus / disabled / loading states, inputs, panels, KPI tiles, tables, badges, pills, dialogs, notices, empty states. Colour roles: ink for primary actions, blue for selection / focus, green only for taking money.
-- **Dashboard**: Sales / Expenses tiles compare with yesterday up to the same time; new Recent transactions panel opens receipts. All figures come from loaded data.
-- **Accessibility**: clickable cards (`role="button"`) work with Enter / Space; focus rings, tabular figures, touch-size targets.
-- Added automated test suite `tools/tests/product-v6.test.js`.
-
----
-
-### [18] Page Cleanup: Inline Styles & Subscription Alignment (v5.4.1)
-- **Date**: 2026-10-30
-- **Commit**: _(uncommitted)_
-- **Scope & Problem**: Pages still carried ~60 hard-coded inline styles (Sales filter bar, KPI colours, role simulator, pager, comparison table) that bypassed the design system, and the Subscription page used its own pill-button styling.
-- **Implementation**:
-  - Replaced every static `style=""` in `index.html` and `js/app.js` with design-system classes (`text-*` tones, `cols-3`, `filter-label`, `sales-pager`, `role-sim-*`, spacing utilities). Only hidden compatibility anchors and JS-computed sizes keep inline styles.
-  - Pager "Prev / Next" now use the real `disabled` state instead of faked opacity.
-  - Subscription plan cards and buttons use the system radius, type and focus ring.
-  - Fixed a v5.4.0 regression: role-preview cards on Employees overflowed because of the single-line button rule.
-  - Tests V09–V10 keep inline styles from creeping back and guard the multi-line card buttons.
-
----
-
-### [19] Full-Length Receipt, Z-Report & Statement Printing (v5.4.2)
-- **Date**: 2026-10-30
-- **Commit**: _(uncommitted)_
-- **Scope & Problem**: Long receipts sometimes printed cut off. Receipts, Z-reports and customer statements are shown in modal dialogs, which the browser keeps fixed to the screen with a capped, scrolling height; printing captured only the part that fit on screen (a 40-item receipt printed about 8% of its content).
-- **Implementation**:
-  - Print buttons call `kivuPrintDialog()`, which marks that dialog as the print target. Pressing Ctrl+P while one of these documents is open does the same (`beforeprint`).
-  - The print stylesheet hides everything else and releases the target from its screen box (no fixed position, height cap or scroll clipping), so the document flows over as many pages as it needs. Buttons are left off the paper; the target is cleared after printing.
-  - A receipt printed on top of the open POS no longer includes the POS behind it.
-  - Test V11 guards the print path.
-
----
-
-## 🧪 Verification & Test Suite
-
-The repository includes a comprehensive automated test and compliance harness:
-
-| Suite | File | Tests | Coverage |
-|---|---|---|---|
-| **Core Helpers** | `tools/tests/helpers.test.js` | 8 | Currency formatting, integer rounding, Kigali UTC+2 timezone |
-| **Notification Persistence** | `tools/tests/notifications-persistence.test.js` | 2 | LocalStorage read notification tracking across reloads |
-| **POS & RBAC** | `tools/tests/pos-rbac.test.js` | 4 | SaaS shielding, blind drawer count, continuous register, supervisor override |
-| **Role Simulator & Invites** | `tools/tests/role-simulator-and-invites.test.js` | 6 | Invite codes, role simulation restrictions, DB error fallback |
-| **Square Auth Layout** | `tools/tests/square-auth-layout.test.js` | 3 | Split-screen DOM structure, baseline IDs, input mapping |
-| **Security Hardening** | `tools/tests/security-hardening.test.js` | 7 | Delegated actions, isolated PIN checks, lock persistence, PIN throttling, F2 guard |
-| **Product v6** | `tools/tests/product-v6.test.js` | 11 | Design-system wiring, CSV parsing, Kigali time, KPI comparison, dialogs, settings |
-| **Total** | | **41** | **100% Passing** |
-
-### Running Quality Checks & Tests
-```powershell
-# 1. Run all unit tests
-node --test tools/tests/*.test.js
-
-# 2. Run master baseline compliance check (DOM IDs, RPCs, syntax, versions)
-node tools/check.js
-
-# 3. Bump version across all manifests and service worker caches
-node tools/bump-version.js <new-version>
+```bash
+npm run typecheck    # TypeScript
+npm test             # unit tests (money, Kigali dates, roles, cart, split payments, CSV, shift maths)
+npm run build        # production build in dist/
+npm run preview      # serve the production build
 ```
 
----
+## Deploy (GitHub Pages)
 
-## 🛠️ Technology Stack
-- **Frontend**: Vanilla JavaScript (ES2022+), CSS3 with CSS Variables, HTML5 Semantic Elements.
-- **Database & Auth**: [Supabase](https://supabase.com) (PostgreSQL 15, Row Level Security, Stored Procedures / RPCs, GoTrue Auth).
-- **Offline / PWA**: Native Service Worker API, CacheStorage API, Web App Manifest.
-- **Testing**: Node.js Native Test Runner (`node:test`, `node:assert/strict`).
-- **Hosting**: GitHub Pages (`https://rogersmugabe.github.io/kivu-solutions/`).
+1. GitHub → repository **Settings → Pages → Source: GitHub Actions** (one time).
+2. Push to `main`. `.github/workflows/deploy.yml` runs the tests, builds and publishes `dist/`.
+
+The app uses relative paths and hash routing, so it works under `https://<user>.github.io/<repo>/`.
+
+## Database (Supabase)
+
+The app uses the existing Supabase project and its functions (`record_sale_cart_v48`, `receive_stock`,
+`request_or_adjust_stock`, `request_or_void_sale`, `close_shift_controlled`, `create_staff_invite`, …),
+so existing shops keep all their data. SQL for database work lives in `supabase/`:
+
+- `supabase/export-schema.sql` — read-only export of tables, policies and key functions. Run it in the
+  Supabase SQL Editor and share the result so database fixes are written against the real schema.
+
+Staff sign in with phone + 6-digit PIN (stored as a Supabase password on a `staff.<phone>@auth.duka.local`
+login). **Supabase → Authentication → "Confirm email" must be off** for staff sign-up to work.
+
+## Project layout
+
+```
+src/
+  App.tsx            routing, role guards, offline sync, device heartbeat
+  auth/              session, profile, shop, plan features
+  components/        UI kit, dialogs & toasts, printing (receipt, Z-report), barcode scanner, charts
+  data/hooks.ts      one cached query per table + write helper
+  layout/            app shell (collapsible sidebar, mobile drawer), navigation
+  lib/               access (roles, plans), format (RWF, Kigali time), sales maths, shifts, offline queue, CSV
+  pages/             one file per page
+  dev/mockBackend.ts sample data for development (?mock)
+supabase/            SQL to run in the Supabase SQL Editor
+legacy/              previous vanilla-JS app, kept for reference (not deployed)
+```

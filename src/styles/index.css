@@ -1,0 +1,65 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --color-ink: #0b0d12;
+  --color-ink-soft: #1f2330;
+  --color-brand-50: #eef4ff;
+  --color-brand-100: #dbe7ff;
+  --color-brand-500: #3b6cf6;
+  --color-brand-600: #2554e8;
+  --color-brand-700: #1d43c4;
+  --color-money-500: #10b981;
+  --color-money-600: #059669;
+  --color-money-700: #047857;
+
+  --radius-xl: 0.875rem;
+  --shadow-card: 0 1px 2px rgb(15 18 25 / 0.04), 0 1px 3px rgb(15 18 25 / 0.06);
+  --shadow-pop: 0 18px 48px -12px rgb(15 18 25 / 0.28);
+}
+
+@layer base {
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    @apply bg-zinc-50 text-zinc-900 font-sans antialiased;
+    font-feature-settings: "ss01", "cv11";
+  }
+  :focus-visible { @apply outline-none ring-2 ring-brand-500/60 ring-offset-1; }
+  ::selection { @apply bg-brand-100; }
+  .tabular { font-variant-numeric: tabular-nums; }
+  dialog::backdrop { background: rgb(11 13 18 / 0.45); backdrop-filter: blur(2px); }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  }
+}
+
+@layer components {
+  .card { @apply rounded-xl border border-zinc-200/80 bg-white shadow-[var(--shadow-card)]; }
+  .input {
+    @apply h-10 w-full rounded-lg border border-zinc-300 bg-white px-3 text-sm text-zinc-900 shadow-xs
+      placeholder:text-zinc-400 transition-colors hover:border-zinc-400
+      focus:border-brand-500 focus:outline-none focus:ring-3 focus:ring-brand-500/20
+      disabled:cursor-not-allowed disabled:bg-zinc-100 disabled:text-zinc-500;
+  }
+  select.input {
+    @apply appearance-none pr-9;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2371717a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.65rem center;
+  }
+  textarea.input { @apply h-auto min-h-20 py-2; }
+  .label { @apply text-[13px] font-medium text-zinc-700; }
+  .th { @apply whitespace-nowrap border-b border-zinc-200 bg-zinc-50/80 px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-zinc-500; }
+  .td { @apply border-b border-zinc-100 px-4 py-3 align-middle text-sm; }
+}
+
+/* Printing: only the document in #print-root goes to the printer, at full length. */
+@media screen { #print-root { display: none; } }
+@media print {
+  @page { margin: 4mm; }
+  body { background: #fff !important; }
+  body > *:not(#print-root) { display: none !important; }
+  #print-root { display: block !important; }
+}

@@ -1,34 +1,28 @@
-# KIVU SOLUTIONS - DEVELOPMENT RULES & CONSTRAINTS
+# KIVU POS — DEVELOPMENT RULES
 
-## RULE 1: ABSOLUTE NON-DISRUPTION OF WEBSITE FUNCTIONALITY
+Kivu is a point-of-sale system: the owner tracks every movement of **stock** and **money**, and
+employees sign in with their own role (role-based access control). Every change must serve that.
 
-> **CRITICAL MANDATE**:
-> Under no circumstances alter, break, rename, remove, or degrade any existing functionality, interactive capability, accounting workflow, or backend integration of the website unless explicitly requested by the user.
-> 
-> All UI modernization, visual restructuring, and styling enhancements must be **100% backward-compatible and additive only**.
+## Architecture (v6)
+- React 19 + TypeScript + Vite, Tailwind CSS v4, TanStack Query, React Router (hash routing).
+- Backend: the existing Supabase project (Postgres + Auth + RLS + RPC functions). The app talks to it
+  directly from the browser; there is no server of our own.
+- Hosting: GitHub Pages, built and deployed by `.github/workflows/deploy.yml` on every push to `main`.
+- `legacy/` holds the previous vanilla-JS app for reference only. It is not built or deployed.
 
----
-
-### Core Directives
-
-1. **DOM ID & Element Preservation**:
-   - Never delete or rename existing DOM element IDs, form inputs, modal dialog IDs, or table container IDs that are referenced by `js/app.js` or external scripts.
-   - If an element or panel is visually replaced or redesigned, retain backward-compatible hidden anchors (or defensive optional chaining in code) so cached service workers or legacy handlers never throw `null` reference errors.
-
-2. **Backend & Supabase Integrity**:
-   - Preserve all Supabase RPC procedure calls (e.g. `record_sale_cart_v48`, `close_shift_controlled`, `record_supplier_purchase_v44`, `get_business_summary_v48`), auth flows, and schema expectations.
-   - Do not alter database queries, column mappings, or table structures without explicit user directive.
-
-3. **Financial & Accounting Correctness**:
-   - Shift opening/closing, cash drawer reconciliations, petty cash payouts, credit/debt ("Amadeni") balances, and receipt generation must remain accurate and uncompromised.
-   - All monetary calculations (RWF) must remain exact integers with no loss of precision.
-
-4. **Offline & Service Worker Compatibility**:
-   - Maintain PWA offline caching integrity in `sw.js`.
-   - Use network-first caching strategies for dynamic scripts and styles to prevent stale code mismatches.
-   - When updating assets, update cache versions systematically and ensure old cached clients fail gracefully.
-
-5. **Defensive Coding Standard**:
-   - Always apply null checks (`el?.textContent`, `if (el) ...`) when manipulating DOM elements.
-   - Validate JavaScript syntax (`node -c js/app.js`) and CSS syntax before finishing any turn.
-   - Verify that all existing buttons, modal triggers, keyboard shortcuts (e.g. F2 POS, Escape modal close), and navigation links continue to work identically.
+## Rules
+1. **Data integrity first.** Money is whole Rwandan Francs (integers). Sales, stock changes, voids,
+   expenses and shift closes go through the database functions (`record_sale_cart_v48`,
+   `receive_stock`, `request_or_adjust_stock`, `request_or_void_sale`, `record_expense`,
+   `close_shift_controlled`, …). Never overwrite a value the database computed.
+2. **Stock only changes through a recorded movement.** Product edits never change quantity directly.
+3. **Access is enforced twice.** `src/lib/access.ts` hides what a role cannot use; the database (RLS
+   and function checks) must also refuse it. Never rely on the UI alone for security.
+4. **Business days are Africa/Kigali time** (`businessDay()` in `src/lib/format.ts`), whatever the
+   device time zone.
+5. **No fake features.** If something needs a database change, write the SQL in `supabase/` and say so;
+   do not simulate it in the browser.
+6. **No secrets in the frontend.** Only the Supabase publishable (anon) key belongs in the app.
+7. **Before finishing:** `npm run typecheck`, `npm test` and `npm run build` must pass. Check pages in
+   the browser with the development sample backend (`npm run dev`, open `/?mock`), including staff
+   roles (`&role=cashier`) and a bar (`&type=bar`), at phone and desktop widths.
