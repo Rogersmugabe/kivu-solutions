@@ -42,6 +42,7 @@ Every feature, enhancement, and bug fix implemented on Kivu Solutions is logged 
                                                                   └── [15] Square-Inspired Split-Screen Auth Experience (v5.3.6)
                                                                        └── [16] Terminal & Client Security Hardening (v5.3.7)
                                                                             └── [17] Functional Repairs, Design System v6 & Dashboard Insights (v5.4.0)
+                                                                                 └── [18] Page Cleanup: Inline Styles & Subscription Alignment (v5.4.1)
 ```
 
 ---
@@ -260,6 +261,19 @@ Every feature, enhancement, and bug fix implemented on Kivu Solutions is logged 
 
 ---
 
+### [18] Page Cleanup: Inline Styles & Subscription Alignment (v5.4.1)
+- **Date**: 2026-10-30
+- **Commit**: _(uncommitted)_
+- **Scope & Problem**: Pages still carried ~60 hard-coded inline styles (Sales filter bar, KPI colours, role simulator, pager, comparison table) that bypassed the design system, and the Subscription page used its own pill-button styling.
+- **Implementation**:
+  - Replaced every static `style=""` in `index.html` and `js/app.js` with design-system classes (`text-*` tones, `cols-3`, `filter-label`, `sales-pager`, `role-sim-*`, spacing utilities). Only hidden compatibility anchors and JS-computed sizes keep inline styles.
+  - Pager "Prev / Next" now use the real `disabled` state instead of faked opacity.
+  - Subscription plan cards and buttons use the system radius, type and focus ring.
+  - Fixed a v5.4.0 regression: role-preview cards on Employees overflowed because of the single-line button rule.
+  - Tests V09–V10 keep inline styles from creeping back and guard the multi-line card buttons.
+
+---
+
 ## 🧪 Verification & Test Suite
 
 The repository includes a comprehensive automated test and compliance harness:
@@ -272,8 +286,8 @@ The repository includes a comprehensive automated test and compliance harness:
 | **Role Simulator & Invites** | `tools/tests/role-simulator-and-invites.test.js` | 6 | Invite codes, role simulation restrictions, DB error fallback |
 | **Square Auth Layout** | `tools/tests/square-auth-layout.test.js` | 3 | Split-screen DOM structure, baseline IDs, input mapping |
 | **Security Hardening** | `tools/tests/security-hardening.test.js` | 7 | Delegated actions, isolated PIN checks, lock persistence, PIN throttling, F2 guard |
-| **Product v6** | `tools/tests/product-v6.test.js` | 8 | Design-system wiring, CSV parsing, Kigali time, KPI comparison, dialogs, settings |
-| **Total** | | **38** | **100% Passing** |
+| **Product v6** | `tools/tests/product-v6.test.js` | 10 | Design-system wiring, CSV parsing, Kigali time, KPI comparison, dialogs, settings |
+| **Total** | | **40** | **100% Passing** |
 
 ### Running Quality Checks & Tests
 ```powershell

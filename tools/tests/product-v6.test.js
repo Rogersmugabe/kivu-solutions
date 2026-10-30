@@ -86,3 +86,16 @@ test('V08: owner device list is rendered by the active Settings renderer', () =>
   assert.ok(appJs.slice(last, appJs.indexOf('};', last)).includes('renderOwnerDevices()'));
   assert.equal((appJs.match(/^function renderDukaAdmin\(/gm) || []).length, 1);
 });
+
+test('V09: no static inline styles outside compatibility anchors and JS-driven sizes', () => {
+  const htmlStyles = (indexHtml.match(/style="[^"]*"/g) || [])
+    .filter(s => !/^style="display:none!important;?"$/.test(s) && s !== 'style="width:0%"');
+  assert.deepEqual(htmlStyles, [], 'move presentation into css/kivu-ds.css');
+  const jsStyles = (appJs.match(/style="[^"]*"/g) || []).filter(s => !s.includes('${'));
+  assert.deepEqual(jsStyles, [], 'templates may only use style="" for computed values');
+});
+
+test('V10: multi-line card buttons are exempt from the single-line button rule', () => {
+  assert.ok(dsCss.includes('.btn.btn-role-sim, .btn.quick-action-card'));
+  assert.match(dsCss, /\.btn\.btn-role-sim[^{]*\{[^}]*white-space: normal/);
+});

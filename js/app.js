@@ -2405,7 +2405,7 @@ function renderDashboard(){
     }
     if(sales.length>=1000){
       alertItems.unshift(`
-        <div class="alert-ribbon-item alert-ribbon-info" style="border-left: 4px solid var(--k-accent, #2563eb);">
+        <div class="alert-ribbon-item alert-ribbon-info alert-ribbon-accent">
           <div class="alert-ribbon-content">
             <span class="alert-ribbon-icon">${kivuIcon("info")}</span>
             <span><b>High Volume Window:</b> Analytics and comparisons are computed over the latest 1,000 sales transactions loaded.</span>
@@ -2548,7 +2548,7 @@ function renderDashboard(){
           </div>
           <div class="drawer-hero-amount">
             <span class="drawer-amt-sub">Register Drawer</span>
-            <strong class="drawer-amt-val" style="color:var(--muted)">0 RWF</strong>
+            <strong class="drawer-amt-val text-muted">0 RWF</strong>
           </div>
           <p class="drawer-inactive-hint">Open a cashier shift to track live drawer balance, log cash sales, and record cash drawer payouts.</p>
         </div>
@@ -2729,7 +2729,7 @@ function renderDashboard(){
                 <th>Reorder Point</th>
                 <th>Status</th>
                 <th>Preferred Supplier</th>
-                <th style="text-align:right">Action</th>
+                <th class="text-right">Action</th>
               </tr>
             </thead>
             <tbody>
@@ -2760,7 +2760,7 @@ function renderDashboard(){
                       <span>${esc(supName)}</span>
                       ${supObj?.phone?`<br><small class="text-muted">${esc(supObj.phone)}</small>`:''}
                     </td>
-                    <td style="text-align:right">
+                    <td class="text-right">
                       ${canRestock?`
                         <button type="button" class="btn secondary btn-sm" onclick="openQuickAddStock('${p.id}')">
                           ↥ Add stock
@@ -2965,16 +2965,16 @@ function renderSales(){
   const pagerEl = $('#salesPager');
   if(pagerEl){
     if(totalFilteredCount <= SALES_PAGE_SIZE){
-      pagerEl.innerHTML = `<span style="color:var(--k-text-3,#64748b);">Showing ${totalFilteredCount} transaction${totalFilteredCount===1?'':'s'}</span>`;
+      pagerEl.innerHTML = `<span class="pager-summary">Showing ${totalFilteredCount} transaction${totalFilteredCount===1?'':'s'}</span>`;
     } else {
       const fromNum = startIdx + 1;
       const toNum = Math.min(startIdx + SALES_PAGE_SIZE, totalFilteredCount);
       pagerEl.innerHTML = `
-        <span style="color:var(--k-text-3,#64748b);">Showing <b>${fromNum}-${toNum}</b> of <b>${totalFilteredCount}</b></span>
-        <div style="display:inline-flex; align-items:center; gap:8px;">
-          <button type="button" class="btn ghost btn-sm" onclick="setSalesPage(${salesCurrentPage - 1})" ${salesCurrentPage <= 1 ? 'disabled style="opacity:0.5;pointer-events:none;"' : ''}>← Prev</button>
+        <span class="pager-summary">Showing <b>${fromNum}-${toNum}</b> of <b>${totalFilteredCount}</b></span>
+        <div class="pager-controls">
+          <button type="button" class="btn ghost btn-sm" onclick="setSalesPage(${salesCurrentPage - 1})" ${salesCurrentPage <= 1 ? 'disabled' : ''}>← Prev</button>
           <span>Page <b>${salesCurrentPage}</b> of <b>${totalPages}</b></span>
-          <button type="button" class="btn ghost btn-sm" onclick="setSalesPage(${salesCurrentPage + 1})" ${salesCurrentPage >= totalPages ? 'disabled style="opacity:0.5;pointer-events:none;"' : ''}>Next →</button>
+          <button type="button" class="btn ghost btn-sm" onclick="setSalesPage(${salesCurrentPage + 1})" ${salesCurrentPage >= totalPages ? 'disabled' : ''}>Next →</button>
         </div>
       `;
     }
@@ -3485,7 +3485,7 @@ function renderEmployees(){
   if($('#empKpiActive')) $('#empKpiActive').textContent=employees.filter(e=>e.active!==false).length;
   if($('#empKpiInvites')) $('#empKpiInvites').textContent=pending.length;
 
-  $('#employeesBody').innerHTML=employees.length?employees.map(e=>`<tr><td><b>${esc(e.name)}</b></td><td>${esc(roleLabel(e.role))}</td><td>${esc(e.phone||'—')}</td><td><span class="badge">${e.active?'Active':'Disabled'}</span></td><td>${sales.filter(s=>s.user_id===e.user_id&&day(s.created_at)===t).length}</td><td><div style="display:flex; gap:6px; align-items:center;">${profile.role==='owner'?`<button class="btn secondary btn-sm" data-kivu-action="startRoleSimulation" data-kivu-arg="${esc(e.role)}" title="Preview interface as this role">👁️ Preview</button>`:''}${can('owner','manager')?`<button class="btn ${e.active?'danger':'secondary'} btn-sm" onclick="setEmployeeActive('${e.id}',${!e.active})">${e.active?'Disable':'Reactivate'}</button>`:'—'}</div></td></tr>`).join(''):`<tr><td colspan="6"><div class="empty-table-state"><span class="empty-icon">${kivuIcon("staff")}</span><p>No staff team members have joined yet.</p>${profile.role==='owner'?'<div style="display:flex; gap:8px; justify-content:center; flex-wrap:wrap; margin-top:8px;"><button class="btn primary btn-sm" onclick="$(\'#staffInviteModal\')?.showModal()">+ Invite Staff</button><button class="btn secondary btn-sm" onclick="startRoleSimulation(\'cashier\')">👁️ Preview Cashier View</button></div>':''}</div></td></tr>`;
+  $('#employeesBody').innerHTML=employees.length?employees.map(e=>`<tr><td><b>${esc(e.name)}</b></td><td>${esc(roleLabel(e.role))}</td><td>${esc(e.phone||'—')}</td><td><span class="badge">${e.active?'Active':'Disabled'}</span></td><td>${sales.filter(s=>s.user_id===e.user_id&&day(s.created_at)===t).length}</td><td><div class="row-actions">${profile.role==='owner'?`<button class="btn secondary btn-sm" data-kivu-action="startRoleSimulation" data-kivu-arg="${esc(e.role)}" title="Preview interface as this role">👁️ Preview</button>`:''}${can('owner','manager')?`<button class="btn ${e.active?'danger':'secondary'} btn-sm" onclick="setEmployeeActive('${e.id}',${!e.active})">${e.active?'Disable':'Reactivate'}</button>`:'—'}</div></td></tr>`).join(''):`<tr><td colspan="6"><div class="empty-table-state"><span class="empty-icon">${kivuIcon("staff")}</span><p>No staff team members have joined yet.</p>${profile.role==='owner'?'<div class="empty-actions"><button class="btn primary btn-sm" onclick="$(\'#staffInviteModal\')?.showModal()">+ Invite Staff</button><button class="btn secondary btn-sm" onclick="startRoleSimulation(\'cashier\')">👁️ Preview Cashier View</button></div>':''}</div></td></tr>`;
   const auditPanel=$('#auditList')?.closest('.panel');
   auditPanel?.classList.toggle('hidden',!hasFeature('audit'));
   if(hasFeature('audit')) $('#auditList').innerHTML=audits.length?audits.slice(0,20).map(a=>`<div class="item"><div><b>${esc(a.user_name||'User')} · ${esc(a.action)}</b><small>${esc(a.entity)} · ${fmt(a.created_at)}</small></div></div>`).join(''):'No audit activity yet.';
@@ -4579,7 +4579,7 @@ async function runOfflineSalesSync(){
 window.addEventListener('online',()=>{updateConnectivityUI();syncOfflineSales().catch(console.warn);});
 window.addEventListener('offline',()=>updateConnectivityUI());
 $('#offlineQueueBtn')?.addEventListener('click',async()=>{const rows=await window.KivuOffline.listSales(shop.id);const errors=rows.filter(x=>x.status==='needs_attention');kivuNotify(rows.length?`${rows.length} offline sale(s) waiting. ${errors.length?errors.length+' need attention because server validation failed. Reconnect and retry after correcting stock/customer data.':'They will sync automatically when online.'}`:'No offline sales waiting.');if(navigator.onLine)syncOfflineSales().catch(console.warn);});
-if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('./sw.js?v=5.4.0',{updateViaCache:'none'}).then(reg=>{reg.update().catch(()=>{});reg.addEventListener('updatefound',()=>{const newWorker=reg.installing;if(!newWorker)return;newWorker.addEventListener('statechange',()=>{if(newWorker.state==='installed'&&navigator.serviceWorker.controller){newWorker.postMessage({type:'SKIP_WAITING'});}});});}).catch(e=>console.warn('Service worker:',e.message));let refreshing=false;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(refreshing)return;refreshing=true;window.location.reload();});});}
+if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('./sw.js?v=5.4.1',{updateViaCache:'none'}).then(reg=>{reg.update().catch(()=>{});reg.addEventListener('updatefound',()=>{const newWorker=reg.installing;if(!newWorker)return;newWorker.addEventListener('statechange',()=>{if(newWorker.state==='installed'&&navigator.serviceWorker.controller){newWorker.postMessage({type:'SKIP_WAITING'});}});});}).catch(e=>console.warn('Service worker:',e.message));let refreshing=false;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(refreshing)return;refreshing=true;window.location.reload();});});}
 
 function findProductByBarcode(code){const clean=String(code||'').trim();return products.find(x=>String(x.barcode||'').trim()===clean);}
 function chooseProductFromBarcode(code,{autoAdd=false,formSelector='#saleForm'}={}){const p=findProductByBarcode(code);if(!p){kivuNotify('No product matches that barcode. Register the barcode in Inventory first.');return null;}const f=$(formSelector);if(f?.elements?.productId){f.elements.productId.value=p.id;if(formSelector==='#saleForm')refreshSaleUnitOptions();if(f.elements.qty)f.elements.qty.value='1';}if(autoAdd)$('#addSaleItemBtn')?.click();return p;}

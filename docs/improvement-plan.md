@@ -73,7 +73,7 @@ One token set and one component layer appended as the last section of `css/style
   loading), inputs / selects / textareas, cards & panels, KPI tiles, tables, badges / pills, tabs / filter
   bars, dialogs, toasts, empty states, sidebar nav, top bar, auth screen.
 
-### Phase C — Page-by-page application (priority 2) ◐
+### Phase C — Page-by-page application (priority 2) ☑
 Overview, Sales, POS dialog, Tables & Orders, Inventory, Customers, Suppliers, Expenses, Employees, Shifts,
 Reports, Controls, Subscription, Settings, Platform admin, auth screens, receipts / Z-report (print).
 
@@ -110,8 +110,7 @@ Done and verified locally:
   customer / open-shift submissions send the expected RPC / table payloads.
 
 Still open:
-- ◐ Phase C: pages inherit the new design system, but page-specific markup (inline styles in the Sales
-  filter bar, the separately styled Subscription page) has not been rewritten.
+- ☑ Phase C (v5.4.1): static inline styles moved into the design system; Subscription page aligned.
 - ☐ Service worker registration could not be exercised in the test browser (environment limitation); verify
   offline install on a real device after deploy.
 - ⛔ Backend items from section 1 (multi-device repayments / petty cash / split tenders, server-side shift
