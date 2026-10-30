@@ -394,13 +394,8 @@ window.addEventListener('keydown', e => {
       initMoneyInputs(modal);
     }
   } else if (e.key === 'Escape') {
-    const openDialog = document.querySelector('dialog[open]');
-    if (openDialog) {
-      openDialog.close();
-      const form = openDialog.querySelector('form');
-      if (form) form.reset();
-      $('#saleCustomerWrap')?.classList.add('hidden');
-    }
+    // The browser closes only the top-most modal dialog on Escape and fires its `cancel`
+    // event; the per-dialog cancel listeners below reset that dialog's own form.
   } else if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
     if ($('#saleModal')?.open && saleCart.length > 0) {
       e.preventDefault();
@@ -520,9 +515,12 @@ function initMoneyInputs(root=document){
 }
 window.initMoneyInputs=initMoneyInputs;
 const pad2=n=>String(n).padStart(2,'0');
-const localDay=d=>{const x=new Date(d);if(isNaN(x.getTime()))return '';return `${x.getFullYear()}-${pad2(x.getMonth()+1)}-${pad2(x.getDate())}`;};
+// Business days are bucketed in Rwanda time (UTC+2) whatever time zone the device is set to.
+const KIVU_TZ='Africa/Kigali';
+const kigaliDayFmt=(()=>{try{return new Intl.DateTimeFormat('en-CA',{timeZone:KIVU_TZ,year:'numeric',month:'2-digit',day:'2-digit'});}catch(_e){return null;}})();
+const localDay=d=>{const x=new Date(d);if(isNaN(x.getTime()))return '';if(kigaliDayFmt){const p={};kigaliDayFmt.formatToParts(x).forEach(o=>{p[o.type]=o.value;});return `${p.year}-${p.month}-${p.day}`;}return `${x.getFullYear()}-${pad2(x.getMonth()+1)}-${pad2(x.getDate())}`;};
 const day=localDay;
-const fmt=d=>new Date(d).toLocaleString('en-RW',{dateStyle:'medium',timeStyle:'short'});
+const fmt=d=>{try{return new Date(d).toLocaleString('en-RW',{dateStyle:'medium',timeStyle:'short',timeZone:KIVU_TZ});}catch(_e){return new Date(d).toLocaleString('en-RW',{dateStyle:'medium',timeStyle:'short'});}};
 let simulatedRole = null;
 const currentEffectiveRole = () => simulatedRole || profile?.role || 'owner';
 const roleLabel=r=>({owner:'Owner',manager:'Manager',cashier:'Cashier',stock_clerk:'Stock Clerk',waiter:'Waiter',kitchen:'Kitchen / Bar Prep'})[r]||r;
@@ -711,7 +709,13 @@ function showAppInitLoader(text){const el=$('#appInitLoader');if(!el)return;cons
 function hideAppInitLoader(){const el=$('#appInitLoader');if(el)el.classList.add('hidden');}
 $('#logoutBtn').onclick=async()=>{try{localStorage.removeItem('kivu_offline_snapshot_v1');}catch(_e){}document.documentElement.classList.remove('has-cached-session');await sb.auth.signOut();};
 $('#topLogoutBtn').onclick=async()=>{try{localStorage.removeItem('kivu_offline_snapshot_v1');}catch(_e){}document.documentElement.classList.remove('has-cached-session');await sb.auth.signOut();};
-sb.auth.onAuthStateChange(async(_event,s)=>{session=s;if(s)await enter();else showAuth()});
+sb.auth.onAuthStateChange(async(event,s)=>{
+  const sameUserLoaded=!!(s&&profile&&shop&&profile.id===s.user?.id);
+  session=s;
+  // Hourly token refreshes and profile updates keep the same user: no need to reload every table.
+  if(sameUserLoaded&&(event==='TOKEN_REFRESHED'||event==='USER_UPDATED'))return;
+  if(s)await enter();else showAuth();
+});
 (async()=>{const {data}=await sb.auth.getSession();session=data.session;if(session)await enter();else showAuth()})();
 
 function showAuth(){try{localStorage.removeItem('kivu_offline_snapshot_v1');}catch(_e){}document.documentElement.classList.remove('has-cached-session');hideAppInitLoader();
@@ -981,6 +985,14 @@ $$('[data-open]').forEach(b=>b.addEventListener('click',()=>{
 $('#upgradeGoBtn')?.addEventListener('click',()=>{ $('#upgradeModal')?.close(); showPage('subscription',true); });
 $$('.cancel-btn').forEach(b=>b.onclick=()=>{const d=b.closest('dialog');d?.querySelector('form')?.reset();d?.close();$('#saleCustomerWrap')?.classList.add('hidden')});
 $$('dialog').forEach(d=>d.addEventListener('click',e=>{if(e.target===d&&d.id!=='terminalLockModal')d.close()}));
+// Escape (native `cancel`) discards the edits of the dialog being dismissed, never of a dialog underneath it.
+$$('dialog').forEach(d=>{
+  if(['terminalLockModal','barcodeCameraModal','confirmDialog','promptDialog'].includes(d.id))return;
+  d.addEventListener('cancel',()=>{
+    d.querySelector('form')?.reset();
+    if(d.id==='saleModal')$('#saleCustomerWrap')?.classList.add('hidden');
+  });
+});
 
 /* DATA */
 async function safeQuery(promise){const r=await promise;if(r.error)throw r.error;return r.data||[]}
@@ -1906,12 +1918,20 @@ $('#pettyCashForm')?.addEventListener('submit',async e=>{
   };
   saveShiftPettyCashPayout(shop.id, payoutRecord);
 
+  // The cash has physically left the drawer, so the device record above is always kept for the
+  // shift count; a server failure is reported instead of being silently swallowed.
+  let serverError=null;
   try {
-    await sb.rpc('record_expense',{p_description:desc,p_amount:amt,p_category:cat});
-  } catch(_e){}
+    const {error}=await sb.rpc('record_expense',{p_description:desc,p_amount:amt,p_category:cat});
+    if(error) serverError=error.message||String(error);
+  } catch(err){ serverError=err?.message||String(err); }
 
-  await audit('logged petty cash payout','shift',{shift_id:currentShift.id,amount:amt,reason});
+  await audit('logged petty cash payout','shift',{shift_id:currentShift.id,amount:amt,reason,server_saved:!serverError});
   e.target.reset();$('#pettyCashModal').close();await refresh();
+  if(serverError){
+    kivuNotify(`Petty cash payout of ${money(amt)} was deducted from this drawer, but the business expense could not be saved online: ${serverError}. Ask the owner or manager to record it as an expense.`,'warning','Saved on this device only');
+    return;
+  }
   kivuNotify(`Petty cash payout of ${money(amt)} recorded and deducted from cash drawer.`);
   window.showToast?.('Petty cash drawer payout recorded.', 'warning', 'Petty Cash Payout');
 });
@@ -2288,7 +2308,7 @@ function renderDashboard(){
   if($('#shiftStatusCard'))$('#shiftStatusCard').textContent=currentShift?`My shift open · ${profile.full_name||roleLabel(profile.role)}`:'No open shift';
 
   /* Executive Command Center Headers & Business Identity */
-  if($('#dashboardShopHeading')) $('#dashboardShopHeading').textContent=`${esc(shop?.name||'Business')} Overview`;
+  if($('#dashboardShopHeading')) $('#dashboardShopHeading').textContent=`${shop?.name||'Business'} Overview`;
   const typeLabels={retail:'Retail Shop & POS',bar:'Bar Counter & Tabs',restaurant:'Restaurant & Kitchen',bar_restaurant:'Bar & Restaurant Service'};
   if($('#dashboardShopTypePill')) $('#dashboardShopTypePill').textContent=typeLabels[shop?.business_type]||'Commercial Business';
 
@@ -2765,7 +2785,28 @@ window.openQuickAddStock=function(productId){
 let salesCurrentPage = 1;
 const SALES_PAGE_SIZE = 25;
 
+/* Today's takings per payment channel on the Sales page (voided sales excluded, split tenders apportioned). */
+function renderSalesChannelCards(){
+  const today=day(new Date());
+  const totals={cash:0,momo:0,bank:0,credit:0};
+  sales.filter(s=>s.status!=='voided'&&day(s.created_at)===today).forEach(s=>{
+    const b=getSalePaymentBreakdown(s);
+    totals.cash+=b.cash; totals.momo+=b.momo; totals.bank+=b.bank; totals.credit+=b.credit;
+  });
+  const set=(id,v)=>{const el=$(id);if(el)el.textContent=money(v);};
+  set('#salesCashToday',totals.cash);
+  set('#salesMomoToday',totals.momo);
+  set('#salesBankToday',totals.bank);
+  set('#salesCreditToday',totals.credit);
+}
+window.filterSalesCategory=function(cat){
+  selectedSalesCategory=cat||'All';
+  salesCurrentPage=1;
+  renderSales();
+};
+
 function renderSales(){
+  renderSalesChannelCards();
   const pillsBox=$('#salesCategoryPills');
   if(pillsBox){
     const cats=['All',...new Set(products.map(p=>p.category).filter(Boolean))];
@@ -2895,8 +2936,8 @@ function renderSales(){
     else if(pLow.includes('+') || pLow.includes('split')) payClass = 'pay-split';
 
     const d = new Date(s.created_at);
-    const dateStr = d.toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' });
-    const timeStr = d.toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
+    const dateStr = d.toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric', timeZone:KIVU_TZ });
+    const timeStr = d.toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit', timeZone:KIVU_TZ });
 
     return `<tr class="${voided?'muted-row':''}">
       <td>
@@ -3202,7 +3243,7 @@ function renderExpenses(){
 
   if($('#expKpiToday')) $('#expKpiToday').textContent=money(expTodayVal);
   if($('#expKpiMonth')) $('#expKpiMonth').textContent=money(expMonthVal);
-  if($('#expKpiTopCat')) $('#expKpiTopCat').textContent=topCat!=='—'?`${esc(topCat)} (${money(maxCatVal)})`:'None';
+  if($('#expKpiTopCat')) $('#expKpiTopCat').textContent=topCat!=='—'?`${topCat} (${money(maxCatVal)})`:'None';
 
   // Category Pills
   const pillsBox=$('#expensesCategoryPills');
@@ -3347,18 +3388,6 @@ window.removeSupplier=async function(id){
   const s=suppliers.find(x=>x.id===id); if(!s||!(await kivuConfirm(`Delete ${s.name}? If purchase history exists Kivu Solutions will archive it instead.`,{danger:true})))return;
   const {data,error}=await sb.rpc('remove_supplier_safe',{p_supplier_id:id}); if(error)return kivuNotify(error.message,'error'); kivuNotify(data==='archived'?'Supplier archived because purchase history exists.':'Supplier deleted.'); await refresh();
 };
-function renderDukaAdmin(){
-  if(!isDukaAdmin)return;
-  const o=platformOverview||{};
-  if($('#adminTotalShops')) $('#adminTotalShops').textContent=o.total_shops||0;
-  if($('#adminActiveShops')) $('#adminActiveShops').textContent=(o.active_shops||0)+(o.trial_shops||0);
-  if($('#adminInactiveShops')) $('#adminInactiveShops').textContent=(o.expired_shops||0)+(o.suspended_shops||0)+(o.cancelled_shops||0);
-  if($('#adminMrr')) $('#adminMrr').textContent=money(o.estimated_mrr||0);
-  const pm=o.plan_mix||{};
-  $('#adminPlanMix').innerHTML=Object.keys(pm).length?Object.entries(pm).map(([k,v])=>`<span class="badge">${esc(k)}: ${v}</span>`).join(' '):'No shops yet.';
-  $('#adminShopsBody').innerHTML=platformShops.length?platformShops.map(s=>`<tr><td><b>${esc(s.name)}</b></td><td>${esc(s.plan)}</td><td><span class="badge">${esc(s.subscription_status||'active')}</span></td><td>${s.current_period_end?fmt(s.current_period_end):'—'}</td><td>${fmt(s.created_at)}</td></tr>`).join(''):'<tr><td colspan="5">No shops yet.</td></tr>';
-}
-
 window.setEmployeeActive=async(id,active)=>{
   if(!can('owner','manager'))return kivuNotify('Only an owner or manager can change staff access.');
   const emp=employees.find(x=>x.id===id);if(!emp)return;
@@ -4482,7 +4511,7 @@ $('#scanProductBarcodeBtn')?.addEventListener('click',async()=>{const code=await
 $('#scanEditProductBarcodeBtn')?.addEventListener('click',async()=>{const code=await window.KivuCameraScanner?.open('Scan product barcode');if(code){const input=$('#editProductBarcodeInput');if(input)input.value=code;}});
 $('#scanStockProductBtn')?.addEventListener('click',async()=>{const code=await window.KivuCameraScanner?.open('Scan product to add stock');if(!code)return;const p=findProductByBarcode(code);if(!p)return kivuNotify('No product matches that barcode. Register the barcode in Inventory first.');const f=$('#stockForm');f.elements.productId.value=p.id;f.elements.qty.focus();});
 
-function parseCsv(text){const rows=[];let row=[],cell='',q=false;for(let i=0;i<text.length;i++){const c=text[i],n=text[i+1];if(c==='"'){if(q&&n==='"'){cell+='"';i++;}else q=!q;}else if(c===','&&!q){row.push(cell);cell='';}else if((c==='\n'||c==='\\r')&&!q){if(c==='\\r'&&n==='\n')i++;row.push(cell);if(row.some(x=>x.trim()!==''))rows.push(row);row=[];cell='';}else cell+=c;}row.push(cell);if(row.some(x=>x.trim()!==''))rows.push(row);if(rows.length<2)return[];const h=rows[0].map(x=>x.trim().toLowerCase());return rows.slice(1).map(r=>Object.fromEntries(h.map((k,i)=>[k,(r[i]||'').trim()])));}
+function parseCsv(text){const rows=[];let row=[],cell='',q=false;for(let i=0;i<text.length;i++){const c=text[i],n=text[i+1];if(c==='"'){if(q&&n==='"'){cell+='"';i++;}else q=!q;}else if(c===','&&!q){row.push(cell);cell='';}else if((c==='\n'||c==='\r')&&!q){if(c==='\r'&&n==='\n')i++;row.push(cell);if(row.some(x=>x.trim()!==''))rows.push(row);row=[];cell='';}else cell+=c;}row.push(cell);if(row.some(x=>x.trim()!==''))rows.push(row);if(rows.length<2)return[];const h=rows[0].map(x=>x.trim().toLowerCase());return rows.slice(1).map(r=>Object.fromEntries(h.map((k,i)=>[k,(r[i]||'').trim()])));}
 $('#importDataBtn')?.addEventListener('click',()=>{if(!can('owner','manager'))return;$('#importDataModal')?.showModal();});
 $('#importDataForm')?.addEventListener('submit',async e=>{e.preventDefault();if(!can('owner','manager'))return kivuNotify('Only owner or manager can import data.');const f=new FormData(e.target),file=f.get('file'),type=f.get('type');if(!file?.text)return kivuNotify('Choose a CSV file.');const rows=parseCsv(await file.text());if(!rows.length)return kivuNotify('No data rows found.');if(rows.length>2000)return kivuNotify('Import at most 2,000 rows at a time.');let payload;if(type==='products'){payload=rows.map(r=>({shop_id:shop.id,name:r.name,qty:Number(r.qty||0),cost:Number(r.cost||0),price:Number(r.price||0),low_stock:Number(r.low_stock||r.low||0),barcode:r.barcode||null,base_unit:r.base_unit||'Piece',bulk_unit:r.bulk_unit||'Carton',units_per_bulk:Number(r.units_per_bulk||1)})).filter(x=>x.name);}else{payload=rows.map(r=>({shop_id:shop.id,name:r.name,phone:r.phone||null,email:r.email||null})).filter(x=>x.name);}if(!payload.length)return kivuNotify('No valid rows found.');const table=type==='products'?'products':'customers';const {error}=await sb.from(table).insert(payload);if(error)return kivuNotify(`Import stopped: ${error.message}`,'error');await audit('imported csv',table,{rows:payload.length});e.target.reset();$('#importDataModal').close();await refresh();kivuNotify(`${payload.length} ${type} imported.`);});
 
@@ -4498,7 +4527,7 @@ renderHospitality=function(){
 };
 $('#requestComplimentaryBtn')?.addEventListener('click',async()=>{if(!can('cashier','waiter'))return;const f=$('#hospitalityOrderForm'),reason=await kivuPrompt('Reason for complimentary item (required):',{title:'Complimentary Reason',required:true,defaultValue:''});if(!reason?.trim())return;const {error}=await sb.rpc('hospitality_request_complimentary',{p_tab_id:f.elements.tabId.value,p_product_id:f.elements.productId.value,p_qty:Number(f.elements.qty.value),p_note:f.elements.note.value||null,p_reason:reason.trim()});if(error)return kivuNotify(error.message,'error');f.elements.note.value='';kivuNotify('Complimentary request sent to owner/manager for approval.');await refresh();});
 
-renderSettingsV41=function(){if(profile?.role!=='owner'||!shop)return;$('#settingsProvince').value=shop.province||'';$('#settingsDistrict').value=shop.district||'';$('#settingsSector').value=shop.sector||'';$('#settingsCell').value=shop.cell||'';$('#settingsLanguage').value=shop.preferred_language||'en';if($('#settingsTaxRate'))$('#settingsTaxRate').value=Number(shop.tax_rate||0);if($('#settingsTaxLabel'))$('#settingsTaxLabel').value=shop.tax_label||'VAT';if($('#settingsTaxNumber'))$('#settingsTaxNumber').value=shop.tax_number||'';};
+renderSettingsV41=function(){if(profile?.role!=='owner'||!shop)return;$('#settingsProvince').value=shop.province||'';$('#settingsDistrict').value=shop.district||'';$('#settingsSector').value=shop.sector||'';$('#settingsCell').value=shop.cell||'';$('#settingsLanguage').value=shop.preferred_language||'en';if($('#settingsTaxRate'))$('#settingsTaxRate').value=Number(shop.tax_rate||0);if($('#settingsTaxLabel'))$('#settingsTaxLabel').value=shop.tax_label||'VAT';if($('#settingsTaxNumber'))$('#settingsTaxNumber').value=shop.tax_number||'';renderOwnerDevices().catch(()=>{});};
 setTimeout(()=>updateConnectivityUI().catch(()=>{}),1000);
 window.addEventListener('keydown', e => {
   if (e.key === 'F2') {
@@ -4888,7 +4917,18 @@ $('#voidSupervisorOverrideBtn')?.addEventListener('click', () => {
     if (!saleId) return;
     try {
       const { error } = await sb.rpc('void_sale_cart_v48', { p_sale_id: saleId, p_reason: reason });
-      if (error) throw error;
+      if (error) {
+        // void_sale_cart_v48 is not part of the published RPC contract. When the database does not
+        // have it, use the standard controlled void so the request is never silently lost.
+        const missing = error.code === 'PGRST202' || /could not find the function|does not exist/i.test(error.message || '');
+        if (!missing) throw error;
+        const fallback = await sb.rpc('request_or_void_sale', { p_sale_id: saleId, p_reason: `${reason} (supervisor override)` });
+        if (fallback.error) throw fallback.error;
+        $('#voidSaleModal')?.close();
+        await refresh();
+        window.showToast?.(fallback.data === 'voided' ? 'Sale voided and stock restored.' : 'Void request sent for owner/manager approval.', fallback.data === 'voided' ? 'success' : 'info', 'Void Status');
+        return;
+      }
       $('#voidSaleModal')?.close();
       await refresh();
       window.showToast?.('Sale voided immediately via supervisor override.', 'success', 'Sale Voided');
