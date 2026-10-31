@@ -17,6 +17,7 @@ The owner sees every movement of stock and money; staff sign in with their own r
 | Money | Expenses · Cash shifts (float, blind count for cashiers, pay-outs, Z-reports) · Reports (profit, products, staff, payment methods, accountant export) | Owner, manager · cashiers run their own shift |
 | Team | Staff & roles (invites, enable / disable) · Approvals & activity (void / adjustment requests, exceptions, audit log) | Owner (invites), manager |
 | Account | Plan & billing · Settings (business, tax, location, signed-in devices) · Platform admin (Platinum Tech only) | Owner · platform admins |
+| Help | Help & user guide — role-aware guides with search and printing, written in Markdown in `src/help/en/` | Everyone |
 
 ### Roles
 | Role | Can |
@@ -98,6 +99,7 @@ src/
   layout/            app shell (collapsible sidebar, mobile drawer), navigation
   lib/               access (roles, plans), format (RWF, Kigali time), sales maths, shifts, offline queue, CSV
   pages/             one file per page
+  help/              user manual: Markdown guides (en/) and the topic list (which roles see which guide)
   dev/mockBackend.ts sample data for development (?mock)
 supabase/            SQL to run in the Supabase SQL Editor
 legacy/              previous vanilla-JS app, kept for reference (not deployed)

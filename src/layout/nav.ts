@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, ShoppingCart, ReceiptText, UtensilsCrossed, Package, ArrowLeftRight, Truck,
-  Wallet, Clock, BarChart3, Users, ShieldCheck, CreditCard, Settings, Building2, type LucideIcon
+  Wallet, Clock, BarChart3, Users, ShieldCheck, CreditCard, Settings, Building2, LifeBuoy, type LucideIcon
 } from 'lucide-react';
 import type { PageKey } from '@/lib/access';
 
@@ -44,6 +44,7 @@ export const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
     items: [
       { key: 'plans', path: '/plans', label: 'Plan & billing', icon: CreditCard, title: 'Plan & billing' },
       { key: 'settings', path: '/settings', label: 'Settings', icon: Settings, title: 'Settings' },
+      { key: 'help', path: '/help', label: 'Help & user guide', icon: LifeBuoy, title: 'Help & user guide' },
       { key: 'admin', path: '/admin', label: 'Platform admin', icon: Building2, title: 'Platform admin' }
     ]
   }

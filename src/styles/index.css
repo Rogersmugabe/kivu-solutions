@@ -53,6 +53,26 @@
   .label { @apply text-[13px] font-medium text-zinc-700; }
   .th { @apply whitespace-nowrap border-b border-zinc-200 bg-zinc-50/80 px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-zinc-500; }
   .td { @apply border-b border-zinc-100 px-4 py-3 align-middle text-sm; }
+
+  /* Help & user guide (rendered Markdown) */
+  .prose-kivu { @apply max-w-3xl text-[15px] leading-relaxed text-zinc-700; }
+  .prose-kivu h1 { @apply mb-4 text-2xl font-semibold tracking-tight text-zinc-900; }
+  .prose-kivu h2 { @apply mt-8 mb-3 border-t border-zinc-100 pt-6 text-lg font-semibold text-zinc-900; }
+  .prose-kivu h3 { @apply mt-6 mb-2 text-[15px] font-semibold text-zinc-900; }
+  .prose-kivu p, .prose-kivu ul, .prose-kivu ol, .prose-kivu table, .prose-kivu blockquote { @apply my-3; }
+  .prose-kivu ul { @apply list-disc pl-5; }
+  .prose-kivu ol { @apply list-decimal pl-5; }
+  .prose-kivu li { @apply my-1 pl-1; }
+  .prose-kivu li > ul { @apply my-1; }
+  .prose-kivu strong { @apply font-semibold text-zinc-900; }
+  .prose-kivu a { @apply font-medium text-brand-600 underline underline-offset-2; }
+  .prose-kivu code { @apply rounded bg-zinc-100 px-1 py-0.5 font-mono text-[13px]; }
+  .prose-kivu blockquote { @apply rounded-lg border-l-4 border-amber-400 bg-amber-50 px-4 py-2 text-amber-900; }
+  .prose-kivu table { @apply block w-full overflow-x-auto text-sm; border-collapse: collapse; }
+  .prose-kivu th { @apply border-b border-zinc-200 bg-zinc-50 px-3 py-2 text-left font-semibold text-zinc-900; }
+  .prose-kivu td { @apply border-b border-zinc-100 px-3 py-2 align-top; }
+  .prose-kivu > :first-child { @apply mt-0; }
+  .help-print article + article { break-before: page; }
 }
 
 /* Printing: only the document in #print-root goes to the printer, at full length. */

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { ChevronsLeft, ChevronsRight, LogOut, Menu, Plus, Wifi, WifiOff, X, ChevronDown, Lock } from 'lucide-react';
+import { ChevronsLeft, ChevronsRight, LogOut, Menu, Plus, Wifi, WifiOff, X, ChevronDown, Lock, LifeBuoy } from 'lucide-react';
 import { useShop } from '@/auth/AuthProvider';
 import { FEATURE_MIN_PLAN, PAGE_FEATURE, ROLE_LABELS, planFor, subscriptionStatus } from '@/lib/access';
 import { formatDate } from '@/lib/format';
@@ -174,6 +174,9 @@ function UserMenu({ name, roleLabel, onSignOut }: { name: string; roleLabel: str
             <p className="text-sm font-medium">{name}</p>
             <p className="text-xs text-zinc-500">{roleLabel}</p>
           </div>
+          <NavLink to="/help" role="menuitem" onClick={() => setOpen(false)} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-sm text-zinc-700 hover:bg-zinc-100">
+            <LifeBuoy className="size-4" /> Help & user guide
+          </NavLink>
           <button type="button" role="menuitem" onClick={onSignOut} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-sm text-zinc-700 hover:bg-zinc-100">
             <LogOut className="size-4" /> Sign out
           </button>

@@ -123,7 +123,7 @@ export default function Shifts() {
           {seeExpected && current && <Notice>Expected in drawer: <b>{money(current.expected)}</b> (float {money(mine?.opening_cash)} + cash sales {money(current.cash)}{current.expenses ? ` − paid out ${money(current.expenses)}` : ''})</Notice>}
           <Field label="Cash counted"><MoneyInput value={counted || ''} onChange={setCounted} placeholder="0" autoFocus /></Field>
           {seeExpected && current && counted > 0 && counted !== current.expected && <Notice tone={counted < current.expected ? 'bad' : 'warn'}>{counted < current.expected ? 'Short' : 'Over'} by <b>{money(Math.abs(counted - current.expected))}</b></Notice>}
-          <Field label={seeExpected ? 'Reason for any difference' : 'Note (optional)'}><Input value={reason} onChange={e => setReason(e.target.value)} placeholder="e.g. Gave wrong change" /></Field>
+          <Field label={seeExpected ? 'Reason for any difference' : 'Note'} hint={seeExpected ? undefined : 'Explain anything unusual. If your count does not match the system, a note is required to close.'}><Input value={reason} onChange={e => setReason(e.target.value)} placeholder="e.g. Gave wrong change" /></Field>
         </form>
       </Dialog>
 
