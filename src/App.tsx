@@ -29,11 +29,12 @@ const Tables = lazy(() => import('@/pages/Tables'));
 const Plans = lazy(() => import('@/pages/Plans'));
 const Settings = lazy(() => import('@/pages/Settings'));
 const Admin = lazy(() => import('@/pages/Admin'));
+const Help = lazy(() => import('@/pages/Help'));
 
 const PAGES: Record<PageKey, React.ComponentType> = {
   dashboard: Dashboard, sell: Sell, sales: Sales, products: Products, stock: Stock, suppliers: Suppliers,
   expenses: Expenses, staff: Staff, shifts: Shifts, approvals: Approvals, reports: Reports, tables: Tables,
-  plans: Plans, settings: Settings, admin: Admin
+  plans: Plans, settings: Settings, help: Help, admin: Admin
 };
 
 const queryClient = new QueryClient({

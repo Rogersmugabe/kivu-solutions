@@ -6,7 +6,7 @@ import type { BusinessType, PlanKey, Role, Shop } from './types';
 
 export type PageKey =
   | 'dashboard' | 'sell' | 'sales' | 'products' | 'stock' | 'suppliers' | 'expenses'
-  | 'staff' | 'shifts' | 'approvals' | 'reports' | 'tables' | 'plans' | 'settings' | 'admin';
+  | 'staff' | 'shifts' | 'approvals' | 'reports' | 'tables' | 'plans' | 'settings' | 'help' | 'admin';
 
 /** Which pages each role may open. The database enforces the same rules with RLS. */
 export const ROLE_PAGES: Record<Role, PageKey[]> = {
@@ -127,5 +127,7 @@ export function visiblePages(role: Role, shop: Shop | null, features: Set<Featur
     if (feature && !features.has(feature) && role !== 'owner') return false;
     return true;
   });
+  // Everyone can read the user guide.
+  pages.push('help');
   return isPlatformAdmin ? [...pages, 'admin'] : pages;
 }
