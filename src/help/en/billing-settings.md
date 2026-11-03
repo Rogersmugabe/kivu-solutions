@@ -16,9 +16,18 @@ New shops start with a free trial. **Plan & billing** shows your plan, its statu
 
 ### Pay or change plan
 
-1. Pay with **MTN Mobile Money** or **Airtel Money** using the payment details Platinum Tech gives you.
-2. Press **Request this plan** (or **Renew**) and confirm.
-3. Your plan changes when Platinum Tech confirms the payment. Your current plan stays active until then.
+**With MTN MoMo (instant):**
+
+1. Press **Pay with MoMo** (or **Renew with MoMo**) on the plan you want.
+2. Choose 1, 3, 6 or 12 months and enter your MTN MoMo number.
+3. Press **Pay**. A prompt appears on your phone — approve it with your MoMo PIN.
+4. Kivu switches your plan as soon as MTN confirms the payment. Keep the page open; it updates by itself.
+
+Renewing the plan you already have adds the months after your current end date, so you never lose days. Choosing a different plan starts it today.
+
+If the prompt does not appear, check pending approvals in your MoMo menu. If a payment shows *Pending* later, press **Check status** on the Plans page. **Payment history** lists every payment and the dates it covers.
+
+**With Airtel Money or bank:** press **Airtel Money or bank? Request instead** under the plan, pay using the details Platinum Tech gives you, and Platinum Tech switches your plan once the payment is confirmed.
 
 If a subscription expires, a banner appears at the top of every page. Renew to keep using paid features; your data is kept.
 

@@ -81,6 +81,12 @@ export interface Expense { id: string; description: string; amount: number; cate
 /** One part of a split sale (supabase/migrations/002). */
 export interface SalePayment { id: string; receipt_no: string; method: string; amount: number; shift_id?: string | null; created_at: string }
 
+export interface SubscriptionPayment {
+  id: string; plan: string; amount: number; months?: number | null; status: 'pending' | 'confirmed' | 'rejected' | 'refunded' | 'failed';
+  payment_method: string; provider?: string | null; payer_phone?: string | null; failure_reason?: string | null;
+  covered_from?: string | null; covered_to?: string | null; created_at: string;
+}
+
 export interface HospitalityPayment { id: string; tab_id: string; method: string; amount: number; shift_id?: string | null; created_at: string }
 
 export interface StockPurchase { id: string; product_id: string; product_name?: string | null; qty: number; total_cost?: number | null; created_at: string; user_name?: string | null }
