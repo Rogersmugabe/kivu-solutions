@@ -22,6 +22,17 @@ export async function rpc<T = unknown>(fn: string, args?: Record<string, unknown
   return data as T;
 }
 
+/** Calls an Edge Function and throws the function's own error message on failure. */
+export async function callFunction<T = unknown>(name: string, body: Record<string, unknown>): Promise<T> {
+  const { data, error } = await supabase.functions.invoke(name, { body });
+  if (error) {
+    let message = error.message;
+    try { message = ((await (error as { context: Response }).context.json()) as { error?: string }).error || message; } catch { /* keep generic */ }
+    throw new Error(friendlyError({ message }));
+  }
+  return data as T;
+}
+
 /** Runs a select builder and throws a readable error on failure. */
 export async function rows<T>(query: PromiseLike<{ data: T[] | null; error: PostgrestError | null }>): Promise<T[]> {
   const { data, error } = await query;

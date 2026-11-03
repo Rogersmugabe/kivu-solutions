@@ -16,7 +16,7 @@ The owner sees every movement of stock and money; staff sign in with their own r
 | Stock | Products · **Stock movements** (one ledger of sales, voids, deliveries, adjustments and wastage) · Suppliers & purchases (supplier debts and payments) | Owner, manager · stock clerk for products & movements |
 | Money | Expenses · Cash shifts (float, blind count for cashiers, pay-outs, Z-reports) · Reports (profit, products, staff, payment methods, accountant export) | Owner, manager · cashiers run their own shift |
 | Team | Staff & roles (invites, enable / disable) · Approvals & activity (void / adjustment requests, exceptions, audit log) | Owner (invites), manager |
-| Account | Plan & billing · Settings (business, tax, location, signed-in devices) · Platform admin (Platinum Tech only) | Owner · platform admins |
+| Account | Plan & billing (pay with MTN MoMo — needs migration 003 and the `momo-pay` function; Airtel / bank by request) · Settings (business, tax, location, signed-in devices) · Platform admin (Platinum Tech only) | Owner · platform admins |
 | Help | Help & user guide — role-aware guides with search and printing, written in Markdown in `src/help/en/` | Everyone |
 
 ### Roles
@@ -74,6 +74,7 @@ so existing shops keep all their data. SQL for database work lives in `supabase/
 
 - `supabase/migrations/` — run each file once, in order, in the SQL Editor.
 - `supabase/functions/staff-signup` — Edge Function that creates staff logins.
+- `supabase/functions/momo-pay` — Edge Function for plan payments with MTN MoMo (see below).
 
 ### Staff sign-up and email confirmation
 Owners sign up with email and keep Supabase's **"Confirm email"** on. Staff sign in with phone + 6-digit
@@ -87,6 +88,35 @@ npx supabase functions deploy staff-signup --no-verify-jwt --project-ref frduols
 ```
 
 `--no-verify-jwt` is needed because the employee is not signed in yet; the invite is the credential.
+
+### Plan payments with MTN MoMo
+Owners pay on **Plan & billing**: Kivu sends a MoMo prompt to their phone and switches the plan when MTN
+confirms. The `momo-pay` Edge Function prices the plan on the server, asks MTN for the payment and only
+extends the plan when MTN itself reports it successful (`kivu_confirm_momo_payment`, migration 003).
+MoMo keys live only in Supabase secrets.
+
+Sandbox setup (testing, no real money):
+
+1. Run `supabase/migrations/003_momo_subscription_payments.sql` in the SQL Editor.
+2. Sign up at [momodeveloper.mtn.com](https://momodeveloper.mtn.com), subscribe to **Collections** and copy the primary key.
+3. Create a sandbox API user and key (prints the next command):
+   ```bash
+   MOMO_SUBSCRIPTION_KEY=<primary key> node scripts/momo-sandbox-user.mjs
+   ```
+4. Run the printed `npx supabase secrets set …` command, then deploy:
+   ```bash
+   npx supabase functions deploy momo-pay --no-verify-jwt --project-ref frduolsneevyndnebxvy
+   ```
+
+In the sandbox, amounts are in EUR and no real prompt is sent. MTN's test numbers decide the result:
+`46733123450` fails, `46733123451` is rejected, `46733123452` times out, `46733123453` stays pending,
+most other numbers succeed. Going live: complete MTN's go-live form and contract
+([momodeveloper.mtn.co.rw/go-live](https://momodeveloper.mtn.co.rw/go-live)), then replace the secrets with the
+live ones from MTN and set `MOMO_TARGET_ENV`, `MOMO_BASE_URL` and `MOMO_CURRENCY=RWF`. Optionally set
+`MOMO_CALLBACK_URL` to `https://frduolsneevyndnebxvy.supabase.co/functions/v1/momo-pay?callback=1`.
+
+Plan prices live in two places that must match: `PLANS` in `src/lib/access.ts` (display) and
+`kivu_plan_price()` in migration 003 (what is charged).
 
 ## Project layout
 

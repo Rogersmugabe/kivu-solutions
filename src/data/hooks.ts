@@ -7,7 +7,7 @@ import { rows, supabase } from '@/lib/supabase';
 import { useShop } from '@/auth/AuthProvider';
 import { useFeedback } from '@/components/feedback';
 import type {
-  ApprovalRequest, AppDevice, AuditLog, Employee, Expense, HospitalityItem, HospitalityPayment, SalePayment, HospitalityTab, HospitalityTable,
+  ApprovalRequest, AppDevice, AuditLog, Employee, Expense, HospitalityItem, HospitalityPayment, SalePayment, SubscriptionPayment, HospitalityTab, HospitalityTable,
   Product, Sale, Shift, StaffInvite, StockAdjustment, StockPurchase, Supplier, SupplierPayment, SupplierPurchase
 } from '@/lib/types';
 
@@ -80,6 +80,9 @@ export const useHospitalityPayments = (enabled = true) =>
   useShopQuery<HospitalityPayment>('hospitality_payments', enabled, id => supabase.from('hospitality_payments').select('*').eq('shop_id', id).gte('created_at', sinceDays(35)).order('created_at', { ascending: false }).limit(3000));
 
 /** Parts of split sales. Empty until supabase/migrations/002 has been run (the table is missing). */
+export const useSubscriptionPayments = (enabled = true) =>
+  useShopQuery<SubscriptionPayment>('subscription_payments', enabled, id => supabase.from('subscription_payments').select('*').eq('shop_id', id).order('created_at', { ascending: false }).limit(24));
+
 export const useSalePayments = (days = 35) =>
   useShopQuery<SalePayment>('sale_payments', true, id => supabase.from('sale_payments').select('*').eq('shop_id', id).gte('created_at', sinceDays(days)).order('created_at', { ascending: false }).limit(5000), [days]);
 

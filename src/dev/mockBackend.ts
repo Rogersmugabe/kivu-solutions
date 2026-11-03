@@ -59,7 +59,8 @@ const db: Record<string, Record<string, unknown>[]> = {
     { id: 'hi1', shop_id: shopId, tab_id: 'tab1', product_name: 'Brochette', qty: 2, unit_price: 1500, sent_at: iso(now - H), created_at: iso(now - H) },
     { id: 'hi2', shop_id: shopId, tab_id: 'tab1', product_name: 'Primus 72cl', qty: 3, unit_price: 1000, created_at: iso(now - H) }
   ],
-  recipe_components: [], hospitality_wastage: [], hospitality_payments: [], sale_payments: []
+  recipe_components: [], hospitality_wastage: [], hospitality_payments: [], sale_payments: [],
+  subscription_payments: [{ id: 'pay0', shop_id: shopId, plan: 'control', months: 1, amount: 10000, status: 'confirmed', payment_method: 'Mobile Money', provider: 'mtn_momo', covered_from: iso(now - 10 * D).slice(0, 10), covered_to: iso(now + 20 * D).slice(0, 10), created_at: iso(now - 10 * D) }]
 };
 
 const pays = ['Cash', 'Mobile Money', 'Cash', 'Bank', 'Split (Cash 1000, MoMo 800)'];
@@ -98,6 +99,35 @@ const rpcAnswers: Record<string, (body: Record<string, unknown>) => unknown> = {
   }
 };
 
+/** Simulates the momo-pay Edge Function and MTN: a number ending in 0 is declined, others are
+ *  approved on the second status check (like MTN's sandbox test numbers). */
+const momoChecks: Record<string, number> = {};
+function momoPay(body: Record<string, unknown>): Response {
+  mockCalls.push({ kind: 'function', name: 'momo-pay', body });
+  const prices: Record<string, number> = { basic: 2000, one_time: 50000, business: 5000, control: 10000, pro: 20000 };
+  if (body.action === 'start') {
+    const phone = String(body.phone || '').replace(/D/g, '');
+    if (phone.length < 9) return json({ error: 'Enter a valid MTN number, for example 0788 123 456.' }, 400);
+    const months = body.plan === 'one_time' ? 1 : Number(body.months || 1);
+    const id = `pay-${Date.now()}`;
+    db.subscription_payments.unshift({ id, shop_id: shopId, plan: body.plan, months, amount: prices[String(body.plan)] * months, status: 'pending', payment_method: 'Mobile Money', provider: 'mtn_momo', payer_phone: phone, created_at: new Date().toISOString() });
+    return json({ id, amount: prices[String(body.plan)] * months, status: 'pending' });
+  }
+  const pay = db.subscription_payments.find(p => p.id === body.id);
+  if (!pay) return json({ error: 'Payment not found.' }, 404);
+  if (pay.status !== 'pending') return json({ status: pay.status, reason: pay.failure_reason });
+  momoChecks[String(pay.id)] = (momoChecks[String(pay.id)] || 0) + 1;
+  if (momoChecks[String(pay.id)] < 2) return json({ status: 'pending' });
+  if (String(pay.payer_phone).endsWith('0')) {
+    Object.assign(pay, { status: 'failed', failure_reason: 'The payment was declined on the phone.' });
+    return json({ status: 'failed', reason: pay.failure_reason });
+  }
+  const end = new Date(Date.now() + Number(pay.months) * 30 * D);
+  Object.assign(pay, { status: 'confirmed', covered_from: iso(Date.now()).slice(0, 10), covered_to: pay.plan === 'one_time' ? null : iso(end.getTime()).slice(0, 10) });
+  Object.assign(db.shops[0], { plan: pay.plan, subscription_status: 'active', current_period_end: pay.plan === 'one_time' ? null : end.toISOString() });
+  return json({ status: 'confirmed' });
+}
+
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
 
 // Signed-in session so the app opens straight into the shop.
@@ -112,6 +142,7 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   const method = (init?.method || 'GET').toUpperCase();
   const body = init?.body ? JSON.parse(String(init.body)) : {};
   if (url.pathname.startsWith('/auth/v1/')) return json(url.pathname.endsWith('/user') ? user : {});
+  if (url.pathname === '/functions/v1/momo-pay') return momoPay(body);
   if (url.pathname.startsWith('/rest/v1/rpc/')) {
     const name = url.pathname.split('/').pop()!;
     mockCalls.push({ kind: 'rpc', name, body });
