@@ -3,3 +3,6 @@ dist/
 *.local
 .vite/
 coverage/
+
+# Supabase CLI local cache
+supabase/.temp/
