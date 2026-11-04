@@ -16,18 +16,18 @@ New shops start with a free trial. **Plan & billing** shows your plan, its statu
 
 ### Pay or change plan
 
-**With MTN MoMo (instant):**
+**With Mobile Money (instant):**
 
-1. Press **Pay with MoMo** (or **Renew with MoMo**) on the plan you want.
-2. Choose 1, 3, 6 or 12 months and enter your MTN MoMo number.
-3. Press **Pay**. A prompt appears on your phone — approve it with your MoMo PIN.
-4. Kivu switches your plan as soon as MTN confirms the payment. Keep the page open; it updates by itself.
+1. Press **Pay now** (or **Renew** on your current plan) under the plan you want.
+2. Choose 1, 3, 6 or 12 months and enter your MTN or Airtel number.
+3. Press **Pay**. A prompt appears on your phone — approve it with your Mobile Money PIN.
+4. Kivu switches your plan as soon as the payment is confirmed. Keep the page open; it updates by itself.
 
 Renewing the plan you already have adds the months after your current end date, so you never lose days. Choosing a different plan starts it today.
 
-If the prompt does not appear, check pending approvals in your MoMo menu. If a payment shows *Pending* later, press **Check status** on the Plans page. **Payment history** lists every payment and the dates it covers.
+If the prompt does not appear, check pending approvals in your Mobile Money menu. If a payment shows *Pending* later, press **Check status** on the Plans page. **Payment history** lists every payment and the dates it covers.
 
-**With Airtel Money or bank:** press **Airtel Money or bank? Request instead** under the plan, pay using the details Platinum Tech gives you, and Platinum Tech switches your plan once the payment is confirmed.
+**By bank transfer, or if Mobile Money payments are not available yet:** press **Request this plan** (or the **Pay by bank transfer** link under the plan), pay using the details Platinum Tech gives you, and Platinum Tech switches your plan once the payment is confirmed.
 
 If a subscription expires, a banner appears at the top of every page. Renew to keep using paid features; your data is kept.
 

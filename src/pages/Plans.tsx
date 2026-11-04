@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Check, CheckCircle2, Smartphone, XCircle } from 'lucide-react';
 import { useShop } from '@/auth/AuthProvider';
 import { useAction, useSubscriptionPayments } from '@/data/hooks';
@@ -13,11 +14,23 @@ const FEATURE_TEXT: Record<Feature, string> = {
   shifts: 'Cash shifts and Z-reports', tables: 'Tables, bills and kitchen queue', approvals: 'Approvals for voids and stock changes', audit: 'Full audit log'
 };
 const CORE = ['Point of sale with receipts', 'Products and stock movements', 'Reports and CSV export', 'Works offline'];
+/** Each card lists only what it adds to the plan before it, so the cards stay short. */
+const BUILDS_ON: Partial<Record<string, string>> = { business: 'basic', control: 'business', pro: 'control' };
+const EXTRA: Partial<Record<string, string[]>> = { pro: ['Priority support'] };
+function planHighlights(p: Plan): { intro: string; items: string[] } {
+  const base = BUILDS_ON[p.key] ? planFor(BUILDS_ON[p.key]) : null;
+  const added = p.features.filter(f => !base?.features.includes(f)).map(f => FEATURE_TEXT[f]);
+  return base
+    ? { intro: `Everything in ${base.label}, plus:`, items: [...added, ...(EXTRA[p.key] ?? [])] }
+    : { intro: 'Includes:', items: [...CORE, ...added] };
+}
 const STATUS_TONE = { active: 'good', trial: 'info', grace: 'warn', expired: 'bad', suspended: 'bad', cancelled: 'bad' } as const;
 const PAY_TONE = { pending: 'warn', confirmed: 'good', failed: 'bad', rejected: 'bad', refunded: 'neutral' } as const;
 const MONTH_OPTIONS = ['1', '3', '6', '12'] as const;
 const POLL_MS = 4000;
-const POLL_LIMIT = 45; // about 3 minutes, longer than MTN keeps a prompt open
+const POLL_LIMIT = 45; // about 3 minutes, longer than a network keeps a prompt open
+
+interface PayConfig { enabled: boolean; provider: string | null; networks: string[] }
 
 type PayStep = { kind: 'form' } | { kind: 'waiting'; id: string; amount: number } | { kind: 'done' } | { kind: 'failed'; reason: string };
 
@@ -31,6 +44,11 @@ export default function Plans() {
   const current = planFor(shop.plan);
   const payments = useSubscriptionPayments();
   const refetchPayments = payments.refetch;
+  // Mobile Money is offered only once a provider is set up in the payment function.
+  const config = useQuery<PayConfig>({ queryKey: ['pay-config'], queryFn: () => callFunction<PayConfig>('momo-pay', { action: 'config' }), retry: false, staleTime: 5 * 60_000 });
+  const payEnabled = !!config.data?.enabled;
+  const networks = (config.data?.networks ?? []).join(' or ') || 'Mobile Money';
+  const coversAirtel = !!config.data?.networks.includes('Airtel');
 
   const [plan, setPlan] = useState<Plan | null>(null);
   const [months, setMonths] = useState<(typeof MONTH_OPTIONS)[number]>('1');
@@ -64,7 +82,7 @@ export default function Plans() {
     }
   }
 
-  // While waiting, ask the server (which asks MTN) until the payment is settled.
+  // While waiting, ask the server (which asks the provider) until the payment is settled.
   useEffect(() => {
     if (step.kind !== 'waiting') return;
     let cancelled = false;
@@ -81,7 +99,7 @@ export default function Plans() {
           setStep({ kind: 'failed', reason: res.reason || 'The payment did not go through.' });
           void refetchPayments();
         } else if (polls.current >= POLL_LIMIT) {
-          setStep({ kind: 'failed', reason: 'No answer from MTN yet. If you approved it, your plan updates when MTN confirms. Check the payment history below.' });
+          setStep({ kind: 'failed', reason: 'No answer yet. If you approved it, your plan updates as soon as the payment is confirmed. Check the payment history below.' });
           void refetchPayments();
         }
       } catch { /* network blip: keep waiting */ }
@@ -98,8 +116,13 @@ export default function Plans() {
     }
   }
 
+  async function askForPlan(p: Plan) {
+    const message = payEnabled ? 'For payments outside the app. Platinum Tech confirms your payment, then switches your plan.' : `${money(p.price)}${p.oneTime ? ' once' : ' per month'}. Platinum Tech confirms your payment, then switches your plan.`;
+    if (await confirm({ title: `Request ${p.label}?`, message, confirmLabel: 'Send request' })) request.mutate(p.key);
+  }
+
   const closePay = () => { if (step.kind !== 'waiting') setPlan(null); };
-  const pending = (payments.data ?? []).find(p => p.status === 'pending' && p.provider === 'mtn_momo');
+  const pending = (payments.data ?? []).find(p => p.status === 'pending' && !!p.provider);
 
   return (
     <>
@@ -111,42 +134,61 @@ export default function Plans() {
           <div><p className="text-xs text-zinc-500">Status</p><Badge tone={STATUS_TONE[status]}>{status.charAt(0).toUpperCase() + status.slice(1)}</Badge></div>
           <div><p className="text-xs text-zinc-500">{status === 'trial' ? 'Trial ends' : 'Renews / expires'}</p><p className="font-medium">{shop.plan === 'one_time' ? 'Never — paid once' : formatDate(status === 'trial' ? shop.trial_ends_at : shop.current_period_end)}</p></div>
         </div>
-        <Notice className="mt-4">Pay with MTN MoMo and your plan switches on as soon as you approve the payment on your phone. Paying for the plan you already have adds the months after your current end date.</Notice>
+        <Notice className="mt-4">{payEnabled
+          ? `Pay with ${networks} Mobile Money and your plan switches on as soon as you approve the payment on your phone. Paying for the plan you already have adds the months after your current end date.`
+          : 'Choose a plan and send a request. Platinum Tech confirms your payment and switches your plan.'}</Notice>
         {pending && (
           <Notice tone="warn" className="mt-3">
-            A MoMo payment of {money(pending.amount)} from {formatDateTime(pending.created_at)} is waiting for approval.{' '}
+            A Mobile Money payment of {money(pending.amount)} from {formatDateTime(pending.created_at)} is waiting for approval.{' '}
             <button type="button" className="font-semibold underline" onClick={() => void checkPending(pending.id)}>Check status</button>
           </Notice>
         )}
       </Card>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
         {PLANS.map(p => {
           const isCurrent = p.key === current.key;
           const popular = p.key === 'business';
           const oneTimeOwned = isCurrent && p.oneTime;
+          const { intro, items } = planHighlights(p);
           return (
-            <div key={p.key} className={cx('card flex flex-col p-5', popular && 'ring-2 ring-ink', isCurrent && 'bg-zinc-50')}>
-              <div className="flex items-center justify-between gap-2">
-                <h2 className="font-semibold">{p.label}</h2>
+            <div key={p.key} className={cx('card relative flex flex-col p-5', popular && 'ring-2 ring-ink', isCurrent && 'bg-zinc-50')}>
+              <div className="flex items-start justify-between gap-2">
+                <h2 className="font-semibold leading-tight">{p.label}</h2>
                 {isCurrent ? <Badge tone="good">Current</Badge> : popular ? <Badge tone="info">Popular</Badge> : null}
               </div>
-              <p className="mt-1 min-h-10 text-[13px] text-zinc-500">{p.tagline}</p>
-              <p className="mt-4 text-2xl font-semibold tracking-tight tabular">{money(p.price)}<span className="text-sm font-normal text-zinc-500">{p.oneTime ? ' once' : ' / month'}</span></p>
-              <ul className="mt-4 flex-1 space-y-2 text-[13px] text-zinc-700">
-                {[...CORE, ...p.features.map(f => FEATURE_TEXT[f])].map(t => (
-                  <li key={t} className="flex gap-2"><Check className="mt-0.5 size-4 shrink-0 text-emerald-600" />{t}</li>
-                ))}
-              </ul>
-              <Button className="mt-5 w-full" variant={popular ? 'primary' : 'secondary'} icon={<Smartphone />} disabled={oneTimeOwned} onClick={() => openPay(p)}>
-                {oneTimeOwned ? 'Paid' : isCurrent ? 'Renew with MoMo' : 'Pay with MoMo'}
-              </Button>
-              {!oneTimeOwned && (
-                <button type="button" className="mt-2 text-xs text-zinc-500 hover:text-zinc-800 disabled:opacity-50" disabled={request.isPending}
-                  onClick={async () => { if (await confirm({ title: `Request ${p.label}?`, message: 'For Airtel Money or bank payments. Platinum Tech confirms your payment, then switches your plan.', confirmLabel: 'Send request' })) request.mutate(p.key); }}>
-                  Airtel Money or bank? Request instead
-                </button>
-              )}
+              <p className="mt-1 text-[13px] leading-snug text-zinc-500 sm:min-h-[2.5rem]">{p.tagline}</p>
+              <p className="mt-4 flex items-baseline gap-1 tabular">
+                <span className="text-2xl font-semibold tracking-tight">{money(p.price)}</span>
+                <span className="text-sm text-zinc-500">{p.oneTime ? 'once' : '/ month'}</span>
+              </p>
+
+              <div className="mt-4">
+                {payEnabled ? (
+                  <Button className="w-full" variant={popular ? 'primary' : 'secondary'} icon={oneTimeOwned ? undefined : <Smartphone />} disabled={oneTimeOwned} onClick={() => openPay(p)}>
+                    {oneTimeOwned ? 'Paid' : isCurrent ? 'Renew' : 'Pay now'}
+                  </Button>
+                ) : (
+                  <Button className="w-full" variant={popular ? 'primary' : 'secondary'} disabled={oneTimeOwned || (isCurrent && status !== 'expired') || request.isPending}
+                    onClick={() => void askForPlan(p)}>
+                    {oneTimeOwned ? 'Paid' : isCurrent ? (status === 'expired' ? 'Renew' : 'Your plan') : 'Request this plan'}
+                  </Button>
+                )}
+                {payEnabled && !oneTimeOwned && (
+                  <button type="button" className="mt-2 block w-full text-center text-xs text-zinc-500 hover:text-zinc-800 disabled:opacity-50" disabled={request.isPending} onClick={() => void askForPlan(p)}>
+                    {coversAirtel ? 'Pay by bank transfer' : 'Pay by Airtel or bank'}
+                  </button>
+                )}
+              </div>
+
+              <div className="mt-5 border-t border-zinc-100 pt-4">
+                <p className="text-xs font-medium text-zinc-500">{intro}</p>
+                <ul className="mt-2 space-y-1.5 text-[13px] text-zinc-700">
+                  {items.map(t => (
+                    <li key={t} className="flex gap-2"><Check className="mt-0.5 size-4 shrink-0 text-emerald-600" />{t}</li>
+                  ))}
+                </ul>
+              </div>
             </div>
           );
         })}
@@ -165,7 +207,7 @@ export default function Plans() {
                     <td className="td whitespace-nowrap">{formatDateTime(p.created_at)}</td>
                     <td className="td">{planFor(p.plan).label}{p.months && p.months > 1 ? ` · ${p.months} months` : ''}</td>
                     <td className="td text-right tabular">{money(p.amount)}</td>
-                    <td className="td">{p.provider === 'mtn_momo' ? 'MTN MoMo' : p.payment_method}</td>
+                    <td className="td">{p.provider === 'mtn_momo' ? 'MTN MoMo' : p.provider ? 'Mobile Money' : p.payment_method}</td>
                     <td className="td whitespace-nowrap">{p.covered_from ? `${formatDate(p.covered_from)} – ${p.covered_to ? formatDate(p.covered_to) : 'forever'}` : '—'}</td>
                     <td className="td"><Badge tone={PAY_TONE[p.status] ?? 'neutral'}>{p.status.charAt(0).toUpperCase() + p.status.slice(1)}</Badge>{p.failure_reason && <p className="mt-1 text-xs text-zinc-500">{p.failure_reason}</p>}</td>
                   </tr>
@@ -188,7 +230,7 @@ export default function Plans() {
                 <Segmented label="Months" value={months} onChange={setMonths} options={MONTH_OPTIONS.map(m => ({ value: m, label: m }))} />
               </Field>
             )}
-            <Field label="MTN MoMo number" hint="You will get a prompt on this phone. Approve it with your MoMo PIN.">
+            <Field label={`${networks} number`} hint="You will get a prompt on this phone. Approve it with your Mobile Money PIN.">
               <Input value={phone} onChange={e => setPhone(e.target.value)} inputMode="tel" autoComplete="tel" placeholder="0788 123 456" required data-autofocus />
             </Field>
             <div className="flex items-center justify-between rounded-lg bg-zinc-50 px-4 py-3 text-sm">
@@ -202,7 +244,7 @@ export default function Plans() {
           <div className="flex flex-col items-center gap-3 py-4 text-center" role="status" aria-live="polite">
             <Spinner />
             <p className="font-medium">Approve {money(step.amount)} on your phone</p>
-            <p className="text-sm text-zinc-500">Enter your MoMo PIN in the prompt. If no prompt appears, check pending approvals in your MoMo menu. This page updates by itself.</p>
+            <p className="text-sm text-zinc-500">Enter your Mobile Money PIN in the prompt. If no prompt appears, check pending approvals in your Mobile Money menu. This page updates by itself.</p>
           </div>
         )}
         {step.kind === 'done' && (
