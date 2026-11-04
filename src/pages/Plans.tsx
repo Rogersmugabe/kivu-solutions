@@ -14,6 +14,16 @@ const FEATURE_TEXT: Record<Feature, string> = {
   shifts: 'Cash shifts and Z-reports', tables: 'Tables, bills and kitchen queue', approvals: 'Approvals for voids and stock changes', audit: 'Full audit log'
 };
 const CORE = ['Point of sale with receipts', 'Products and stock movements', 'Reports and CSV export', 'Works offline'];
+/** Each card lists only what it adds to the plan before it, so the cards stay short. */
+const BUILDS_ON: Partial<Record<string, string>> = { business: 'basic', control: 'business', pro: 'control' };
+const EXTRA: Partial<Record<string, string[]>> = { pro: ['Priority support'] };
+function planHighlights(p: Plan): { intro: string; items: string[] } {
+  const base = BUILDS_ON[p.key] ? planFor(BUILDS_ON[p.key]) : null;
+  const added = p.features.filter(f => !base?.features.includes(f)).map(f => FEATURE_TEXT[f]);
+  return base
+    ? { intro: `Everything in ${base.label}, plus:`, items: [...added, ...(EXTRA[p.key] ?? [])] }
+    : { intro: 'Includes:', items: [...CORE, ...added] };
+}
 const STATUS_TONE = { active: 'good', trial: 'info', grace: 'warn', expired: 'bad', suspended: 'bad', cancelled: 'bad' } as const;
 const PAY_TONE = { pending: 'warn', confirmed: 'good', failed: 'bad', rejected: 'bad', refunded: 'neutral' } as const;
 const MONTH_OPTIONS = ['1', '3', '6', '12'] as const;
@@ -135,39 +145,50 @@ export default function Plans() {
         )}
       </Card>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
         {PLANS.map(p => {
           const isCurrent = p.key === current.key;
           const popular = p.key === 'business';
           const oneTimeOwned = isCurrent && p.oneTime;
+          const { intro, items } = planHighlights(p);
           return (
-            <div key={p.key} className={cx('card flex flex-col p-5', popular && 'ring-2 ring-ink', isCurrent && 'bg-zinc-50')}>
-              <div className="flex items-center justify-between gap-2">
-                <h2 className="font-semibold">{p.label}</h2>
+            <div key={p.key} className={cx('card relative flex flex-col p-5', popular && 'ring-2 ring-ink', isCurrent && 'bg-zinc-50')}>
+              <div className="flex items-start justify-between gap-2">
+                <h2 className="font-semibold leading-tight">{p.label}</h2>
                 {isCurrent ? <Badge tone="good">Current</Badge> : popular ? <Badge tone="info">Popular</Badge> : null}
               </div>
-              <p className="mt-1 min-h-10 text-[13px] text-zinc-500">{p.tagline}</p>
-              <p className="mt-4 text-2xl font-semibold tracking-tight tabular">{money(p.price)}<span className="text-sm font-normal text-zinc-500">{p.oneTime ? ' once' : ' / month'}</span></p>
-              <ul className="mt-4 flex-1 space-y-2 text-[13px] text-zinc-700">
-                {[...CORE, ...p.features.map(f => FEATURE_TEXT[f])].map(t => (
-                  <li key={t} className="flex gap-2"><Check className="mt-0.5 size-4 shrink-0 text-emerald-600" />{t}</li>
-                ))}
-              </ul>
-              {payEnabled ? (
-                <Button className="mt-5 w-full" variant={popular ? 'primary' : 'secondary'} icon={<Smartphone />} disabled={oneTimeOwned} onClick={() => openPay(p)}>
-                  {oneTimeOwned ? 'Paid' : isCurrent ? 'Renew with Mobile Money' : 'Pay with Mobile Money'}
-                </Button>
-              ) : (
-                <Button className="mt-5 w-full" variant={popular ? 'primary' : 'secondary'} disabled={oneTimeOwned || (isCurrent && status !== 'expired') || request.isPending}
-                  onClick={() => void askForPlan(p)}>
-                  {oneTimeOwned ? 'Paid' : isCurrent ? (status === 'expired' ? 'Renew' : 'Your plan') : 'Request this plan'}
-                </Button>
-              )}
-              {payEnabled && !oneTimeOwned && (
-                <button type="button" className="mt-2 text-xs text-zinc-500 hover:text-zinc-800 disabled:opacity-50" disabled={request.isPending} onClick={() => void askForPlan(p)}>
-                  {coversAirtel ? 'Bank transfer? Request instead' : 'Airtel Money or bank? Request instead'}
-                </button>
-              )}
+              <p className="mt-1 text-[13px] leading-snug text-zinc-500 sm:min-h-[2.5rem]">{p.tagline}</p>
+              <p className="mt-4 flex items-baseline gap-1 tabular">
+                <span className="text-2xl font-semibold tracking-tight">{money(p.price)}</span>
+                <span className="text-sm text-zinc-500">{p.oneTime ? 'once' : '/ month'}</span>
+              </p>
+
+              <div className="mt-4">
+                {payEnabled ? (
+                  <Button className="w-full" variant={popular ? 'primary' : 'secondary'} icon={oneTimeOwned ? undefined : <Smartphone />} disabled={oneTimeOwned} onClick={() => openPay(p)}>
+                    {oneTimeOwned ? 'Paid' : isCurrent ? 'Renew' : 'Pay now'}
+                  </Button>
+                ) : (
+                  <Button className="w-full" variant={popular ? 'primary' : 'secondary'} disabled={oneTimeOwned || (isCurrent && status !== 'expired') || request.isPending}
+                    onClick={() => void askForPlan(p)}>
+                    {oneTimeOwned ? 'Paid' : isCurrent ? (status === 'expired' ? 'Renew' : 'Your plan') : 'Request this plan'}
+                  </Button>
+                )}
+                {payEnabled && !oneTimeOwned && (
+                  <button type="button" className="mt-2 block w-full text-center text-xs text-zinc-500 hover:text-zinc-800 disabled:opacity-50" disabled={request.isPending} onClick={() => void askForPlan(p)}>
+                    {coversAirtel ? 'Pay by bank transfer' : 'Pay by Airtel or bank'}
+                  </button>
+                )}
+              </div>
+
+              <div className="mt-5 border-t border-zinc-100 pt-4">
+                <p className="text-xs font-medium text-zinc-500">{intro}</p>
+                <ul className="mt-2 space-y-1.5 text-[13px] text-zinc-700">
+                  {items.map(t => (
+                    <li key={t} className="flex gap-2"><Check className="mt-0.5 size-4 shrink-0 text-emerald-600" />{t}</li>
+                  ))}
+                </ul>
+              </div>
             </div>
           );
         })}
