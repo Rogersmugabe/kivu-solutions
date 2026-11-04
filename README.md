@@ -16,7 +16,7 @@ The owner sees every movement of stock and money; staff sign in with their own r
 | Stock | Products · **Stock movements** (one ledger of sales, voids, deliveries, adjustments and wastage) · Suppliers & purchases (supplier debts and payments) | Owner, manager · stock clerk for products & movements |
 | Money | Expenses · Cash shifts (float, blind count for cashiers, pay-outs, Z-reports) · Reports (profit, products, staff, payment methods, accountant export) | Owner, manager · cashiers run their own shift |
 | Team | Staff & roles (invites, enable / disable) · Approvals & activity (void / adjustment requests, exceptions, audit log) | Owner (invites), manager |
-| Account | Plan & billing (pay with MTN MoMo — needs migration 003 and the `momo-pay` function; Airtel / bank by request) · Settings (business, tax, location, signed-in devices) · Platform admin (Platinum Tech only) | Owner · platform admins |
+| Account | Plan & billing (pay with Mobile Money — MTN and Airtel through Relworx, or MTN direct; needs migration 003 and the `momo-pay` function; bank by request) · Settings (business, tax, location, signed-in devices) · Platform admin (Platinum Tech only) | Owner · platform admins |
 | Help | Help & user guide — role-aware guides with search and printing, written in Markdown in `src/help/en/` | Everyone |
 
 ### Roles
@@ -74,7 +74,7 @@ so existing shops keep all their data. SQL for database work lives in `supabase/
 
 - `supabase/migrations/` — run each file once, in order, in the SQL Editor.
 - `supabase/functions/staff-signup` — Edge Function that creates staff logins.
-- `supabase/functions/momo-pay` — Edge Function for plan payments with MTN MoMo (see below).
+- `supabase/functions/momo-pay` — Edge Function for plan payments with Mobile Money (see below).
 
 ### Staff sign-up and email confirmation
 Owners sign up with email and keep Supabase's **"Confirm email"** on. Staff sign in with phone + 6-digit
@@ -89,13 +89,28 @@ npx supabase functions deploy staff-signup --no-verify-jwt --project-ref frduols
 
 `--no-verify-jwt` is needed because the employee is not signed in yet; the invite is the credential.
 
-### Plan payments with MTN MoMo
-Owners pay on **Plan & billing**: Kivu sends a MoMo prompt to their phone and switches the plan when MTN
-confirms. The `momo-pay` Edge Function prices the plan on the server, asks MTN for the payment and only
-extends the plan when MTN itself reports it successful (`kivu_confirm_momo_payment`, migration 003).
-MoMo keys live only in Supabase secrets.
+### Plan payments with Mobile Money
+Owners pay on **Plan & billing**: Kivu sends a payment prompt to their phone and switches the plan when the
+payment is confirmed. The `momo-pay` Edge Function prices the plan on the server, asks the provider for the
+payment and only extends the plan when the provider itself reports it successful (`kivu_confirm_momo_payment`,
+migration 003). Provider keys live only in Supabase secrets. Until a provider is set up, the Plans page shows
+only "Request this plan".
 
-Sandbox setup (testing, no real money):
+The function uses **Relworx** (MTN and Airtel Rwanda) when its secrets are set, otherwise **MTN MoMo direct**.
+
+#### Relworx (MTN + Airtel)
+1. Run `supabase/migrations/003_momo_subscription_payments.sql` in the SQL Editor (once).
+2. In the Relworx dashboard: create a business account (it needs an **RWF Mobile Money** wallet), set its
+   **Request Payment Webhook** to `https://frduolsneevyndnebxvy.supabase.co/functions/v1/momo-pay?callback=relworx`,
+   and create an API key.
+3. Save the secrets and deploy:
+   ```bash
+   npx supabase secrets set --project-ref frduolsneevyndnebxvy RELWORX_ACCOUNT_NO=<REL…> RELWORX_API_KEY=<api key> RELWORX_WEBHOOK_KEY=<webhook signing key>
+   npx supabase functions deploy momo-pay --no-verify-jwt --project-ref frduolsneevyndnebxvy
+   ```
+Relworx charges real money from the first payment; test with a small plan on your own number.
+
+#### MTN MoMo direct — sandbox setup (testing, no real money)
 
 1. Run `supabase/migrations/003_momo_subscription_payments.sql` in the SQL Editor.
 2. Sign up at [momodeveloper.mtn.com](https://momodeveloper.mtn.com), subscribe to **Collections** and copy the primary key.

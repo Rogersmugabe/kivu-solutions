@@ -105,12 +105,14 @@ const momoChecks: Record<string, number> = {};
 function momoPay(body: Record<string, unknown>): Response {
   mockCalls.push({ kind: 'function', name: 'momo-pay', body });
   const prices: Record<string, number> = { basic: 2000, one_time: 50000, business: 5000, control: 10000, pro: 20000 };
+  // &pay=off simulates a project where no payment provider is set up yet.
+  if (body.action === 'config') return json(params.get('pay') === 'off' ? { enabled: false, provider: null, networks: [] } : { enabled: true, provider: 'relworx', networks: ['MTN', 'Airtel'] });
   if (body.action === 'start') {
-    const phone = String(body.phone || '').replace(/D/g, '');
-    if (phone.length < 9) return json({ error: 'Enter a valid MTN number, for example 0788 123 456.' }, 400);
+    const phone = String(body.phone || '').replace(/\D/g, '');
+    if (phone.length < 9) return json({ error: 'Enter a valid MTN or Airtel number, for example 0788 123 456.' }, 400);
     const months = body.plan === 'one_time' ? 1 : Number(body.months || 1);
     const id = `pay-${Date.now()}`;
-    db.subscription_payments.unshift({ id, shop_id: shopId, plan: body.plan, months, amount: prices[String(body.plan)] * months, status: 'pending', payment_method: 'Mobile Money', provider: 'mtn_momo', payer_phone: phone, created_at: new Date().toISOString() });
+    db.subscription_payments.unshift({ id, shop_id: shopId, plan: body.plan, months, amount: prices[String(body.plan)] * months, status: 'pending', payment_method: 'Mobile Money', provider: 'relworx', payer_phone: phone, created_at: new Date().toISOString() });
     return json({ id, amount: prices[String(body.plan)] * months, status: 'pending' });
   }
   const pay = db.subscription_payments.find(p => p.id === body.id);
