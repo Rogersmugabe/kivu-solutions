@@ -1,6 +1,6 @@
 # Kivu POS
 
-Point of sale, stock control and cash control for shops, bars and restaurants in Rwanda.
+Simple point of sale, stock control and cash control for shops, bars and restaurants in Rwanda.
 The owner sees every movement of stock and money; staff sign in with their own role.
 
 **Stack:** React 19 · TypeScript · Vite · Tailwind CSS v4 · TanStack Query · Supabase (Postgres, Auth, RLS) · PWA (works offline) · hosted on GitHub Pages.
