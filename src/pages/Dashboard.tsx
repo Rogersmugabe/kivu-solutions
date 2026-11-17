@@ -111,7 +111,7 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Kpi label="Sales today" value={money(data.salesToday)} icon={<Coins />} footer={<Delta today={data.salesToday} yesterday={data.salesY} />} />
-        <Kpi label="Gross profit today" value={money(data.profitToday)} icon={<TrendingUp />} footer={<Delta today={data.profitToday} yesterday={data.profitY} />} />
+        <Kpi label="Net profit today" value={money(data.profitToday)} icon={<TrendingUp />} footer={<Delta today={data.profitToday} yesterday={data.profitY} />} />
         <Kpi label="Expenses today" value={money(data.expToday)} icon={<Wallet />} footer={<Delta today={data.expToday} yesterday={data.expY} goodWhenUp={false} />} />
         <Kpi label="Receipts today" value={String(data.receiptsToday)} icon={<ReceiptText />} footer={<Delta today={data.receiptsToday} yesterday={data.receiptsY} format={n => String(n)} />} />
       </div>

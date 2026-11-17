@@ -65,3 +65,10 @@ export const isValidRwPhone = (phone: string) => /^\+2507\d{8}$/.test(phone);
 export function pluralize(n: number, one: string, many = `${one}s`): string {
   return `${n} ${n === 1 ? one : many}`;
 }
+
+/** YYYY-MM-DD plus whole months (same day of the month, clamped to the month's last day). */
+export function addMonths(day: string, months: number): string {
+  const [y, m, d] = day.split('-').map(Number);
+  const last = new Date(Date.UTC(y, m - 1 + months + 1, 0)).getUTCDate();
+  return new Date(Date.UTC(y, m - 1 + months, Math.min(d, last))).toISOString().slice(0, 10);
+}

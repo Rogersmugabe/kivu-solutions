@@ -9,6 +9,18 @@ import { INVITABLE_ROLES, ROLE_DESCRIPTIONS, ROLE_LABELS, employeeRole, isHospit
 import { rpc } from '@/lib/supabase';
 import type { Employee, Role } from '@/lib/types';
 
+/** Copies text; falls back to a hidden textarea where the Clipboard API is blocked (older phones, some webviews). */
+async function copyText(text: string): Promise<boolean> {
+  try { await navigator.clipboard.writeText(text); return true; } catch { /* try the fallback */ }
+  const area = document.createElement('textarea');
+  area.value = text;
+  area.setAttribute('readonly', '');
+  area.style.cssText = 'position:fixed;top:0;left:0;opacity:0';
+  document.body.appendChild(area);
+  area.select();
+  try { return document.execCommand('copy'); } catch { return false; } finally { area.remove(); }
+}
+
 export default function Staff() {
   const { session, can, shop, hasFeature } = useShop();
   // The database only lets waiters and kitchen staff join bars and restaurants.
@@ -53,7 +65,8 @@ export default function Staff() {
     `Hello ${c.name}, you are invited to join our shop on Kivu POS as ${ROLE_LABELS[c.role]}.\n\n1. Open ${window.location.href.split('#')[0]}\n2. Choose "Create account" → "Staff"\n3. Enter invite code ${c.code}, your name and this phone number (${c.phone})\n4. Choose a 6-digit PIN — you will use it to sign in.\n\nThe code expires in 14 days.`;
 
   async function copy(text: string) {
-    try { await navigator.clipboard.writeText(text); setCopied(true); window.setTimeout(() => setCopied(false), 1500); } catch { toast('warning', 'Copy failed', 'Select the code and copy it manually.'); }
+    if (await copyText(text)) { setCopied(true); window.setTimeout(() => setCopied(false), 1500); }
+    else toast('warning', 'Copy failed', 'Select the code and copy it manually.');
   }
 
   return (
@@ -116,7 +129,7 @@ export default function Staff() {
 
       <Card title="What each role can do" className="mt-4">
         <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {(['owner', ...INVITABLE_ROLES] as Role[]).map(r => (
+          {(['owner', ...roleOptions] as Role[]).map(r => (
             <div key={r} className="rounded-xl border border-zinc-200 p-4">
               <dt className="text-sm font-semibold">{ROLE_LABELS[r]}</dt>
               <dd className="mt-1 text-[13px] leading-relaxed text-zinc-600">{ROLE_DESCRIPTIONS[r]}</dd>

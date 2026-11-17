@@ -104,7 +104,8 @@ export function ZReport({ shop, shift, totals }: { shop: Shop; shift: Shift; tot
     <div className={slip}>
       <div className="text-center">
         <div className="text-sm font-bold">{shop.name}</div>
-        <div className="font-bold">SHIFT Z-REPORT</div>
+        {/* Z-report once the shift is closed; mid-shift it is an X-report. */}
+        <div className="font-bold">{shift.closed_at ? 'SHIFT Z-REPORT' : 'SHIFT X-REPORT (SHIFT STILL OPEN)'}</div>
       </div>
       <Line />
       <Row left="Staff" right={shift.employee_name || '—'} />

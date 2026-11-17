@@ -56,6 +56,15 @@ export default function Sell() {
   const [parked, setParked] = useState<ParkedSale[]>(() => readParked(shop.id));
   const [showParked, setShowParked] = useState(false);
   const cartRef = useRef<HTMLDivElement>(null);
+  // On phones the cart sits below the products; the checkout bar is only needed while it is off screen.
+  const [cartInView, setCartInView] = useState(false);
+  useEffect(() => {
+    const el = cartRef.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return;
+    const io = new IntersectionObserver(([entry]) => setCartInView(entry.isIntersecting), { threshold: 0.15 });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
 
   const categories = useMemo(() => ['All', ...[...new Set(products.map(p => p.category).filter(Boolean) as string[])].sort()], [products]);
   const filtered = useMemo(() => {
@@ -192,7 +201,7 @@ export default function Sell() {
   const needsShift = hasFeature('shifts') && role === 'cashier' && !myShift.isLoading && !myShift.data;
 
   return (
-    <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_400px] xl:grid-cols-[minmax(0,1fr)_440px]">
+    <div className={cx('grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_400px] lg:pb-0 xl:grid-cols-[minmax(0,1fr)_440px]', lines.length > 0 && 'pb-20')}>
       <div className="min-w-0 space-y-4">
         {!online && <Notice tone="warn"><WifiOff className="mr-1.5 inline size-4" />You are offline. Sales are saved on this device and sync when the internet returns.</Notice>}
         {queued.length > 0 && <Notice tone={queued.some(q => q.status === 'failed') ? 'bad' : 'info'}>{queued.length} sale{queued.length === 1 ? '' : 's'} waiting to sync{queued.some(q => q.status === 'failed') ? ` — ${queued.filter(q => q.status === 'failed').length} rejected by the server (${queued.find(q => q.last_error)?.last_error})` : ''}.</Notice>}
@@ -332,7 +341,7 @@ export default function Sell() {
       </div>
 
       {/* Mobile checkout bar */}
-      {lines.length > 0 && (
+      {lines.length > 0 && !cartInView && (
         <div className="fixed inset-x-0 bottom-0 z-20 border-t border-zinc-200 bg-white/95 p-3 backdrop-blur lg:hidden">
           <Button variant="money" size="lg" className="w-full" onClick={() => cartRef.current?.scrollIntoView({ behavior: 'smooth' })}>
             Review {itemCount} item{itemCount === 1 ? '' : 's'} · {money(totals.total)}

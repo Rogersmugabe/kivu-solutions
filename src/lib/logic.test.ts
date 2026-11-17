@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { businessDay, minuteOfDay, money, normalizeRwPhone, parseMoney, isValidRwPhone } from './format';
+import { addMonths, businessDay, minuteOfDay, money, normalizeRwPhone, parseMoney, isValidRwPhone } from './format';
 import { ROLE_PAGES, employeeRole, enabledFeatures, roleCan, subscriptionStatus, visiblePages } from './access';
 import { addSalePayments, billPaymentsByReceipt, bulkPrice, cartTotals, groupReceipts, lineTotal, paymentBreakdown, unitsInCart } from './sales';
 import { parseCsv } from './csv';
@@ -170,5 +170,15 @@ describe('employee roles', () => {
     expect(employeeRole('Cashier')).toBe('cashier');
     expect(employeeRole('Kitchen')).toBe('kitchen');
     expect(employeeRole('manager')).toBe('manager');
+  });
+});
+
+describe('addMonths', () => {
+  it('keeps the day of the month and clamps at month end', () => {
+    expect(addMonths('2026-11-17', 1)).toBe('2026-12-17');
+    expect(addMonths('2026-12-17', 1)).toBe('2027-01-17');
+    expect(addMonths('2026-01-31', 1)).toBe('2026-02-28');
+    expect(addMonths('2028-01-31', 1)).toBe('2028-02-29');
+    expect(addMonths('2026-03-31', 12)).toBe('2027-03-31');
   });
 });
