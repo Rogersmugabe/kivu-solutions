@@ -43,7 +43,7 @@ Read the reason, then **Approve** or **Reject**. Nothing changes until it is app
 
 ## Dashboard
 
-The first page owners and managers see: today's sales, receipts, gross profit and expenses, the last 7 days, how customers paid, best sellers, recent receipts and **stock alerts** (low and out of stock, plus stock value at cost).
+The first page owners and managers see: today's sales, receipts, net profit (after cost of goods and expenses) and expenses, the last 7 days, how customers paid, best sellers, recent receipts and **stock alerts** (low and out of stock, plus stock value at cost).
 
 ## Reports
 

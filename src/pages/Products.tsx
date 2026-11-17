@@ -79,12 +79,17 @@ export default function Products() {
     const rowsIn = parseCsv(await file.text());
     if (!rowsIn.length) throw new Error('No rows found. The first line must be a header: name,price,cost,qty,category,barcode,low_stock');
     if (rowsIn.length > 2000) throw new Error('Import at most 2,000 products at a time.');
-    const payload = rowsIn.filter(r => r.name).map(r => ({
+    const named = rowsIn.filter(r => r.name);
+    const payload = named.map(r => ({
       shop_id: shop.id, name: r.name, price: Math.round(Number(r.price || 0)), cost: Math.round(Number(r.cost || 0)), qty: Number(r.qty || 0),
-      low_stock: Number(r.low_stock || r.low || 0), barcode: r.barcode || null, base_unit: r.base_unit || 'Piece', bulk_unit: r.bulk_unit || 'Carton', units_per_bulk: Number(r.units_per_bulk || 1)
+      low_stock: Number(r.low_stock || r.low || 0), barcode: r.barcode || null, base_unit: r.base_unit || 'Piece', bulk_unit: r.bulk_unit || 'Carton', units_per_bulk: Number(r.units_per_bulk || 1),
+      expiry_date: /^\d{4}-\d{2}-\d{2}$/.test(r.expiry_date || '') ? r.expiry_date : null
     }));
     if (!payload.length) throw new Error('No row has a "name" value.');
-    const { error } = await supabase.from('products').insert(payload);
+    const withCategory = payload.map((row, i) => ({ ...row, category: named[i].category?.trim() || null }));
+    let { error } = await supabase.from('products').insert(withCategory);
+    // The category column is added by supabase/migrations/001; before that, import without it.
+    if (error && /column/i.test(error.message)) ({ error } = await supabase.from('products').insert(payload));
     if (error) throw new Error(error.message);
     await writeAudit(shop.id, session.user.id, profile.full_name || 'Owner', 'imported products', 'product', { rows: payload.length });
     return payload.length;
@@ -206,8 +211,8 @@ export default function Products() {
         footer={<><Button onClick={() => setImportOpen(false)}>Cancel</Button><Button variant="primary" loading={importer.isPending} onClick={() => fileRef.current?.click()}>Choose CSV file</Button></>}>
         <div className="space-y-3 text-sm text-zinc-600">
           <p>The first line must name the columns. Supported columns:</p>
-          <p className="rounded-lg bg-zinc-100 p-3 font-mono text-xs">name,price,cost,qty,category,barcode,low_stock,base_unit,bulk_unit,units_per_bulk</p>
-          <p>Only <b>name</b> is required. Amounts are whole Rwandan Francs.</p>
+          <p className="rounded-lg bg-zinc-100 p-3 font-mono text-xs">name,price,cost,qty,category,barcode,low_stock,base_unit,bulk_unit,units_per_bulk,expiry_date</p>
+          <p>Only <b>name</b> is required. Amounts are whole Rwandan Francs; dates are YYYY-MM-DD.</p>
           <input ref={fileRef} type="file" accept=".csv,text/csv" hidden onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) importer.mutate(f, { onSuccess: () => setImportOpen(false) }); }} />
         </div>
       </Dialog>
